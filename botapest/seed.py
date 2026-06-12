@@ -6,6 +6,7 @@ to aggregate files into one building per N-segment path prefix.
 """
 import subprocess
 import time
+from collections import Counter
 from fnmatch import fnmatch
 from pathlib import Path
 
@@ -53,6 +54,7 @@ def seed(repo: str, zone: dict) -> dict:
 
     group = {c["id"]: c.get("group") for c in zone["components"]}
     buildings: dict[str, dict] = {}
+    exts: dict[str, Counter] = {}
     now = time.time()
     for f in sorted(files):
         depth = group[comp[f]]
@@ -65,4 +67,7 @@ def seed(repo: str, zone: dict) -> dict:
         if last[f]:
             b["age_days"] = min(b["age_days"], round((now - last[f]) / 86400))
         b["files"] += 1
+        exts.setdefault(key, Counter())[Path(f).suffix.lstrip(".").lower()] += 1
+    for key, b in buildings.items():
+        b["ext"] = exts[key].most_common(1)[0][0]
     return {"zone": zone, "buildings": list(buildings.values())}

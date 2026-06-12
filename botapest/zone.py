@@ -12,9 +12,24 @@ from .seed import git
 LAYERS = ["back", "mid", "front", "under"]
 FRONT = ("frontend", "front", "ui", "web", "client", "www", "app", "site", "landing", "docs", "doc", "examples")
 BACK = ("db", "database", "storage", "data", "store", "migrations", "models")
-UNDER = ("tests", "test", "testing", "github", "scripts", "infra", "ci", "tools", "build", "deploy", "tmp")
+UNDER = ("tests", "test", "testing", "github", "scripts", "infra", "ci", "tools", "build",
+         "deploy", "docker", "tmp")
 PALETTE = ["#5b8dd9", "#b5651d", "#16a085", "#d4a953", "#8e5d9f", "#2980b9",
            "#c0395b", "#4a6b5c", "#c9b78a", "#5c6b73"]
+KINDS = [(("tests", "test", "testing"), "tests"),
+         (UNDER, "infra"),                       # before docs: "docker" must not match "doc"
+         (("docs", "doc", "examples"), "docs"),
+         (("api",), "api"),
+         (BACK, "storage"),
+         (FRONT, "frontend")]
+
+
+def guess_kind(name: str) -> str:
+    n = name.lower().lstrip(".")
+    for prefixes, kind in KINDS:
+        if any(n.startswith(k) for k in prefixes):
+            return kind
+    return "service"
 
 
 def guess_layer(name: str) -> str:
@@ -35,7 +50,7 @@ def auto_zone(repo: str) -> dict:
     for i, (d, n) in enumerate(counts.most_common()):
         if n < 3:
             continue
-        comp = {"id": d, "name": d, "layer": guess_layer(d), "kind": "auto",
+        comp = {"id": d, "name": d, "layer": guess_layer(d), "kind": guess_kind(d),
                 "color": PALETTE[i % len(PALETTE)], "globs": [f"{d}/*"]}
         if n > 150:
             comp["group"] = 3                       # huge dirs: one building per subdir
