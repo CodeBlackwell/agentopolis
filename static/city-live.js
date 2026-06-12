@@ -6,7 +6,7 @@ let cityState = null;
 
 fetch('city-data.json').then(r => r.json()).then(data => {
   cityState = City.layout(data);
-  City.fit(cityCam, cityCanvas, cityState, 115, 30);
+  City.fit(cityCam, cityCanvas, cityState, 115, 30, 1.18);
   requestAnimationFrame(function frame(t) {
     cityCtx.clearRect(0, 0, cityCanvas.width, cityCanvas.height);
     City.draw(cityCtx, cityCam, cityState, t);

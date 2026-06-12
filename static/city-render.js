@@ -1,15 +1,22 @@
-// Botapest City lib — layout from zoning + git seed, iso drawing, live growth.
-// Everything is scoped; pages talk to the `City` object only.
+// Botapest City lib — strip-packed layout from zoning + git seed, iso drawing, live growth.
+// Pages talk to the `City` object; CityScape (loaded after) draws ground/water/props.
 const City = (() => {
   const HW = 26, HH = 13, FLOOR = 14;
   const proj = (cam, x, y) => ({ sx: cam.ox + (x - y) * HW * cam.s, sy: cam.oy + (x + y) * HH * cam.s });
   const lift = (p, h) => ({ sx: p.sx, sy: p.sy - h });
   const hash = s => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const depth = (a, b) => (a.x + a.y) - (b.x + b.y);
 
   function shade(hex, f) {
     const n = parseInt(hex.slice(1), 16);
     const c = v => Math.round(Math.min(255, v * f));
     return `rgb(${c(n >> 16)},${c((n >> 8) & 255)},${c(n & 255)})`;
+  }
+
+  function mix(hexA, hexB, k) {
+    const a = parseInt(hexA.slice(1), 16), b = parseInt(hexB.slice(1), 16);
+    const ch = sh => Math.round(((a >> sh) & 255) * (1 - k) + ((b >> sh) & 255) * k);
+    return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
   }
 
   function quad(ctx, a, b, c, d, fill) {
@@ -20,50 +27,99 @@ const City = (() => {
     ctx.fill();
   }
 
+  // ---- layout: pack districts into full-width layer strips, lots back-to-front ----
   function layout(data) {
+    const state = { zone: data.zone, blocks: [], buildings: [], props: [],
+                    byPath: new Map(), items: [], clouds: [], cityHall: null };
     const byComp = {};
     for (const b of data.buildings) (byComp[b.component] ??= []).push(b);
-    let bandY = 0;
-    const bands = [];
-    for (const layer of data.zone.layers) {
-      const band = { blocks: [], width: 0 };
-      let bx = 0, maxRows = 0;
-      for (const comp of data.zone.components.filter(c => c.layer === layer)) {
-        const list = byComp[comp.id] || [];
-        const cols = list.length ? Math.max(2, Math.round(Math.sqrt(list.length * 2.4))) : 4;
-        const rows = list.length ? Math.ceil(list.length / cols) : 3;
-        band.blocks.push({ comp, list, x0: bx, y0: bandY, cols, rows, next: list.length });
-        bx += cols + 2;
-        maxRows = Math.max(maxRows, rows);
-      }
-      band.width = bx - 2;
-      bandY += maxRows + 2.5;
-      bands.push(band);
-    }
-    const w = Math.max(...bands.map(b => b.width));
-    for (const band of bands)
-      for (const block of band.blocks) block.x0 += (w - band.width) / 2;
 
-    const state = { zone: data.zone, blocks: bands.flatMap(b => b.blocks),
-                    buildings: [], byPath: new Map(), clouds: [], cityHall: null, w, h: bandY };
-    for (const block of state.blocks) {
-      block.list.forEach((b, i) => place(state, block, b, i));
-      if (block.comp.kind === 'civic')
-        state.cityHall = { x: block.x0 + block.cols / 2, y: block.y0 + block.rows / 2 };
+    let W = Math.min(80, Math.max(24, Math.round(1.9 * Math.sqrt(data.buildings.length + 30))));
+    const strips = [];
+    for (const layer of data.zone.layers) {
+      const comps = data.zone.components.filter(c => c.layer === layer);
+      if (!comps.length) continue;
+      const lists = comps.map(c => byComp[c.id] || []);
+      const need = comps.map((c, i) => c.kind === 'civic' ? 12 : Math.max(1, lists[i].length));
+      const total = need.reduce((a, b) => a + b, 0);
+      const streets = comps.length - 1;
+      const rows = Math.max(2, Math.ceil(total / (W - streets - 2)));
+      const widths = need.map(n => Math.max(Math.ceil(n / rows),
+        Math.min(Math.ceil(n / rows) + 1, Math.round((W - streets) * n / total))));
+      strips.push({ comps, lists, rows, widths, used: widths.reduce((a, b) => a + b, 0) + streets });
     }
-    state.buildings.sort((a, b) => (a.x + a.y) - (b.x + b.y));
+    W = Math.max(W, ...strips.map(s => s.used));
+
+    let y = 0;
+    for (const strip of strips) {
+      let x = Math.floor((W - strip.used) / 2);
+      strip.comps.forEach((comp, i) => {
+        const block = { comp, list: strip.lists[i], x0: x, y0: y,
+                        cols: strip.widths[i], rows: strip.rows, lots: [], next: 0,
+                        pave: [mix('#57455a', comp.color, .22), mix('#4d3d50', comp.color, .22)] };
+        for (let r = 0; r < block.rows; r++)
+          for (let c = 0; c < block.cols; c++)
+            block.lots.push({ x: x + c + .5, y: y + r + .5 });
+        state.blocks.push(block);
+        x += strip.widths[i] + 1;
+      });
+      y += strip.rows + 1;                          // avenue after each strip
+    }
+    state.W = W;
+    state.H = y;
+    buildGround(state);
+    for (const block of state.blocks) fillBlock(state, block);
+    state.items = [...state.buildings, ...state.props].sort(depth);
     state.clouds = data.zone.clouds.map((c, i) => ({ name: c.name, tether: c.tether, band: 60 + (i % 2) * 52 }));
     return state;
   }
 
+  // codes: 0 street, 1 avenue, 2 green, 3 plaza, 10+i district pavement
+  function buildGround(state) {
+    const g = Array.from({ length: state.H }, () => new Array(state.W).fill(2));
+    state.blocks.forEach((block, i) => {
+      for (let r = 0; r < block.rows; r++) {
+        for (let c = 0; c < block.cols; c++)
+          g[block.y0 + r][block.x0 + c] = block.comp.kind === 'civic' ? 3 : 10 + i;
+        if (block.x0 + block.cols < state.W) g[block.y0 + r][block.x0 + block.cols] = 0;
+      }
+    });
+    for (const block of state.blocks)                       // avenue row under each strip
+      for (let x = 0; x < state.W; x++) g[block.y0 + block.rows][x] = 1;
+    g.forEach((row, y) => row.forEach((code, x) => {
+      const h = hash(`g${x},${y}`);
+      if (code === 2 && h % 3 === 0) state.props.push({ kind: 'tree', x: x + .5, y: y + .5, seed: h });
+      if (code === 1 && x % 6 === 3 && h % 2) state.props.push({ kind: 'lamp', x: x + .5, y: y + .6, seed: h });
+    }));
+    state.ground = g;
+  }
+
+  function fillBlock(state, block) {
+    const under = block.comp.layer === 'under';
+    for (const b of block.list)
+      b.floors = under ? 1 : 1 + b.centrality + (b.commits >= 12 ? 1 : 0);
+    block.list.sort((a, b) => b.floors - a.floors);         // towers at the strip's back
+    block.list.forEach((b, i) => place(state, block, b, i));
+    block.next = block.list.length;
+    for (let i = block.next; i < block.lots.length; i++) {  // leftover lots get dressing
+      const h = hash(block.comp.id + i);
+      const kind = under ? (h % 3 ? 'car' : 'crates')
+                 : h % 4 === 0 ? 'tree' : h % 4 === 1 ? 'car' : null;
+      if (kind) state.props.push({ kind, ...block.lots[i], seed: h, block, lot: i });
+    }
+    if (block.comp.kind === 'civic')
+      state.cityHall = { x: block.x0 + block.cols / 2, y: block.y0 + block.rows / 2 };
+  }
+
   function place(state, block, b, i) {
     const under = block.comp.layer === 'under';
-    b.x = block.x0 + (i % block.cols) + .5;
-    b.y = block.y0 + Math.floor(i / block.cols) + .5;
+    const lot = block.lots[i];
+    b.x = lot.x;
+    b.y = lot.y;
     b.color = block.comp.color;
-    b.floors ??= under ? 1 : 1 + b.centrality + (b.commits >= 12 ? 1 : 0);
     b.heightScale = under ? .35 : 1;
-    b.foot = .55 + .38 * Math.min(1, Math.log10(b.loc + 1) / 4);
+    b.foot = b.floors === 1 && !under ? .96                 // minnows join into terraces
+           : .55 + .38 * Math.min(1, Math.log10(b.loc + 1) / 4);
     b.lit ??= Math.max(0, 1 - b.age_days / 240);
     state.buildings.push(b);
     state.byPath.set(b.path, b);
@@ -75,12 +131,15 @@ const City = (() => {
   function addBuilding(state, path) {
     const comp = state.zone.components.find(c => c.globs.some(g => matches(path, g)));
     const block = state.blocks.find(bl => bl.comp === comp);
-    if (!block) return null;
+    if (!block || block.next >= block.lots.length) return null;
     const b = { path, component: comp.id, loc: 30, commits: 0, centrality: 0, age_days: 0,
                 files: 1, floors: 1, lit: 1, born: performance.now() };
-    place(state, block, b, block.next++);
-    block.rows = Math.max(block.rows, Math.ceil(block.next / block.cols));
-    state.buildings.sort((x, y) => (x.x + x.y) - (y.x + y.y));
+    const i = block.next++;
+    const prop = state.props.find(p => p.block === block && p.lot === i);
+    if (prop) prop.hidden = true;
+    place(state, block, b, i);
+    state.items.push(b);
+    state.items.sort(depth);
     return b;
   }
 
@@ -98,15 +157,16 @@ const City = (() => {
     if (['Edit', 'Write', 'NotebookEdit'].includes(e.tool)) b.scaffold = true;
   }
 
-  function fit(cam, canvas, state, reserve = 210, bias = 55) {
-    cam.s = Math.min((canvas.width - 40) / ((state.w + state.h) * HW),
-                     (canvas.height - reserve) / ((state.w + state.h) * HH));
+  function fit(cam, canvas, state, reserve = 210, bias = 55, overscan = 1) {
+    cam.s = overscan * Math.min((canvas.width - 40) / ((state.W + state.H) * HW),
+                                (canvas.height - reserve) / ((state.W + state.H) * HH));
     cam.ox = 0; cam.oy = 0;
-    const center = proj(cam, state.w / 2, state.h / 2);
+    const center = proj(cam, state.W / 2, state.H / 2);
     cam.ox = canvas.width / 2 - center.sx;
     cam.oy = canvas.height / 2 + bias - center.sy;
   }
 
+  // ---- buildings ----
   function drawBuilding(ctx, cam, b, t) {
     const pop = b.born ? Math.min(1, (t - b.born) / 600) : 1;
     const f = b.foot * pop / 2;
@@ -118,6 +178,7 @@ const City = (() => {
     quad(ctx, base[2], base[1], top[1], top[2], shade(b.color, .75));
     quad(ctx, top[0], top[1], top[2], top[3], shade(b.color, 1.05));
     if (h > 14 * cam.s) drawWindows(ctx, cam, base, h, b, t);
+    if (pop === 1) roofProps(ctx, cam, b, top, t);
     if (b.scaffold) drawScaffold(ctx, cam, base, h);
     if (b.flash && t - b.flash < 1500) drawFlash(ctx, cam, top, (t - b.flash) / 1500);
     b.screen = { sx: (base[1].sx + base[3].sx) / 2, top: top[2].sy - 4,
@@ -137,6 +198,26 @@ const City = (() => {
           ctx.fillRect(x - 2 * cam.s, yy, 4 * cam.s, 5 * cam.s);
         }
       }
+    }
+  }
+
+  function roofProps(ctx, cam, b, top, t) {
+    const s = cam.s, seed = hash(b.path);
+    const cx = (top[1].sx + top[3].sx) / 2, cy = (top[0].sy + top[2].sy) / 2;
+    if (b.floors >= 6 && seed % 2) {
+      ctx.strokeStyle = '#1a0a16';
+      ctx.lineWidth = Math.max(1, 1.2 * s);
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - 13 * s); ctx.stroke();
+      ctx.fillStyle = `rgba(255,90,90,${.45 + .4 * Math.sin(t / 420 + seed)})`;
+      ctx.fillRect(cx - 1.5 * s, cy - 16 * s, 3 * s, 3 * s);
+    } else if (b.floors >= 3 && seed % 3 === 0) {
+      ctx.fillStyle = '#4a3a4e';
+      ctx.fillRect(cx - 4 * s, cy - 8 * s, 8 * s, 8 * s);
+      ctx.fillStyle = '#5d4a61';
+      ctx.beginPath(); ctx.ellipse(cx, cy - 8 * s, 4 * s, 2 * s, 0, 0, Math.PI * 2); ctx.fill();
+    } else if (b.floors >= 2 && seed % 5 === 0) {
+      ctx.fillStyle = '#8a8f98';
+      ctx.fillRect(cx - 3 * s, cy - 4 * s, 6 * s, 4 * s);
     }
   }
 
@@ -195,19 +276,24 @@ const City = (() => {
     ctx.fillStyle = '#f9efe3';
     for (const [dx, dy, w, h] of [[-30, -8, 60, 16], [-18, -18, 36, 14], [-6, 2, 42, 12]])
       ctx.fillRect(x + dx * s, sy + dy * s, w * s, h * s);
-    ctx.fillStyle = '#f9efe3';
     ctx.font = `bold ${Math.max(8, 9 * s)}px Silkscreen, monospace`;
     ctx.textAlign = 'center';
     ctx.fillText(cloud.name, x, sy - 24 * s);
   }
 
   function draw(ctx, cam, state, t) {
-    for (const b of state.buildings) drawBuilding(ctx, cam, b, t);
+    CityScape.drawHorizon(ctx, cam, state, t);
+    CityScape.drawWater(ctx, cam, state, t);
+    CityScape.drawGround(ctx, cam, state, t);
+    for (const it of state.items) {
+      if (it.kind) { if (!it.hidden) CityScape.drawProp(ctx, cam, it, t); }
+      else drawBuilding(ctx, cam, it, t);
+    }
     if (state.cityHall) drawCityHall(ctx, cam, state.cityHall.x, state.cityHall.y);
-    ctx.fillStyle = 'rgba(243,207,217,.75)';
+    ctx.fillStyle = 'rgba(243,207,217,.6)';
     for (const block of state.blocks) {
-      const p = proj(cam, block.x0 + block.cols / 2, block.y0 + block.rows + .6);
-      ctx.font = `${Math.max(7, 9 * cam.s)}px Silkscreen, monospace`;
+      const p = proj(cam, block.x0 + block.cols / 2, block.y0 + block.rows + .55);
+      ctx.font = `${Math.max(7, 8 * cam.s)}px Silkscreen, monospace`;
       ctx.textAlign = 'center';
       ctx.fillText(block.comp.name.toUpperCase(), p.sx, p.sy);
     }
@@ -228,5 +314,5 @@ const City = (() => {
     return hit;
   }
 
-  return { layout, fit, draw, applyEvent, pick, proj };
+  return { layout, fit, draw, applyEvent, pick, proj, hash, shade, mix };
 })();
