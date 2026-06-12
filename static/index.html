@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Grand Botapest Hotel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🛎️</text></svg>">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Limelight&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pink: #f3cfd9;
+    --pink-deep: #e8a8bd;
+    --plum: #3d1832;
+    --plum-soft: #5a2c4d;
+    --gold: #d4a953;
+    --cream: #f9efe3;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    background: var(--pink);
+    background-image:
+      repeating-linear-gradient(45deg, transparent 0 22px, rgba(232,168,189,.35) 22px 44px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 28px 16px 40px;
+    color: var(--plum);
+  }
+  header { text-align: center; margin-bottom: 22px; }
+  header h1 {
+    font-family: 'Limelight', cursive;
+    font-size: clamp(28px, 5vw, 52px);
+    letter-spacing: .06em;
+    color: var(--plum);
+    text-shadow: 3px 3px 0 var(--gold);
+  }
+  header .rule {
+    width: 320px; max-width: 70vw;
+    margin: 10px auto 6px;
+    border-top: 3px double var(--plum);
+  }
+  header p {
+    font-family: 'Silkscreen', monospace;
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+  #lamp { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+          background: #c0392b; margin-right: 6px; vertical-align: 1px; }
+  #lamp.on { background: #27ae60; box-shadow: 0 0 6px #27ae60; }
+  .frame {
+    background: var(--plum);
+    padding: 14px;
+    border: 4px solid var(--gold);
+    box-shadow: 0 18px 40px rgba(61,24,50,.45), inset 0 0 0 2px var(--plum-soft);
+  }
+  canvas { display: block; image-rendering: pixelated; background: #2a1024; }
+  #ticker {
+    width: 992px; max-width: 95vw;
+    margin-top: 18px;
+    background: var(--cream);
+    border: 3px solid var(--plum);
+    box-shadow: 5px 5px 0 var(--plum);
+    font-family: 'Silkscreen', monospace;
+    font-size: 10px;
+    max-height: 150px;
+    overflow-y: auto;
+  }
+  #ticker div { padding: 4px 12px; border-bottom: 1px dashed var(--pink-deep); }
+  #ticker div:first-child { background: var(--pink); }
+  #ticker .t { color: var(--plum-soft); margin-right: 8px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>The Grand Botapest Hotel</h1>
+    <div class="rule"></div>
+    <p><span id="lamp"></span>agents at your service &middot; est. 2026</p>
+  </header>
+  <div class="frame"><canvas id="hotel" width="964" height="560"></canvas></div>
+  <div id="ticker"></div>
+  <script src="render.js"></script>
+  <script src="hotel.js"></script>
+</body>
+</html>
