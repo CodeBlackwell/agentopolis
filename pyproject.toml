@@ -1,6 +1,6 @@
 [project]
 name = "botapest"
-version = "0.2.1"
+version = "0.3.0"
 description = "Botapest City — Habbo-style visualization of Claude Code agents building your repo as a city"
 readme = "README.md"
 license = "MIT"
