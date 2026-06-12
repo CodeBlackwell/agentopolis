@@ -47,7 +47,10 @@ def main() -> None:
         runner = uvicorn.Server(uvicorn.Config(server.app, port=args.port,
                                                log_level="warning", timeout_graceful_shutdown=2))
         server.runner = runner
-        runner.run()
+        try:
+            runner.run()
+        except KeyboardInterrupt:           # uvicorn re-raises the Ctrl+C after shutdown
+            pass
 
 
 if __name__ == "__main__":
