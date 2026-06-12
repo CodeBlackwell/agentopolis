@@ -1,9 +1,26 @@
 """botapest — run from any git repo to watch agents build its city."""
 import argparse
+import subprocess
+import time
 
 import uvicorn
 
 from . import hooks, server
+
+
+def free_port(port: int) -> None:
+    holders = lambda: subprocess.run(["lsof", "-ti", f":{port}"],
+                                     capture_output=True, text=True).stdout.split()
+    pids = holders()
+    if not pids:
+        return
+    print(f"freeing port {port} (pid {', '.join(pids)})")
+    for sig in ("-TERM", "-KILL"):
+        subprocess.run(["kill", sig, *pids], capture_output=True)
+        for _ in range(20):
+            if not holders():
+                return
+            time.sleep(.1)
 
 
 def main() -> None:
@@ -22,6 +39,7 @@ def main() -> None:
     elif args.command == "detach":
         hooks.detach()
     else:
+        free_port(args.port)
         server.configure(args.repo, args.zone)
         print(f"Botapest City on http://localhost:{args.port} (repo: {args.repo})")
         uvicorn.run(server.app, port=args.port, log_level="warning")
