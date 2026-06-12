@@ -18,6 +18,11 @@ function cityHandle(e) {
   if (cityState) City.applyEvent(cityState, e);
 }
 
+window.addEventListener('keydown', e => {
+  if (e.key === 'q' || e.key === 'e')
+    cityCam.rot = ((cityCam.rot || 0) + (e.key === 'q' ? 1 : 3)) % 4;
+});
+
 cityCanvas.addEventListener('mousemove', m => {
   const r = cityCanvas.getBoundingClientRect();
   const hit = cityState && City.pick(cityState,

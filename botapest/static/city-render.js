@@ -1,11 +1,15 @@
-// Botapest City lib — strip-packed layout from zoning + git seed, iso drawing, live growth.
+// Botapest City lib — diamond-ring radial layout from zoning + git seed, iso drawing, live growth.
 // Pages talk to the `City` object; CityScape (loaded after) draws ground/water/props.
 const City = (() => {
   const HW = 26, HH = 13, FLOOR = 14;
-  const proj = (cam, x, y) => ({ sx: cam.ox + (x - y) * HW * cam.s, sy: cam.oy + (x + y) * HH * cam.s });
+  const proj = (cam, x, y) => {
+    for (let i = cam.rot || 0; i--;) { const t = x; x = cam.cx + y - cam.cy; y = cam.cy + cam.cx - t; }
+    return { sx: cam.ox + (x - y) * HW * cam.s, sy: cam.oy + (x + y) * HH * cam.s };
+  };
   const lift = (p, h) => ({ sx: p.sx, sy: p.sy - h });
   const hash = s => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
-  const depth = (a, b) => (a.x + a.y) - (b.x + b.y);
+  const DKEY = [p => p.x + p.y, p => p.y - p.x, p => -p.x - p.y, p => p.x - p.y];   // painter's key per quarter turn
+  const spin = (cam, pts) => cam.rot ? pts.map((_, j, a) => a[(j + cam.rot) % 4]) : pts;
   const q = (vals, k) => vals.sort((x, y) => x - y)[Math.floor(vals.length * k)] ?? 0;
 
   function shade(hex, f) {
@@ -28,96 +32,89 @@ const City = (() => {
     ctx.fill();
   }
 
-  // ---- layout: pack districts into full-width layer strips, lots back-to-front ----
+  // ---- layout: concentric diamond rings around the civic plaza, districts as angular wedges ----
   function layout(data) {
     const state = { zone: data.zone, blocks: [], buildings: [], props: [],
                     byPath: new Map(), items: [], clouds: [], cityHall: null };
     const byComp = {};
     for (const b of data.buildings) (byComp[b.component] ??= []).push(b);
 
-    let W = Math.min(80, Math.max(24, Math.round(1.9 * Math.sqrt(data.buildings.length + 30))));
-    const strips = [];
-    for (const layer of data.zone.layers) {
-      const comps = data.zone.components.filter(c => c.layer === layer);
-      if (!comps.length) continue;
+    const groups = [data.zone.components.filter(c => c.kind === 'civic'),
+                    ...data.zone.layers.map(l =>
+                      data.zone.components.filter(c => c.layer === l && c.kind !== 'civic'))];
+    const annuli = [];
+    let r = 2;                                              // rings 0-1 are the city-hall plaza
+    for (const comps of groups.filter(g => g.length)) {
       const lists = comps.map(c => byComp[c.id] || []);
-      const need = comps.map((c, i) => c.kind === 'civic' ? 12 : Math.max(1, lists[i].length));
+      const need = lists.map(l => Math.max(1, l.length) + 2);   // +2 spare lots for live growth
       const total = need.reduce((a, b) => a + b, 0);
-      const streets = comps.length - 1;
-      const rows = Math.max(2, Math.ceil(total / (W - streets - 2)));
-      const widths = need.map(n => Math.max(Math.ceil(n / rows),
-        Math.min(Math.ceil(n / rows) + 1, Math.round((W - streets) * n / total))));
-      strips.push({ layer, comps, lists, rows, widths,
-                    used: widths.reduce((a, b) => a + b, 0) + streets });
+      let r1 = r, cap = 0;                                  // ring r holds 8r tiles minus 4 spokes;
+      while (cap < total) { if ((r1 - r) % 3 !== 2) cap += 8 * r1 - 4; r1++; }   // every 3rd ring is a street
+      annuli.push({ comps, lists, need, r0: r, r1, layer: comps[0].layer, tiles: [] });
+      r = r1 + 2 + hash(`canal${annuli.length}`) % 2;       // canal between annuli, 2-3 rings wide
     }
-    W = Math.max(W, ...strips.map(s => s.used));
-
-    let y = 0;
-    for (const strip of strips) {
-      if (!state.river && y && ['front', 'under'].includes(strip.layer)) {
-        state.river = { y0: y, rows: 3 };                   // the Danube: back-of-stack bank | front bank
-        state.bridges = [.28, .52, .76].map(k => Math.round(W * k));
-        y += 4;                                             // +1 green promenade so towers don't hide the water
-      }
-      let x = Math.floor((W - strip.used) / 2);
-      strip.comps.forEach((comp, i) => {
-        const block = { comp, list: strip.lists[i], x0: x, y0: y,
-                        cols: strip.widths[i], rows: strip.rows, lots: [], next: 0, carved: new Set(),
-                        pave: [mix('#57455a', comp.color, .22), mix('#4d3d50', comp.color, .22)] };
-        let cap = block.rows * block.cols;                  // keep ≥2 spare lots for live growth
-        for (let r = 0; r < block.rows; r++)
-          for (let c = 0; c < block.cols; c++) {
-            const edge = !r || !c || r === block.rows - 1 || c === block.cols - 1;
-            if (edge && comp.kind !== 'civic' && cap > block.list.length + 2 &&
-                hash(`c${x + c},${y + r}`) % 3 === 0) { block.carved.add(`${x + c},${y + r}`); cap--; }
-            else block.lots.push({ x: x + c + .5, y: y + r + .5 });
-          }
-        state.blocks.push(block);
-        x += strip.widths[i] + 1;
-      });
-      y += strip.rows + 1;                          // avenue after each strip
-    }
+    const Rmax = r - 1, margin = 3, cx = margin + Rmax, cy = cx;
+    state.W = state.H = 2 * Rmax + 2 * margin + 1;
     if ((data.dead || []).length) {
       state.graves = data.dead.map((path, i) =>
-        ({ kind: 'grave', path, x: 2.5 + (i % 8) * 1.2, y: y + .7 + Math.floor(i / 8), seed: hash(path) }));
-      state.cemetery = { y0: y, rows: Math.ceil(state.graves.length / 8), x1: Math.min(W - 1, 13) };
+        ({ kind: 'grave', path, x: 2.5 + (i % 8) * 1.2, y: state.H + .7 + Math.floor(i / 8), seed: hash(path) }));
+      state.cemetery = { y0: state.H, rows: Math.ceil(state.graves.length / 8), x1: Math.min(state.W - 1, 13) };
       state.props.push(...state.graves);
-      y += state.cemetery.rows + 1;
+      state.H += state.cemetery.rows + 1;
     }
     state.deps = data.deps || [];
     state.docker = data.docker || 0;
-    state.W = W;
-    state.H = y;
-    buildGround(state);
+    state.cityHall = { x: cx + .5, y: cy + .5 };
+    buildGround(state, annuli, cx, cy, Rmax);
     state.cuts = {                                          // repo-relative thresholds, no absolutes
       commits: q(data.buildings.map(b => b.commits), 2 / 3),
       imports: q(data.buildings.map(b => b.imports || 0), .9),
       todos: q(data.buildings.map(b => b.todos || 0), .9) };
     for (const block of state.blocks) fillBlock(state, block);
-    state.items = [...state.buildings, ...state.props].sort(depth);
+    state.sortedRot = 0;
+    state.items = [...state.buildings, ...state.props].sort((a, b) => DKEY[0](a) - DKEY[0](b));
     state.clouds = data.zone.clouds.map((c, i) => ({ name: c.name, tether: c.tether, band: 60 + (i % 2) * 52 }));
     return state;
   }
 
   // codes: 0 street, 1 avenue, 2 green, 3 plaza, 4 river, 5 bridge, 6 cemetery, 10+i district pavement
-  function buildGround(state) {
+  function buildGround(state, annuli, cx, cy, Rmax) {
     const g = Array.from({ length: state.H }, () => new Array(state.W).fill(2));
-    state.blocks.forEach((block, i) => {
-      for (let r = 0; r < block.rows; r++) {
-        for (let c = 0; c < block.cols; c++)
-          if (!block.carved.has(`${block.x0 + c},${block.y0 + r}`))
-            g[block.y0 + r][block.x0 + c] = block.comp.kind === 'civic' ? 3 : 10 + i;
-        if (block.x0 + block.cols < state.W) g[block.y0 + r][block.x0 + block.cols] = 0;
+    for (let y = 0; y < state.H; y++)
+      for (let x = 0; x < state.W; x++) {
+        const dx = x - cx, dy = y - cy, rr = Math.max(Math.abs(dx), Math.abs(dy));
+        if (rr <= 1) g[y][x] = 3;                           // city-hall plaza
+        else if (rr > Rmax) continue;                       // parkland past the city limits
+        else {
+          const ann = annuli.find(a => rr >= a.r0 && rr < a.r1);
+          if (!ann) g[y][x] = !dx || !dy ? 5 : 4;           // grachtengordel: canal ring, spokes bridge it
+          else if (!dx || !dy) g[y][x] = 0;                 // 4 radial spokes
+          else if ((rr - ann.r0) % 3 === 2) g[y][x] = 1;    // minor ring street splits the wedge mass
+          else ann.tiles.push({ x, y, r: rr, a: Math.atan2(dy, dx) });
+        }
       }
-    });
-    for (const block of state.blocks)                       // avenue row under each strip
-      for (let x = 0; x < state.W; x++) g[block.y0 + block.rows][x] = 1;
-    if (state.river) {
-      for (let r = 0; r < state.river.rows; r++)
-        for (let x = 0; x < state.W; x++)
-          g[state.river.y0 + r][x] = state.bridges.some(b => x === b || x === b + 1) ? 5 : 4;
-      for (const b of state.bridges)                        // bridge ramps cross the promenade
-        g[state.river.y0 + state.river.rows][b] = g[state.river.y0 + state.river.rows][b + 1] = 0;
+    for (const ann of annuli) {
+      ann.tiles.sort((t1, t2) => t1.a - t2.a);              // atan2 seam lands on the west spoke
+      const total = ann.need.reduce((a, b) => a + b, 0);
+      let acc = 0, i0 = 0;
+      ann.comps.forEach((comp, k) => {
+        acc += ann.need[k];
+        const i1 = Math.round(ann.tiles.length * acc / total), id = state.blocks.length;
+        const block = { comp, list: ann.lists[k], lots: [], next: 0,
+                        pave: [mix('#57455a', comp.color, .22), mix('#4d3d50', comp.color, .22)] };
+        const tiles = ann.tiles.slice(i0, i1).sort((t1, t2) => t1.r - t2.r || t1.a - t2.a);
+        i0 = i1;
+        let cap = tiles.length;                             // keep ≥2 spare lots for live growth
+        for (const tl of tiles) {
+          if (tl.r === ann.r1 - 1 && comp.kind !== 'civic' && cap > block.list.length + 2 &&
+              hash(`c${tl.x},${tl.y}`) % 3 === 0) { cap--; continue; }   // ragged outskirts stay green
+          g[tl.y][tl.x] = comp.kind === 'civic' ? 3 : 10 + id;
+          block.lots.push({ x: tl.x + .5, y: tl.y + .5 });
+        }
+        block.lx = block.lots.reduce((a, l) => a + l.x, 0) / block.lots.length;
+        block.ly = block.lots.reduce((a, l) => a + l.y, 0) / block.lots.length;
+        state.blocks.push(block);
+      });
     }
     if (state.cemetery)
       for (let r = 0; r < state.cemetery.rows; r++)
@@ -139,11 +136,9 @@ const City = (() => {
                    age: q(block.list.map(b => b.age_days), 1 / 3) };
     for (const b of block.list)                             // each district spotlights its own active third
       b.billboard = b.commits > cuts.commits || b.age_days < cuts.age;
-    block.list.sort((a, b) => b.floors - a.floors);         // towers at the strip's back
+    block.list.sort((a, b) => b.floors - a.floors);         // lots run downtown→outskirts: towers center
     block.list.forEach((b, i) => place(state, block, b, i));
     block.next = block.list.length;
-    if (block.comp.kind === 'civic')
-      state.cityHall = { x: block.x0 + block.cols / 2, y: block.y0 + block.rows / 2 };
     for (let i = block.next; i < block.lots.length; i++) {  // leftover lots get dressing
       const lot = block.lots[i];
       if (state.cityHall && Math.abs(lot.x - state.cityHall.x) < 2 &&
@@ -188,7 +183,8 @@ const City = (() => {
     if (prop) prop.hidden = true;
     place(state, block, b, i);
     state.items.push(b);
-    state.items.sort(depth);
+    const k = DKEY[state.sortedRot];
+    state.items.sort((a, c) => k(a) - k(c));
     return b;
   }
 
@@ -207,6 +203,7 @@ const City = (() => {
   }
 
   function fit(cam, canvas, state, reserve = 210, bias = 55, overscan = 1) {
+    cam.cx = state.W / 2; cam.cy = state.H / 2;             // rotation pivot
     cam.s = overscan * Math.min((canvas.width - 40) / ((state.W + state.H) * HW),
                                 (canvas.height - reserve) / ((state.W + state.H) * HH));
     cam.ox = 0; cam.oy = 0;
@@ -219,8 +216,8 @@ const City = (() => {
   function drawBuilding(ctx, cam, b, t) {
     const pop = b.born ? Math.min(1, (t - b.born) / 600) : 1;
     const f = b.foot * pop / 2;
-    const base = [proj(cam, b.x - f, b.y - f), proj(cam, b.x + f, b.y - f),
-                  proj(cam, b.x + f, b.y + f), proj(cam, b.x - f, b.y + f)];
+    const base = spin(cam, [proj(cam, b.x - f, b.y - f), proj(cam, b.x + f, b.y - f),
+                            proj(cam, b.x + f, b.y + f), proj(cam, b.x - f, b.y + f)]);
     const h = b.floors * FLOOR * b.heightScale * pop * cam.s;
     const top = base.map(p => lift(p, h));
     quad(ctx, base[3], base[2], top[2], top[3], shade(b.color, .55));
@@ -358,8 +355,8 @@ const City = (() => {
 
   function drawPenthouse(ctx, cam, b, h) {                  // class-heavy: setback tier
     const f = b.foot * .3, hp = (8 + 3 * Math.min(3, b.classes)) * cam.s;
-    const base = [proj(cam, b.x - f, b.y - f), proj(cam, b.x + f, b.y - f),
-                  proj(cam, b.x + f, b.y + f), proj(cam, b.x - f, b.y + f)].map(p => lift(p, h));
+    const base = spin(cam, [proj(cam, b.x - f, b.y - f), proj(cam, b.x + f, b.y - f),
+                            proj(cam, b.x + f, b.y + f), proj(cam, b.x - f, b.y + f)]).map(p => lift(p, h));
     const top = base.map(p => lift(p, hp));
     quad(ctx, base[3], base[2], top[2], top[3], shade(b.color, .62));
     quad(ctx, base[2], base[1], top[1], top[2], shade(b.color, .85));
@@ -441,8 +438,8 @@ const City = (() => {
 
   function drawCityHall(ctx, cam, x, y) {
     const s = cam.s;
-    const box = (r, dz) => [proj(cam, x - r, y - r), proj(cam, x + r, y - r),
-                            proj(cam, x + r, y + r), proj(cam, x - r, y + r)]
+    const box = (r, dz) => spin(cam, [proj(cam, x - r, y - r), proj(cam, x + r, y - r),
+                                      proj(cam, x + r, y + r), proj(cam, x - r, y + r)])
                            .map(p => lift(p, dz));
     const iso = (pts, tops, color) => {
       quad(ctx, pts[3], pts[2], tops[2], tops[3], shade(color, .55));
@@ -489,26 +486,33 @@ const City = (() => {
   }
 
   function draw(ctx, cam, state, t) {
-    CityScape.drawHorizon(ctx, cam, state, t);
-    CityScape.drawWater(ctx, cam, state, t);
+    const R = cam.rot || 0;
+    if (state.sortedRot !== R) {                            // painter's order follows the camera
+      const k = DKEY[R];
+      state.items.sort((a, b) => k(a) - k(b));
+      state.sortedRot = R;
+    }
+    const flat = R ? { ...cam, rot: 0 } : cam;              // scenery stays screen-anchored
+    CityScape.drawHorizon(ctx, flat, state, t);
+    CityScape.drawWater(ctx, flat, state, t);
     CityScape.drawGround(ctx, cam, state, t);
-    if (state.deps.length) CityScape.drawStation(ctx, cam, state, t);
+    if (state.deps.length) CityScape.drawStation(ctx, flat, state, t);
     for (const it of state.items) {
       if (it.kind) { if (!it.hidden) CityScape.drawProp(ctx, cam, it, t); }
       else drawBuilding(ctx, cam, it, t);
     }
     if (state.cityHall) drawCityHall(ctx, cam, state.cityHall.x, state.cityHall.y);
-    if (state.docker) CityScape.drawPort(ctx, cam, state, t);
+    if (state.docker) CityScape.drawPort(ctx, flat, state, t);
     ctx.fillStyle = 'rgba(243,207,217,.6)';
     for (const block of state.blocks) {
-      const p = proj(cam, block.x0 + block.cols / 2, block.y0 + block.rows + .55);
+      const p = proj(cam, block.lx, block.ly + .55);
       ctx.font = `${Math.max(7, 8 * cam.s)}px Silkscreen, monospace`;
       ctx.textAlign = 'center';
       ctx.fillText(block.comp.name.toUpperCase(), p.sx, p.sy);
     }
     for (const c of state.clouds) {
       const block = state.blocks.find(bl => bl.comp.id === c.tether);
-      const a = proj(cam, block.x0 + block.cols / 2, block.y0 + block.rows / 2);
+      const a = proj(cam, block.lx, block.ly);
       c.sx = a.sx; c.ax = a.sx; c.ay = a.sy;
       c.sy = Math.min(c.band * Math.max(.8, cam.s), a.sy - 120 * cam.s);
       drawCloud(ctx, cam, c, t);

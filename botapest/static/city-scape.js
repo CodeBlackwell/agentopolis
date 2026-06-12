@@ -19,10 +19,10 @@ const CityScape = (() => {
         else if (code === 2) tile(ctx, cam, x, y, alt ? '#2c4a34' : '#28432f');
         else if (code === 3) tile(ctx, cam, x, y, alt ? '#e3d2b2' : '#d8c5a0');
         else if (code === 4) {
-          tile(ctx, cam, x, y, alt ? '#16323c' : '#142e38');
-          if ((x * 7 + y * 11) % 6 === 0) {                 // river shimmer
+          tile(ctx, cam, x, y, alt ? '#1d5a72' : '#1a5168');
+          if ((x * 7 + y * 11) % 4 === 0) {                 // canal shimmer
             const p = proj(cam, x + .5, y + .5);
-            ctx.strokeStyle = `rgba(190,228,238,${Math.max(0, .1 + .1 * Math.sin(t / 650 + x * 1.7 + y))})`;
+            ctx.strokeStyle = `rgba(190,228,238,${Math.max(0, .16 + .13 * Math.sin(t / 650 + x * 1.7 + y))})`;
             ctx.lineWidth = Math.max(1, cam.s);
             ctx.beginPath(); ctx.moveTo(p.sx - 5 * cam.s, p.sy); ctx.lineTo(p.sx + 5 * cam.s, p.sy); ctx.stroke();
           }
@@ -129,7 +129,7 @@ const CityScape = (() => {
     }
   }
 
-  function drawStation(ctx, cam, state, t) {                // package deps arrive as freight
+  function drawStation(ctx, cam, state, t) {                // package deps arrive by freight train
     const s = cam.s, x = -1.8;                              // open left edge: nothing occludes it
     ctx.strokeStyle = '#564a58';
     ctx.lineWidth = Math.max(1, 1.2 * s);
@@ -137,15 +137,38 @@ const CityScape = (() => {
       const a = proj(cam, x + dx, .5), b = proj(cam, x + dx, state.H - .5);
       ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
     }
-    const cars = state.deps.slice(0, Math.floor((state.H - 5) / 1.6));
+    const cars = state.deps.slice(0, Math.floor((state.H - 5) / 1.2));
+    const span = state.H + (cars.length + 4) * 1.2;         // track + off-screen lead for the loop
+    const head = (t / 700) % span;                          // engine crawls toward the depot
+    const at = k => head - 2.5 - k * 1.2;                   // coupled cars trail the engine
     cars.forEach((dep, i) => {
-      const p = proj(cam, x + .15, 4.5 + i * 1.6), seed = hash(dep);
+      const y = at(i + 1);
+      if (y < .5 || y > state.H - 1) return;
+      const p = proj(cam, x + .15, y), seed = hash(dep);
       ctx.fillStyle = CARS[seed % CARS.length];
       ctx.fillRect(p.sx - 8 * s, p.sy - 9 * s, 16 * s, 7 * s);
       ctx.fillStyle = '#1a0a16';
       ctx.fillRect(p.sx - 6 * s, p.sy - 2.5 * s, 3 * s, 2.5 * s);
       ctx.fillRect(p.sx + 3 * s, p.sy - 2.5 * s, 3 * s, 2.5 * s);
     });
+    const ey = at(0);
+    if (ey >= .5 && ey <= state.H - 1) {                    // locomotive
+      const p = proj(cam, x + .15, ey);
+      ctx.fillStyle = '#2b2230';
+      ctx.fillRect(p.sx - 9 * s, p.sy - 10 * s, 18 * s, 8 * s);
+      ctx.fillStyle = '#5a2c4d';
+      ctx.fillRect(p.sx - 8 * s, p.sy - 14 * s, 7 * s, 4 * s);
+      ctx.fillStyle = `rgba(255,214,120,${.6 + .3 * Math.sin(t / 300)})`;
+      ctx.fillRect(p.sx + 7 * s, p.sy - 8 * s, 2.5 * s, 2.5 * s);
+      ctx.fillStyle = '#1a0a16';
+      ctx.fillRect(p.sx - 6 * s, p.sy - 2.5 * s, 3 * s, 2.5 * s);
+      ctx.fillRect(p.sx + 3 * s, p.sy - 2.5 * s, 3 * s, 2.5 * s);
+      for (let i = 0; i < 3; i++) {                         // smoke puffs
+        const k = (t / 800 + i / 3) % 1, r = (2 + 3 * k) * s;
+        ctx.fillStyle = `rgba(200,200,212,${.3 * (1 - k)})`;
+        ctx.fillRect(p.sx - 5 * s - r / 2, p.sy - 14 * s - 9 * k * s - r, r, r);
+      }
+    }
     const d = proj(cam, x, state.H - 1.5);                  // depot at the open foreground end
     ctx.fillStyle = '#5a2c4d';
     ctx.fillRect(d.sx - 8 * s, d.sy - 14 * s, 16 * s, 14 * s);
