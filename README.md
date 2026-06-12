@@ -17,7 +17,7 @@ pan/zoom. The city re-seeds itself from git whenever HEAD moves.
 ## Install & run
 
 ```bash
-uv tool install /path/to/botapest   # installs the `botapest` CLI globally
+uv tool install botapest            # or: pipx install botapest
 botapest attach                     # one-time: fire-and-forget hooks into ~/.claude/settings.json
 
 cd ~/code/any-repo

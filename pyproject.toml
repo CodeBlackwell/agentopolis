@@ -2,6 +2,11 @@
 name = "botapest"
 version = "0.2.0"
 description = "Botapest City — Habbo-style visualization of Claude Code agents building your repo as a city"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "LeChristopher Blackwell", email = "codeblackwell@gmail.com" }]
+keywords = ["claude-code", "visualization", "agents", "isometric", "pixel-art"]
 requires-python = ">=3.11"
 dependencies = ["fastapi>=0.110", "uvicorn>=0.29"]
 
