@@ -27,6 +27,11 @@ const City = (() => {
     return [...pts.slice(k), ...pts.slice(0, k)];
   };
   const q = (vals, k) => vals.sort((x, y) => x - y)[Math.floor(vals.length * k)] ?? 0;
+  const near = (h, mx, my) => {                             // point within w of segment ax,ay→bx,by
+    const dx = h.bx - h.ax, dy = h.by - h.ay;
+    const u = Math.max(0, Math.min(1, ((mx - h.ax) * dx + (my - h.ay) * dy) / (dx * dx + dy * dy)));
+    return Math.hypot(mx - (h.ax + u * dx), my - (h.ay + u * dy)) < h.w;
+  };
 
   function shade(hex, f) {
     const n = parseInt(hex.slice(1), 16);
@@ -581,9 +586,10 @@ const City = (() => {
       state.items.sort((a, b) => k(a) - k(b));
       state.sortedRot = R;
     }
-    const flat = R ? { ...cam, rot: 0 } : cam;              // scenery stays screen-anchored
+    state.hits = [];                                        // hover targets rebuilt each frame
+    const flat = R ? { ...cam, rot: 0 } : cam;              // only the distant horizon stays screen-anchored
     CityScape.drawHorizon(ctx, flat, state, t);
-    CityScape.drawWater(ctx, flat, state, t);
+    CityScape.drawWater(ctx, cam, state, t);
     CityScape.drawGround(ctx, cam, state, t);
     if (state.deps.length) CityScape.drawStation(ctx, cam, state, t);   // the freight line hugs the grid
     for (const it of state.items) {
@@ -591,7 +597,7 @@ const City = (() => {
       else drawBuilding(ctx, cam, it, t);
     }
     if (state.cityHall) drawCityHall(ctx, cam, state.cityHall.x, state.cityHall.y);
-    if (state.docker) CityScape.drawPort(ctx, flat, state, t);
+    if (state.docker) CityScape.drawPort(ctx, cam, state, t);   // ships ride the rotating harbor
     ctx.fillStyle = 'rgba(243,207,217,.6)';
     for (const block of state.blocks) {
       const p = proj(cam, block.lx, block.ly + .55);
@@ -601,6 +607,7 @@ const City = (() => {
     }
     for (const c of state.clouds) {
       const block = state.blocks.find(bl => bl.comp.id === c.tether);
+      if (!block) continue;                                 // tether names an unbuilt district
       const a = proj(cam, block.lx, block.ly);
       c.sx = a.sx; c.ax = a.sx; c.ay = a.sy;
       c.sy = Math.min(c.band * Math.max(.8, cam.s), a.sy - 120 * cam.s);
@@ -609,12 +616,16 @@ const City = (() => {
   }
 
   function pick(state, mx, my) {
+    state.mouse = { mx, my };
     let hit = null;
     for (const b of state.buildings)
       if (b.screen && mx > b.screen.x0 && mx < b.screen.x1 && my > b.screen.y0 && my < b.screen.y1)
         hit = b;
+    for (const h of state.hits || [])
+      if (!hit && (h.ax !== undefined ? near(h, mx, my)
+                 : mx > h.x0 && mx < h.x1 && my > h.y0 && my < h.y1)) hit = h;
     return hit;
   }
 
-  return { layout, fit, draw, applyEvent, pick, proj, hash, shade, mix };
+  return { layout, fit, draw, applyEvent, pick, proj, hash, shade, mix, near };
 })();

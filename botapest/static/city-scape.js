@@ -1,6 +1,6 @@
 // Environment for Botapest City: ground fabric, waterfront, horizon, street props.
 const CityScape = (() => {
-  const { proj, hash } = City;
+  const { proj, hash, near } = City;
 
   function tile(ctx, cam, x, y, fill) {
     const a = proj(cam, x, y), b = proj(cam, x + 1, y), c = proj(cam, x + 1, y + 1), d = proj(cam, x, y + 1);
@@ -88,6 +88,15 @@ const CityScape = (() => {
 
   const CARS = ['#c0395b', '#2980b9', '#27ae60', '#d4a953', '#8e44ad', '#e67e22'];
 
+  function hit(ctx, state, r, s) {                          // register hover target; outline when under the mouse
+    state.hits.push(r);
+    const m = state.mouse;
+    if (!m || m.mx < r.x0 || m.mx > r.x1 || m.my < r.y0 || m.my > r.y1) return;
+    ctx.strokeStyle = '#ffd678';
+    ctx.lineWidth = Math.max(2, 2 * s);
+    ctx.strokeRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
+  }
+
   function drawProp(ctx, cam, p, t) {
     const { sx, sy } = proj(cam, p.x, p.y), s = cam.s, base = sy + 6 * s;
     if (p.kind === 'tree') {
@@ -150,6 +159,8 @@ const CityScape = (() => {
       ctx.fillStyle = '#1a0a16';
       ctx.fillRect(p.sx - 6 * s, p.sy - 2.5 * s, 3 * s, 2.5 * s);
       ctx.fillRect(p.sx + 3 * s, p.sy - 2.5 * s, 3 * s, 2.5 * s);
+      hit(ctx, state, { x0: p.sx - 8 * s, x1: p.sx + 8 * s, y0: p.sy - 9 * s, y1: p.sy,
+                        tip: `${dep} · freight car (package dep)` }, s);
     });
     const ey = at(0);
     if (ey >= .5 && ey <= state.H - 1) {                    // locomotive
@@ -167,6 +178,20 @@ const CityScape = (() => {
         const k = (t / 800 + i / 3) % 1, r = (2 + 3 * k) * s;
         ctx.fillStyle = `rgba(200,200,212,${.3 * (1 - k)})`;
         ctx.fillRect(p.sx - 5 * s - r / 2, p.sy - 14 * s - 9 * k * s - r, r, r);
+      }
+      hit(ctx, state, { x0: p.sx - 9 * s, x1: p.sx + 9 * s, y0: p.sy - 14 * s, y1: p.sy,
+                        tip: `freight line · ${state.deps.length} package deps` }, s);
+    }
+    const r0 = proj(cam, x + .15, .5), r1 = proj(cam, x + .15, state.H - .5);
+    const track = { ax: r0.sx, ay: r0.sy, bx: r1.sx, by: r1.sy, w: 9 * s,
+                    tip: `${state.deps.length} packages: ${state.deps.join(' · ')}` };
+    state.hits.push(track);                                 // after cars: a car under the mouse wins
+    if (state.mouse && near(track, state.mouse.mx, state.mouse.my)) {
+      ctx.strokeStyle = 'rgba(255,214,120,.8)';
+      ctx.lineWidth = Math.max(2, 2 * s);
+      for (const dx of [0, .3]) {
+        const a = proj(cam, x + dx, .5), b = proj(cam, x + dx, state.H - .5);
+        ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
       }
     }
     const d = proj(cam, x, state.H - 1.5);                  // depot at the open foreground end
@@ -197,6 +222,8 @@ const CityScape = (() => {
       }
       ctx.fillStyle = `rgba(255,90,90,${.45 + .4 * Math.sin(t / 700 + i)})`;
       ctx.fillRect(p.sx + 15.5 * s, sy - 11 * s, 2 * s, 2 * s);
+      hit(ctx, state, { x0: p.sx - 23 * s, x1: p.sx + 20 * s, y0: sy - 11 * s, y1: sy + 9 * s,
+                        tip: `container ship · ${state.docker} docker/compose file${state.docker > 1 ? 's' : ''}` }, s);
     }
   }
 

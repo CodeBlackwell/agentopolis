@@ -51,9 +51,9 @@
     align-items: flex-start;
     width: 100%;
   }
-  /* frame width derived from the height budget: canvases stack at 1060/1280 of width */
+  /* frame width derived from the height budget: canvases stack at 1140/1280 of width */
   .frame {
-    width: min(calc((100vh - 160px) * 1.16), calc(100vw - 400px));
+    width: min(calc((100vh - 160px) * 1.12), calc(100vw - 400px));
   }
   #citybg, #hotel { width: 100%; height: auto; }
   header p {
@@ -74,6 +74,19 @@
   canvas { display: block; image-rendering: pixelated; background: #2a1024; }
   #citybg { background: linear-gradient(#241020 0%, #3d1832 60%, #2a1024 100%); cursor: grab; }
   #citybg:active { cursor: grabbing; }
+  .mapwrap { position: relative; }
+  #mapctl {
+    position: absolute; top: 10px; right: 10px;
+    display: grid; grid-template-columns: repeat(2, 26px); gap: 4px;
+    background: rgba(42,16,36,.82); border: 2px solid var(--gold); padding: 5px;
+  }
+  #mapctl button {
+    width: 26px; height: 26px; line-height: 1; cursor: pointer;
+    background: var(--plum-soft); color: var(--cream); border: 1px solid var(--gold);
+    font-family: 'Silkscreen', monospace; font-size: 13px;
+  }
+  #mapctl button:hover { background: var(--gold); color: var(--plum); }
+  #mapctl .wide { grid-column: span 2; width: auto; }
   .plaque {
     background: var(--gold); color: var(--plum);
     font-family: 'Silkscreen', monospace; font-size: 10px;
@@ -131,9 +144,18 @@
   </header>
   <div id="main">
     <div class="frame">
-      <canvas id="citybg" width="1280" height="500"></canvas>
+      <div class="mapwrap">
+        <canvas id="citybg" width="1280" height="500"></canvas>
+        <div id="mapctl">
+          <button data-act="rot-" title="rotate left (Q)">&#8634;</button>
+          <button data-act="rot+" title="rotate right (E)">&#8635;</button>
+          <button data-act="zoom+" title="zoom in">+</button>
+          <button data-act="zoom-" title="zoom out">&minus;</button>
+          <button data-act="reset" class="wide" title="reset view">reset</button>
+        </div>
+      </div>
       <div class="plaque">city hall &middot; dispatch floor</div>
-      <canvas id="hotel" width="1280" height="560"></canvas>
+      <canvas id="hotel" width="1280" height="640"></canvas>
     </div>
     <div id="side">
       <div id="legend">
@@ -157,6 +179,7 @@
   <script src="city-scape.js"></script>
   <script src="city-live.js"></script>
   <script src="render.js"></script>
+  <script src="hall.js"></script>
   <script src="hotel.js"></script>
 </body>
 </html>

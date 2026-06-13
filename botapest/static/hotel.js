@@ -143,7 +143,7 @@ canvas.addEventListener('mousemove', m => {
   let hit = null;
   for (const av of avatars.values()) {
     const { sx, sy } = iso(av.x, av.y);
-    if (Math.abs(mx - sx) < 16 && my > sy - 20 && my < sy + 32) hit = av;
+    if (Math.abs(mx - sx) < 22 && my > sy - 40 && my < sy + 42) hit = av;
   }
   if (hit) {
     const secs = Math.round((performance.now() - (hit.since || performance.now())) / 1000);

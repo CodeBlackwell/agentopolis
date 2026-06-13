@@ -26,6 +26,19 @@
   canvas { display: block; image-rendering: pixelated; cursor: grab;
            background: linear-gradient(#241020 0%, #3d1832 55%, #2a1024 100%); }
   canvas:active { cursor: grabbing; }
+  .mapwrap { position: relative; }
+  #mapctl {
+    position: absolute; top: 24px; right: 24px;
+    display: grid; grid-template-columns: repeat(2, 28px); gap: 5px;
+    background: rgba(42,16,36,.82); border: 2px solid var(--gold); padding: 6px;
+  }
+  #mapctl button {
+    width: 28px; height: 28px; line-height: 1; cursor: pointer;
+    background: var(--plum-soft); color: var(--cream); border: 1px solid var(--gold);
+    font-family: 'Silkscreen', monospace; font-size: 14px;
+  }
+  #mapctl button:hover { background: var(--gold); color: var(--plum); }
+  #mapctl .wide { grid-column: span 2; width: auto; }
   #tooltip { position: fixed; display: none; pointer-events: none; z-index: 10;
              background: var(--cream); border: 2px solid var(--plum);
              box-shadow: 3px 3px 0 var(--plum); font-family: 'Silkscreen', monospace;
@@ -38,7 +51,16 @@
     <div></div>
     <p>drag to pan &middot; scroll to zoom &middot; Q/E to rotate</p>
   </header>
-  <div class="frame"><canvas id="city" width="1280" height="720"></canvas></div>
+  <div class="frame"><div class="mapwrap">
+    <canvas id="city" width="1280" height="720"></canvas>
+    <div id="mapctl">
+      <button data-act="rot-" title="rotate left (Q)">&#8634;</button>
+      <button data-act="rot+" title="rotate right (E)">&#8635;</button>
+      <button data-act="zoom+" title="zoom in">+</button>
+      <button data-act="zoom-" title="zoom out">&minus;</button>
+      <button data-act="reset" class="wide" title="reset view">reset</button>
+    </div>
+  </div></div>
   <div id="tooltip"></div>
   <script src="city-render.js"></script>
   <script src="city-scape.js"></script>

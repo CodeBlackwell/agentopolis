@@ -1,6 +1,6 @@
-// Isometric room + Habbo-style pixel avatars, plain canvas.
-const GRID = 12, HW = 32, HH = 16, OX = 640, OY = 96, WALL = 58, DOOR_Y = 7;
-const SKIN = '#f0c8a0', FLOOR_A = '#c9a878', FLOOR_B = '#bb9a6a', LINE = '#a3855a';
+// Isometric dispatch floor: shared iso math + Habbo-style pixel avatars.
+const GRID = 12, HW = 44, HH = 22, OX = 640, OY = 100, WALL = 92, DOOR_Y = 7;
+const SKIN = '#f0c8a0', AV_SCALE = 1.35;
 
 const iso = (x, y) => ({ sx: OX + (x - y) * HW, sy: OY + (x + y) * HH });
 
@@ -13,90 +13,18 @@ function diamond(ctx, sx, sy) {
   ctx.closePath();
 }
 
-function drawRoom(ctx) {
-  for (let x = 0; x < GRID; x++) {
-    for (let y = 0; y < GRID; y++) {
-      const { sx, sy } = iso(x, y);
-      diamond(ctx, sx, sy);
-      ctx.fillStyle = (x + y) % 2 ? FLOOR_A : FLOOR_B;
-      if (x >= 4 && x <= 7 && y >= 5 && y <= 8) ctx.fillStyle = (x + y) % 2 ? '#b54d5e' : '#a84352';
-      ctx.fill();
-      ctx.strokeStyle = LINE;
-      ctx.stroke();
-    }
-  }
-  const edge = (x, y) => iso(x, y);          // walls follow the iso floor edges
-  wallQuad(ctx, edge(0, 0), edge(0, DOOR_Y), '#5a2c4d');
-  wallQuad(ctx, edge(0, DOOR_Y), edge(0, DOOR_Y + 1), '#1a0a16');
-  wallQuad(ctx, edge(0, DOOR_Y + 1), edge(0, GRID), '#5a2c4d');
-  wallQuad(ctx, edge(0, 0), edge(GRID, 0), '#6b3a5c');
-}
-
-function wallQuad(ctx, a, b, color) {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(a.sx, a.sy);
-  ctx.lineTo(b.sx, b.sy);
-  ctx.lineTo(b.sx, b.sy - WALL);
-  ctx.lineTo(a.sx, a.sy - WALL);
-  ctx.closePath();
-  ctx.fill();
-}
-
 function px(ctx, cx, base, dx, dy, w, h, color) {
   ctx.fillStyle = color;
   ctx.fillRect(Math.round(cx + dx), Math.round(base + dy), w, h);
 }
 
-const FURNITURE = [
-  { x: 5, y: 1, draw: deskReception }, { x: 9, y: 1, draw: deskTerminal },
-  { x: 1, y: 4, draw: bookshelf }, { x: 1, y: 9, draw: workbench },
-  { x: 10, y: 9, draw: phoneBooth }, { x: 11, y: 1, draw: plant }, { x: 0, y: 11, draw: plant },
-];
-
-function anchor(item) { const { sx, sy } = iso(item.x, item.y); return { cx: sx, base: sy + 26 }; }
-
-function deskReception(ctx, cx, base) {
-  px(ctx, cx, base, -30, -26, 60, 26, '#3d1832');
-  px(ctx, cx, base, -30, -30, 60, 6, '#d4a953');
-  px(ctx, cx, base, -4, -38, 8, 8, '#d4a953');
-  px(ctx, cx, base, -2, -42, 4, 4, '#f9efe3');
-}
-function deskTerminal(ctx, cx, base) {
-  px(ctx, cx, base, -26, -20, 52, 20, '#4a4a52');
-  px(ctx, cx, base, -18, -50, 36, 28, '#2b2b30');
-  px(ctx, cx, base, -14, -46, 28, 20, '#1fd06b');
-  px(ctx, cx, base, -12, -42, 18, 2, '#0a5a2c');
-  px(ctx, cx, base, -12, -36, 12, 2, '#0a5a2c');
-}
-function bookshelf(ctx, cx, base) {
-  px(ctx, cx, base, -22, -62, 44, 62, '#7a4a26');
-  const spines = ['#c0392b', '#2980b9', '#27ae60', '#f1c40f', '#8e44ad'];
-  for (let row = 0; row < 3; row++)
-    for (let i = 0; i < 5; i++)
-      px(ctx, cx, base, -18 + i * 8, -56 + row * 19, 6, 14, spines[(i + row) % 5]);
-}
-function workbench(ctx, cx, base) {
-  px(ctx, cx, base, -28, -22, 56, 8, '#9c6b35');
-  px(ctx, cx, base, -24, -14, 6, 14, '#7a4a26');
-  px(ctx, cx, base, 18, -14, 6, 14, '#7a4a26');
-  px(ctx, cx, base, -16, -28, 10, 6, '#95a5a6');
-  px(ctx, cx, base, 4, -30, 4, 10, '#7f8c8d');
-}
-function phoneBooth(ctx, cx, base) {
-  px(ctx, cx, base, -18, -68, 36, 68, '#c0395b');
-  px(ctx, cx, base, -13, -60, 26, 30, '#2a1024');
-  px(ctx, cx, base, -13, -74, 26, 6, '#d4a953');
-}
-function plant(ctx, cx, base) {
-  px(ctx, cx, base, -8, -10, 16, 10, '#b35630');
-  px(ctx, cx, base, -12, -30, 24, 20, '#2e8b4f');
-  px(ctx, cx, base, -6, -38, 12, 10, '#37a35e');
-}
-
 function drawAvatar(ctx, av, t) {
   const { sx, sy } = iso(av.x, av.y);
-  const cx = sx, feet = sy + 28;
+  const cx = sx, feet = sy + 30;
+  ctx.save();
+  ctx.translate(cx, feet);
+  ctx.scale(AV_SCALE, AV_SCALE);
+  ctx.translate(-cx, -feet);
   ctx.fillStyle = 'rgba(0,0,0,.25)';
   ctx.beginPath();
   ctx.ellipse(cx, feet, 14, 5, 0, 0, Math.PI * 2);
@@ -126,13 +54,14 @@ function drawAvatar(ctx, av, t) {
   px(ctx, cx, base, -5, -35, 2, 3, '#241510');              // eyes
   px(ctx, cx, base, 3, -35, 2, 3, '#241510');
   px(ctx, cx, base, -2, -30, 4, 2, '#b3795a');              // mouth
+  ctx.restore();
   ctx.font = '8px Silkscreen, monospace';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#1a0a16';
-  ctx.fillRect(cx - ctx.measureText(av.name).width / 2 - 3, base - 58, ctx.measureText(av.name).width + 6, 11);
+  ctx.fillRect(cx - ctx.measureText(av.name).width / 2 - 3, feet - bob - 76, ctx.measureText(av.name).width + 6, 11);
   ctx.fillStyle = av.isAgent ? '#f3cfd9' : '#d4a953';
-  ctx.fillText(av.name, cx, base - 49);
-  return { cx, top: base - 60 };
+  ctx.fillText(av.name, cx, feet - bob - 67);
+  return { cx, top: feet - bob - 78 };
 }
 
 function drawBubble(ctx, cx, top, text, age) {
@@ -158,8 +87,8 @@ function drawBubble(ctx, cx, top, text, age) {
 }
 
 function render(ctx, avatars, t) {
-  ctx.clearRect(0, 0, 1280, 560);
-  drawRoom(ctx);
+  ctx.clearRect(0, 0, 1280, 640);
+  drawHall(ctx);
   const items = [
     ...FURNITURE.map(f => ({ depth: f.x + f.y, draw: () => { const a = anchor(f); f.draw(ctx, a.cx, a.base); } })),
     ...avatars.map(av => ({ depth: av.x + av.y + .5, av })),

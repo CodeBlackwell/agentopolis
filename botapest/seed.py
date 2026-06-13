@@ -16,6 +16,34 @@ CLASS = re.compile(r"^\s*(export |abstract |public |final )*(class|interface|str
 IMPORT = re.compile(r"^\s*(import|from|require|use|#include)\b|=\s*require\(")
 TODO = re.compile(r"TODO|FIXME|HACK")
 
+# A dependency name (substring match) marks the district that declares it as a cloud client.
+DEP_CLOUDS = [
+    ("AWS", ("boto3", "botocore", "aioboto3", "aws-sdk", "aws-cdk")),
+    ("GCP", ("google-cloud", "google-api-python-client", "firebase")),
+    ("Azure", ("azure-", "@azure/")),
+    ("Cloudflare", ("cloudflare", "wrangler")),
+    ("Supabase", ("supabase",)),
+    ("Vercel", ("@vercel",)),
+    ("Stripe", ("stripe",)),
+    ("OpenAI", ("openai",)),
+    ("Anthropic", ("anthropic",)),
+    ("Clerk", ("clerk",)),
+    ("Twilio", ("twilio",)),
+    ("Sentry", ("sentry",)),
+    ("Datadog", ("datadog", "ddtrace")),
+]
+# A file (glob on full path or basename) marks the district that owns it as a cloud user.
+FILE_CLOUDS = [
+    ("GitHub Actions", ("*.github/workflows/*",)),
+    ("Terraform", ("*.tf", "*.tf.json")),
+    ("Vercel", ("vercel.json",)),
+    ("Fly.io", ("fly.toml",)),
+    ("Render", ("render.yaml", "render.yml")),
+    ("Heroku", ("procfile",)),
+    ("Netlify", ("netlify.toml",)),
+    ("Cloudflare", ("wrangler.toml", "wrangler.json", "wrangler.jsonc")),
+]
+
 
 def git(repo: str, *args: str) -> str:
     return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True).stdout
@@ -66,6 +94,33 @@ def parse_deps(repo: str, files: list[str]) -> list[str]:
         except (ValueError, OSError):            # fixture/vendored manifests may be malformed
             continue
     return sorted(found)
+
+
+def detect_clouds(repo: str, comp: dict[str, str | None]) -> list[dict]:
+    """Fingerprint cloud providers from deps + config files; tether each to its district."""
+    real = lambda c: c and c not in ("civic", "commons")
+    files = Counter(c for c in comp.values() if c)
+    default = next((c for c, _ in files.most_common() if real(c)),
+                   files.most_common(1)[0][0] if files else None)
+    votes: dict[str, Counter] = {}
+    for f, c in comp.items():
+        name = f.rsplit("/", 1)[-1].lower()
+        is_manifest = name in ("package.json", "pyproject.toml") or \
+            (name.startswith("requirements") and name.endswith(".txt"))
+        for dep in parse_deps(repo, [f]) if is_manifest else []:
+            for label, fps in DEP_CLOUDS:
+                if any(fp in dep for fp in fps):
+                    votes.setdefault(label, Counter())[c or default] += 1
+        for label, pats in FILE_CLOUDS:
+            if any(fnmatch(f, p) or fnmatch(name, p) for p in pats):
+                votes.setdefault(label, Counter())[c or default] += 1
+    clouds = []
+    for label, counter in votes.items():
+        ranked = [cid for cid, _ in counter.most_common() if cid]
+        tether = next((c for c in ranked if real(c)), (ranked or [default])[0])
+        if tether:
+            clouds.append({"name": label, "tether": tether})
+    return clouds
 
 
 def dead_files(repo: str, alive: set[str]) -> list[str]:
@@ -125,6 +180,9 @@ def seed(repo: str, zone: dict) -> dict:
     for key, b in buildings.items():
         b["ext"] = exts[key].most_common(1)[0][0]
     docker = sum(1 for f in comp if "dockerfile" in f.lower() or "compose.y" in f.lower())
+    named = {c["name"].lower() for c in zone.get("clouds", [])}    # manual clouds win
+    zone["clouds"] = zone.get("clouds", []) + \
+        [c for c in detect_clouds(repo, comp) if c["name"].lower() not in named]
     return {"zone": zone, "buildings": list(buildings.values()),
             "deps": parse_deps(repo, list(comp)), "docker": docker,
             "dead": dead_files(repo, set(comp))}
