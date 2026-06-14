@@ -9,6 +9,7 @@ import json
 import os
 import threading
 from collections import deque
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote
 
@@ -21,7 +22,16 @@ from .nation import CAPITAL, discover_repos, is_mother, load_nation
 from .seed import git, seed
 from .zone import load_zone
 
-app = FastAPI()
+shutting_down = asyncio.Event()                  # set on lifespan shutdown; SSE streams watch it to end
+
+
+@asynccontextmanager
+async def lifespan(_app: "FastAPI"):
+    yield
+    shutting_down.set()
+
+
+app = FastAPI(lifespan=lifespan)
 subscribers: set[asyncio.Queue] = set()
 history: deque = deque(maxlen=100)
 city = {"repo": ".", "zone_path": None}
@@ -38,7 +48,6 @@ if _root := os.environ.get("AGENTOPOLIS_ROOT"):
 if _repo := os.environ.get("AGENTOPOLIS_REPO"):
     city.update(repo=_repo, zone_path=os.environ.get("AGENTOPOLIS_ZONE"))
 seeded: dict[str, dict] = {}        # repo path -> {head, data}, cached per git HEAD
-runner = None       # uvicorn.Server, set by cli — lets SSE streams end on Ctrl+C
 
 
 def configure(repo: str, zone_path: str | None) -> None:
@@ -154,7 +163,7 @@ def forge_city(url: str):
 
 
 @app.get("/events")
-async def events() -> StreamingResponse:
+async def events(request: Request) -> StreamingResponse:
     queue: asyncio.Queue = asyncio.Queue()
     for event in history:                       # replay so late joiners see state
         queue.put_nowait(event)
@@ -163,7 +172,7 @@ async def events() -> StreamingResponse:
     async def stream():
         try:
             yield "retry: 2000\n\n"
-            while not (runner and runner.should_exit):
+            while not shutting_down.is_set() and not await request.is_disconnected():
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=1)
                     yield f"data: {json.dumps(event)}\n\n"

@@ -73,11 +73,14 @@ const City = (() => {
        data.zone.components.filter(c => c.layer === l && c.kind !== 'civic'))].filter(g => g.length);
   const need = (comp, list) => Math.max(comp.kind === 'civic' ? 6 : 1, list.length) + 2;   // +2 spare lots
 
+  const widen = bw => bw + Math.floor(bw / 2);            // gross width that yields bw lot-columns after alleys
+
   function paveRect(state, g, block, x0, y0, w, h) {
     const plaza = block.comp.kind === 'civic';
     for (let y = y0; y < y0 + h; y++)
       for (let x = x0; x < x0 + w; x++) {
         if (y < 0 || x < 0 || y >= state.H || x >= state.W) continue;
+        if (!plaza && w >= 4 && (x - x0) % 3 === 2) { g[y][x] = 0; continue; }   // back-alley: no lot is landlocked
         g[y][x] = plaza ? 3 : 10 + block.id;
         block.lots.push({ x: x + .5, y: y + .5 });
       }
@@ -144,8 +147,8 @@ const City = (() => {
   function planGrid(state, data, byComp) {
     const cells = groupsOf(data).flat().map(c => {
       const list = byComp[c.id] || [], n = need(c, list);
-      const w = Math.max(2, Math.round(Math.sqrt(n * 1.4)));
-      return { comp: c, list, w, h: Math.max(2, Math.ceil(n / w)) };
+      const bw = Math.max(2, Math.round(Math.sqrt(n * 1.4)));
+      return { comp: c, list, w: widen(bw), h: Math.max(2, Math.ceil(n / bw)) };
     });
     const targetW = Math.max(Math.ceil(Math.sqrt(cells.reduce((a, c) => a + (c.w + 1) * (c.h + 1), 0))),
                              ...cells.map(c => c.w));
@@ -174,7 +177,7 @@ const City = (() => {
     const cells = groupsOf(data).flat().map(c => {          // ordered civic → back → mid → front → under
       const list = byComp[c.id] || [], n = need(c, list);
       const h = Math.max(2, Math.min(4, Math.round(Math.sqrt(n))));
-      return { comp: c, list, h, w: Math.max(2, Math.ceil(n / h)) };
+      return { comp: c, list, h, w: widen(Math.max(2, Math.ceil(n / h))) };
     });
     const margin = 3, gap = 1, spineW = 2, maxDepth = Math.max(...cells.map(c => c.h));
     const cyTop = margin + maxDepth;
@@ -195,7 +198,44 @@ const City = (() => {
     state.cityHall = { x: civic.lx, y: civic.ly };
   }
 
-  const PLANS = { radial: planRadial, grid: planGrid, spine: planSpine };
+  // ---- form D: a green commons ringed by neighborhoods, dirt lanes as spokes (small / simple repos) ----
+  function lane(g, x0, y0, x1, y1) {                       // straight dirt lane, only carved over greenery
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1;
+    for (let i = 0; i <= n; i++) {
+      const x = Math.round(x0 + (x1 - x0) * i / n), y = Math.round(y0 + (y1 - y0) * i / n);
+      if (g[y] && g[y][x] === 2) g[y][x] = 0;
+    }
+  }
+  function planVillage(state, data, byComp) {
+    const wings = groupsOf(data).flat().filter(c => c.kind !== 'civic').map(c => {
+      const list = byComp[c.id] || [], n = need(c, list), bw = Math.max(2, Math.round(Math.sqrt(n * 1.2)));
+      return { comp: c, list, w: widen(bw), h: Math.max(2, Math.ceil(n / bw)) };
+    });
+    const N = wings.length || 1, ext = Math.max(2, ...wings.map(w => Math.max(w.w, w.h)));
+    let R = 3 + Math.ceil(ext / 2);                         // ring radius: wings hug the green's edge
+    while (N > 1 && 2 * R * Math.sin(Math.PI / N) < ext + 2) R++;   // splay wings so they never collide
+    const c = R + Math.ceil(ext / 2) + 3;                   // center; map spans the far wing + a tree margin
+    state.W = state.H = 2 * c + 1;
+    state.cityHall = { x: c + .5, y: c + .5 };
+    const g = Array.from({ length: state.H }, () => new Array(state.W).fill(2));
+    for (let y = 0; y < state.H; y++)
+      for (let x = 0; x < state.W; x++) {
+        const rr = Math.max(Math.abs(x - c), Math.abs(y - c));
+        if (rr <= 1) g[y][x] = 3;                           // hall pad
+        else if (rr === 2) g[y][x] = 1;                     // ring lane around the green (gets lamps)
+      }
+    wings.forEach((wing, k) => {
+      const a = -Math.PI / 2 + 2 * Math.PI * k / N;         // first wing due north, then clockwise
+      const wx = c + Math.round(R * Math.cos(a)), wy = c + Math.round(R * Math.sin(a));
+      lane(g, c, c, wx, wy);                                // spoke from the green to the neighborhood
+      paveRect(state, g, newBlock(state, wing.comp, wing.list),
+               wx - (wing.w >> 1), wy - (wing.h >> 1), wing.w, wing.h);
+    });
+    state.ground = g;
+    state.village = true;
+  }
+
+  const PLANS = { radial: planRadial, grid: planGrid, spine: planSpine, village: planVillage };
   const PIPE = ['back', 'mid', 'front'];                   // the data-flow stack; 'under' isn't a stage
   // The FORM is a claim about structure the data must support: a measurable coupling hub (radial),
   // a balanced full-stack split (spine), or peer modules with no center (grid). Order matters —
@@ -203,7 +243,8 @@ const City = (() => {
   function choosePlan(data) {
     const real = data.zone.components.filter(c => c.kind !== 'civic' && c.kind !== 'auto');
     const n = real.length;
-    if (n <= 2) return planSpine;                           // too small for a macro-form to read
+    if (n <= 2 || data.buildings.length <= 40) return planVillage;   // a hamlet: a green ringed by
+                                                            // neighborhoods reads alive where a macro-form can't
 
     const wsum = {}, wt = {};                               // commit-weighted mean centrality per district
     for (const b of data.buildings) {                       // (commit weight damps one-off mega-commit noise)
@@ -253,6 +294,56 @@ const City = (() => {
     }));
   }
 
+  function villageDressing(state) {                       // pasture life: a fenced herd, a hay field, farm landmarks
+    const c = state.cityHall.x - .5;
+    const grass = (x, y) => !!(state.ground[y] && state.ground[y][x] === 2);
+    const place = (kind, x, y, extra) => state.props.push({ kind, x, y, seed: hash(`${kind}${x}${y}`), ...extra });
+    const cluster = (kind, a, spread, n) => {             // sunflower scatter: organic, evenly spread, no row
+      for (let i = 0; i < n; i++) {
+        const ang = i * 2.399963 + (hash(`${kind}${i}`) % 100) / 100;   // golden angle + a little jitter
+        const rad = spread * Math.sqrt((i + .5) / n);
+        place(kind, a.x + .5 + Math.cos(ang) * rad, a.y + .5 + Math.sin(ang) * rad);
+      }
+    };
+    const open = [];                                      // pasture tiles ranked by elbow room (clear paddocks)
+    for (let y = 2; y < state.H - 2; y++)
+      for (let x = 2; x < state.W - 2; x++) {
+        const r = Math.max(Math.abs(x - c), Math.abs(y - c));
+        if (!grass(x, y) || r < 5 || r >= c) continue;
+        let room = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) room += grass(x + dx, y + dy) ? 1 : 0;
+        open.push({ x, y, room });
+      }
+    if (!open.length) return;
+    open.sort((a, b) => b.room - a.room);
+    const used = [];
+    const claim = () => {                                 // openest pasture tile that's clear of prior features
+      const o = open.find(o => used.every(u => Math.hypot(o.x - u.x, o.y - u.y) > 5))
+             || open.find(o => !used.includes(o)) || open[0];
+      used.push(o); return o;
+    };
+    const tower = open.slice().sort((a, b) =>             // back-edge landmark on the horizon
+      Math.hypot(a.x - c, a.y - 2) - Math.hypot(b.x - c, b.y - 2))[0];
+    place('watertower', tower.x + .5, tower.y + .5); used.push(tower);
+    const pad = claim();                                  // a fenced paddock of grazing cattle
+    cluster('cow', pad, 1.4, 5);
+    for (let i = -2; i < 2; i++) for (const [x, y, dx, dy] of
+      [[pad.x + i, pad.y - 2, 1, 0], [pad.x + i, pad.y + 2, 1, 0],
+       [pad.x - 2, pad.y + i, 0, 1], [pad.x + 2, pad.y + i, 0, 1]])
+      if (grass(x, y)) place('fence', x + .5, y + .5, { dx, dy });
+    const dist = (o, t) => Math.hypot(o.x - t.x, o.y - t.y);
+    const near = open.find(o => !used.includes(o) &&     // windmill: clear pasture just beyond the pen
+      dist(o, pad) >= 3 && dist(o, pad) <= 5);
+    const mill = near || { x: pad.x, y: pad.y - 4 };
+    used.push(mill); place('windmill', mill.x + .5, mill.y + .5);
+    const hay = open.find(o => !used.includes(o) &&      // haystacks: pasture just outside the pen, clear of the mill
+      dist(o, pad) >= 3 && dist(o, pad) <= 4 && dist(o, mill) >= 3);
+    const clear = [[tower, 1.6], [mill, 1.4], [pad, 3.4]];   // farm plots are cleared ground
+    if (hay) { used.push(hay); cluster('hay', hay, .5, 3); clear.push([hay, 1.3]); }
+    state.props = state.props.filter(p => p.kind !== 'tree'
+      || clear.every(([f, r]) => Math.hypot(p.x - f.x - .5, p.y - f.y - .5) > r));
+  }
+
   function layout(data) {
     const state = { zone: data.zone, blocks: [], buildings: [], props: [],
                     byPath: new Map(), items: [], clouds: [], cityHall: null };
@@ -261,6 +352,10 @@ const City = (() => {
     (PLANS[data.zone.plan] || choosePlan(data))(state, data, byComp);   // .agentopolis.json may pin "plan"
     addCemetery(state, data);
     sprinkle(state);
+    if (state.village && state.cityHall) {                  // a well anchors the green commons
+      state.props.push({ kind: 'well', x: state.cityHall.x + 1.5, y: state.cityHall.y + 1.5, seed: 7 });
+      villageDressing(state);
+    }
     state.deps = data.deps || [];
     state.docker = data.docker || [];
     state.cuts = {                                          // repo-relative thresholds, no absolutes
@@ -289,7 +384,9 @@ const City = (() => {
     for (const b of block.list) {                           // mass adds floors: +1 per loc decade past 100
       b.floors = under ? 1 : 1 + b.centrality + (b.commits > state.cuts.commits ? 1 : 0)
                + Math.max(0, Math.floor(Math.log10(b.loc + 1)) - 1);
+      if (state.village && !under) b.floors += hash(b.path + 'v') % 4 === 0 ? 1 : 0;   // break the flat carpet
       b.floors = Math.min(b.floors, FCAP[FORM[b.ext]] ?? 14);
+      if (state.village) b.lit = Math.max(0, .5 + (hash(b.path) % 40) / 100);   // dusk hamlet: windows glow warm
     }
     const cuts = { commits: q(block.list.map(b => b.commits), 2 / 3),
                    age: q(block.list.map(b => b.age_days), 1 / 3) };

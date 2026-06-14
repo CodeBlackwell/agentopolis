@@ -62,11 +62,10 @@ def main() -> None:
             opener = threading.Timer(1, lambda: webbrowser.open(url))
             opener.daemon = True
             opener.start()
-        # SSE streams watch runner.should_exit so open browsers don't block Ctrl+C;
-        # the graceful-shutdown timeout is the backstop for any other slow request
+        # SSE streams end on client disconnect / lifespan shutdown; the graceful-shutdown
+        # timeout is the backstop that force-closes any still-open stream on Ctrl+C
         runner = uvicorn.Server(uvicorn.Config(server.app, port=args.port,
                                                log_level="warning", timeout_graceful_shutdown=2))
-        server.runner = runner
         try:
             runner.run()
         except KeyboardInterrupt:           # uvicorn re-raises the Ctrl+C after shutdown

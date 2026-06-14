@@ -6,7 +6,14 @@ dev:
     -lsof -ti :4242 | xargs kill -9 2>/dev/null
     @echo "Agentopolis Nation on http://localhost:4242 (nation: ..)"
     @sleep 1 && open http://localhost:4242 &
-    exec env AGENTOPOLIS_ROOT=.. .venv/bin/uvicorn agentopolis.server:app --reload --reload-dir agentopolis --port 4242 --log-level warning
+    exec env AGENTOPOLIS_ROOT=.. .venv/bin/uvicorn agentopolis.server:app --reload --reload-dir agentopolis --port 4242 --log-level warning --timeout-graceful-shutdown 1
+
+# Serve one repo as a city on http://localhost:4243 (small/simple repos render as a village). e.g. `just town ../AURA`
+town repo=".":
+    -lsof -ti :4243 | xargs kill -9 2>/dev/null
+    @echo "Agentopolis Town on http://localhost:4243 (repo: {{repo}})"
+    @sleep 1 && open http://localhost:4243 &
+    exec env AGENTOPOLIS_REPO={{repo}} .venv/bin/uvicorn agentopolis.server:app --reload --reload-dir agentopolis --port 4243 --log-level warning --timeout-graceful-shutdown 1
 
 # Re-bake the BLACKBOX showcase fixtures (run before deploy when repos change)
 bake:

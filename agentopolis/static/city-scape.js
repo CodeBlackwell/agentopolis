@@ -132,6 +132,91 @@ const CityScape = (() => {
       if (state)                                            // hovering any stone lists the whole graveyard
         hit(ctx, state, { x0: sx - 4 * s, x1: sx + 4 * s, y0: base - 10 * s, y1: base + 2 * s,
                           tip: state.graveTip, scroll: true }, s);
+    } else if (p.kind === 'cow') {                          // grazing cow, black-and-white
+      const f = p.seed % 2 ? 1 : -1;
+      ctx.fillStyle = '#2b2230';
+      for (const dx of [-4, -1.5, 1.5, 4]) ctx.fillRect(sx + dx * s, base - 2.5 * s, 1.2 * s, 2.5 * s);
+      ctx.fillStyle = '#efe9e2';
+      ctx.fillRect(sx - 5 * s, base - 6 * s, 10 * s, 4 * s);
+      ctx.fillStyle = '#2b2230';
+      ctx.fillRect(sx - 3 * s, base - 5.5 * s, 2.5 * s, 2 * s);
+      ctx.fillRect(sx + 1.5 * s, base - 6 * s, 2 * s, 2.5 * s);
+      ctx.fillStyle = '#efe9e2';
+      ctx.fillRect(sx + f * 4 * s, base - 8 * s, 3 * s, 3 * s);
+      ctx.fillStyle = '#c97f8a';
+      ctx.fillRect(sx + f * 5 * s, base - 6 * s, 1.5 * s, 1.5 * s);
+    } else if (p.kind === 'hay') {                          // little stack of square bales
+      const bale = (bx, by) => {
+        ctx.fillStyle = '#c9a23f';
+        ctx.fillRect(bx - 2.5 * s, by - 3 * s, 5 * s, 3 * s);
+        ctx.fillStyle = '#dcb957';                          // sunlit top
+        ctx.fillRect(bx - 2.5 * s, by - 3 * s, 5 * s, s);
+        ctx.strokeStyle = '#a8842f';                        // baling twine
+        ctx.lineWidth = Math.max(1, .6 * s);
+        ctx.beginPath();
+        ctx.moveTo(bx - .9 * s, by - 3 * s); ctx.lineTo(bx - .9 * s, by);
+        ctx.moveTo(bx + .9 * s, by - 3 * s); ctx.lineTo(bx + .9 * s, by);
+        ctx.stroke();
+      };
+      bale(sx - 2.2 * s, base); bale(sx + 2.2 * s, base); bale(sx, base - 2.6 * s);
+    } else if (p.kind === 'fence') {                        // post-and-rail, runs to its neighbour tile
+      const b = proj(cam, p.x + p.dx, p.y + p.dy);
+      ctx.strokeStyle = '#6e5a45';
+      ctx.lineWidth = Math.max(1, 1.3 * s);
+      for (const dz of [3.5 * s, 6.5 * s]) {
+        ctx.beginPath(); ctx.moveTo(sx, base - dz); ctx.lineTo(b.sx, base - dz); ctx.stroke();
+      }
+      ctx.fillStyle = '#5a4a3e';
+      ctx.fillRect(sx - s, base - 7 * s, 2 * s, 7 * s);
+      ctx.fillRect(b.sx - s, base - 7 * s, 2 * s, 7 * s);
+    } else if (p.kind === 'windmill') {                     // farm landmark: tapered tower + turning sails
+      const hb = 22 * s, capY = base - hb;
+      ctx.fillStyle = '#d8c5a0';
+      ctx.beginPath();
+      ctx.moveTo(sx - 5 * s, base); ctx.lineTo(sx + 5 * s, base);
+      ctx.lineTo(sx + 3 * s, capY); ctx.lineTo(sx - 3 * s, capY); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#1a0a16';
+      ctx.fillRect(sx - 1.5 * s, base - 7 * s, 3 * s, 7 * s);   // doorway
+      ctx.fillStyle = '#8a3a2e';
+      ctx.beginPath(); ctx.moveTo(sx - 4 * s, capY); ctx.lineTo(sx + 4 * s, capY); ctx.lineTo(sx, capY - 6 * s); ctx.closePath(); ctx.fill();
+      const hx = sx, hy = capY + 2 * s, rot = t / 1400 + p.seed;
+      ctx.strokeStyle = '#5a4a3e';
+      ctx.lineWidth = Math.max(1, 1.4 * s);
+      for (let i = 0; i < 4; i++) {
+        const a = rot + i * Math.PI / 2, ex = hx + Math.cos(a) * 11 * s, ey = hy + Math.sin(a) * 11 * s;
+        ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.fillStyle = 'rgba(243,239,227,.8)';
+        ctx.beginPath();
+        ctx.moveTo(hx + Math.cos(a) * 4 * s, hy + Math.sin(a) * 4 * s);
+        ctx.lineTo(ex, ey); ctx.lineTo(ex - Math.sin(a) * 3 * s, ey + Math.cos(a) * 3 * s);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle = '#2b2230';
+      ctx.beginPath(); ctx.arc(hx, hy, 1.8 * s, 0, Math.PI * 2); ctx.fill();
+    } else if (p.kind === 'watertower') {                   // small-town landmark: tank on splayed legs
+      const ty = base - 22 * s;
+      ctx.strokeStyle = '#4a3a2e';
+      ctx.lineWidth = Math.max(1, 1.2 * s);
+      ctx.beginPath();
+      for (const dx of [-5, -2, 2, 5]) { ctx.moveTo(sx + dx * s, base); ctx.lineTo(sx + dx * .4 * s, ty + 7 * s); }
+      ctx.moveTo(sx - 5 * s, base - 9 * s); ctx.lineTo(sx + 5 * s, base - 13 * s);   // cross-brace
+      ctx.stroke();
+      ctx.fillStyle = '#9aa6ad';
+      ctx.fillRect(sx - 5 * s, ty, 10 * s, 8 * s);
+      ctx.fillStyle = '#7d8890';
+      ctx.fillRect(sx - 5 * s, ty + 6 * s, 10 * s, 2 * s);
+      ctx.fillStyle = '#8a3a2e';
+      ctx.beginPath(); ctx.moveTo(sx - 6 * s, ty); ctx.lineTo(sx + 6 * s, ty); ctx.lineTo(sx, ty - 7 * s); ctx.closePath(); ctx.fill();
+    } else if (p.kind === 'well') {                         // village well: stone curb + little roof
+      ctx.fillStyle = '#4a3a2e';
+      ctx.fillRect(sx - 4 * s, base - 13 * s, 1.5 * s, 9 * s);
+      ctx.fillRect(sx + 2.5 * s, base - 13 * s, 1.5 * s, 9 * s);
+      ctx.fillStyle = '#6e5a4a';
+      ctx.fillRect(sx - 4 * s, base - 5 * s, 8 * s, 5 * s);
+      ctx.fillStyle = '#1a2a30';
+      ctx.fillRect(sx - 3 * s, base - 4.5 * s, 6 * s, 3 * s);
+      ctx.fillStyle = '#8a3a2e';
+      ctx.fillRect(sx - 6 * s, base - 15 * s, 12 * s, 3 * s);
     } else if (p.kind === 'crates') {
       ctx.fillStyle = '#9c6b35';
       ctx.fillRect(sx - 6 * s, base - 6 * s, 6 * s, 6 * s);
