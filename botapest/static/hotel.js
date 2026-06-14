@@ -171,10 +171,18 @@ requestAnimationFrame(frame);
 
 const canvas = document.getElementById('hotel');
 const tooltip = document.getElementById('tooltip');
+canvas.addEventListener('wheel', m => {
+  m.preventDefault();
+  const r = canvas.getBoundingClientRect();
+  hallZoom(m.deltaY < 0 ? 1.12 : 1 / 1.12,
+    (m.clientX - r.left) * (canvas.width / r.width),
+    (m.clientY - r.top) * (canvas.height / r.height));
+}, { passive: false });
+
 canvas.addEventListener('mousemove', m => {
   const r = canvas.getBoundingClientRect();
-  const mx = (m.clientX - r.left) * (canvas.width / r.width);
-  const my = (m.clientY - r.top) * (canvas.height / r.height);
+  const mx = ((m.clientX - r.left) * (canvas.width / r.width) - hallCam.ox) / hallCam.s;
+  const my = ((m.clientY - r.top) * (canvas.height / r.height) - hallCam.oy) / hallCam.s;
   let hit = null;
   for (const av of avatars.values()) {
     const { sx, sy } = iso(av.x, av.y);

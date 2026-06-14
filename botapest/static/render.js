@@ -4,6 +4,17 @@ const SKIN = '#f0c8a0', AV_SCALE = 1.35;
 
 const iso = (x, y) => ({ sx: OX + (x - y) * HW, sy: OY + (x + y) * HH });
 
+const hallCam = { s: 1, ox: 0, oy: 0 };                     // dispatch-floor zoom, applied as a canvas transform
+const HALL_ZOOM_MIN = .7, HALL_ZOOM_MAX = 2.4;
+
+function hallZoom(k, mx = 640, my = 320) {                  // zoom toward the cursor, clamped to range
+  const s = Math.max(HALL_ZOOM_MIN, Math.min(HALL_ZOOM_MAX, hallCam.s * k));
+  k = s / hallCam.s;                                        // re-derive k so a clamped edge doesn't drift the focus
+  hallCam.ox = mx + (hallCam.ox - mx) * k;
+  hallCam.oy = my + (hallCam.oy - my) * k;
+  hallCam.s = s;
+}
+
 function diamond(ctx, sx, sy) {
   ctx.beginPath();
   ctx.moveTo(sx, sy);
@@ -87,7 +98,9 @@ function drawBubble(ctx, cx, top, text, age) {
 }
 
 function render(ctx, avatars, t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, 1280, 640);
+  ctx.setTransform(hallCam.s, 0, 0, hallCam.s, hallCam.ox, hallCam.oy);
   drawHall(ctx);
   const items = [
     ...FURNITURE.map(f => ({ depth: f.x + f.y, draw: () => { const a = anchor(f); f.draw(ctx, a.cx, a.base); } })),
