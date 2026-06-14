@@ -21,14 +21,16 @@
     display: grid; gap: 12px; padding: 10px 14px 14px;
     /* head spans both columns; map (primary) + rail; dispatch dock spans the floor */
     grid-template-columns: 1fr 264px;
-    grid-template-rows: auto minmax(0, 1fr) minmax(0, 34vh);
-    grid-template-areas: "head head" "map rail" "dock dock";
+    grid-template-rows: minmax(0, 1fr) minmax(0, 34vh);
+    grid-template-areas: "map rail" "dock dock";
   }
-  header { grid-area: head; text-align: center; }
-  header h1 { font-family: 'Limelight', cursive; font-size: clamp(20px, 2.6vw, 32px);
-              letter-spacing: .06em; text-shadow: 2px 2px 0 var(--gold); }
-  header p { font-family: 'Silkscreen', monospace; font-size: 11px;
-             letter-spacing: .18em; text-transform: uppercase; }
+  /* title rides on the map canvas (over the sky) so the map reclaims the header row's height */
+  header { position: absolute; top: 8px; left: 14px; z-index: 3; pointer-events: none;
+           text-shadow: 0 2px 7px rgba(0,0,0,.75), 1px 1px 0 var(--plum); }
+  header h1 { font-family: 'Limelight', cursive; font-size: clamp(18px, 1.9vw, 26px);
+              letter-spacing: .06em; color: var(--cream); }
+  header p { font-family: 'Silkscreen', monospace; font-size: 9px; color: var(--pink-deep);
+             letter-spacing: .16em; text-transform: uppercase; margin-top: 1px; }
 
   /* every zone wears the same gilded exhibit frame */
   .mapwrap, #side, #dock {
@@ -58,7 +60,7 @@
 
   /* ---- nation-mode map chrome ---- */
   #back {
-    position: absolute; top: 24px; left: 24px; display: none; cursor: pointer;
+    position: absolute; top: 58px; left: 14px; display: none; cursor: pointer;
     background: var(--plum-soft); color: var(--cream); border: 2px solid var(--gold);
     font-family: 'Silkscreen', monospace; font-size: 12px; padding: 7px 12px;
   }
@@ -76,17 +78,6 @@
   #tiers button.active { background: var(--gold); color: var(--plum); font-weight: 700; }
   #tiers button.off { opacity: .38; pointer-events: none; }
   #tiers .sep { color: var(--gold); font-size: 11px; }
-
-  /* ---- city-mode map chrome ---- */
-  #crumb {
-    position: absolute; top: 14px; left: 14px; display: none; max-width: 62%; z-index: 2;
-    background: rgba(42,16,36,.88); border: 2px solid var(--gold); padding: 6px 10px;
-    font-family: 'Silkscreen', monospace; font-size: 11px; color: var(--cream);
-  }
-  #crumb b { color: var(--gold); }
-  #crumb .back { cursor: pointer; color: var(--pink-deep); }
-  #crumb .back:hover { color: var(--gold); }
-  #crumbInfo { display: block; margin-top: 4px; font-size: 9px; color: var(--pink-deep); }
 
   /* ---- side rail ---- */
   #side { grid-area: rail; min-height: 0; display: flex; flex-direction: column; }
@@ -107,8 +98,6 @@
     font-family: 'Silkscreen', monospace; font-size: 9px; padding-bottom: 4px;
   }
   #legend .row { display: flex; align-items: center; gap: 8px; padding: 3px 10px; }
-  #legend .dclick { cursor: pointer; }
-  #legend .dclick:hover { background: var(--pink); }
   #legend .chip { flex: 0 0 10px; height: 10px; border: 1px solid var(--plum-soft); }
 
   .plaque {
@@ -174,24 +163,18 @@
 </style>
 </head>
 <body data-mode="{{MODE}}">
-  <header>
-    <h1>Botapest <span class="m-nation">Nation</span><span class="m-city">City</span></h1>
-    <p class="m-nation">drag to pan &middot; scroll to zoom &middot; click a city to enter it &middot; Q/E to rotate inside</p>
-    <p class="m-city">the city builds itself &middot; agents at your service</p>
-  </header>
-
   <div class="mapwrap">
     <canvas id="map" width="1280" height="720"></canvas>
+    <header>
+      <h1>Botapest <span class="m-nation">Nation</span><span class="m-city">City</span></h1>
+      <p class="m-nation">drag to pan &middot; scroll to zoom &middot; click a city to enter it &middot; Q/E to rotate inside</p>
+      <p class="m-city">the city builds itself &middot; agents at your service</p>
+    </header>
     <button id="back" class="m-nation" title="back to world map">&#8593; WORLD MAP</button>
     <div id="tiers" class="m-nation">
       <button data-tier="world">WORLD</button><span class="sep">&#9656;</span>
       <button data-tier="state">STATE</button><span class="sep">&#9656;</span>
-      <button data-tier="city">CITY</button><span class="sep">&#9656;</span>
-      <button data-tier="district">DISTRICT</button>
-    </div>
-    <div id="crumb" class="m-city">
-      <span class="back" data-nav="city">&#9664; CITY</span> &#9656; <b id="crumbName"></b>
-      <span id="crumbInfo"></span>
+      <button data-tier="city">CITY</button>
     </div>
     <div id="mapctl">
       <button data-act="rot-" title="rotate left (Q)">&#8634;</button>

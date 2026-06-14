@@ -263,8 +263,6 @@ const City = (() => {
     sprinkle(state);
     state.deps = data.deps || [];
     state.docker = data.docker || [];
-    state.co_edges = data.co_edges || [];                   // co-commit coupling, surfaced at district zoom
-    state.district_edges = data.district_edges || [];
     state.cuts = {                                          // repo-relative thresholds, no absolutes
       commits: q(data.buildings.map(b => b.commits), 2 / 3),
       imports: q(data.buildings.map(b => b.imports || 0), .9),
@@ -778,122 +776,6 @@ const City = (() => {
     }
   }
 
-  // ---- District: drill into one component — its files as a neighborhood, streets = co-commit ----
-  // ---- coupling, road stubs = districts it co-changes with, clouds = the services it leans on. ----
-  const ROLE = { frontend: 'User-facing UI', api: 'Service gateway', storage: 'Data & persistence',
-                 infra: 'Build, deploy & tooling', tests: 'Tests & verification', docs: 'Documentation',
-                 service: 'Application logic', civic: 'City core', auto: 'Loose files' };
-
-  function districtLayout(city, compId) {
-    const comp = city.zone.components.find(c => c.id === compId);
-    const list = city.buildings.filter(b => b.component === compId)
-      .sort((a, b) => b.centrality - a.centrality || b.commits - a.commits || b.floors - a.floors);
-    const cols = Math.max(3, Math.ceil(Math.sqrt(list.length || 1)));
-    const rows = Math.max(1, Math.ceil(list.length / cols));
-    const gap = 2, margin = 3, gate = 3;                    // gap = street room; gate = apron at the south edge
-    const W = margin * 2 + cols * gap, H = margin * 2 + rows * gap + gate;
-    const cgx = (cols - 1) / 2, cgy = (rows - 1) / 2;        // grid centre → seat the coupling hubs downtown
-    const cells = [];
-    for (let cy = 0; cy < rows; cy++)
-      for (let cx = 0; cx < cols; cx++)
-        cells.push({ cx, cy, d: Math.hypot(cx - cgx, cy - cgy) });
-    cells.sort((a, b) => a.d - b.d);
-    const block = { id: 0, comp, pave: [mix('#57455a', comp.color, .22), mix('#4d3d50', comp.color, .22)] };
-    const g = Array.from({ length: H }, () => new Array(W).fill(2));
-    list.forEach((b, i) => {
-      const c = cells[i], tx = margin + c.cx * gap, ty = margin + c.cy * gap;
-      for (const [x, y] of [[tx, ty], [tx + 1, ty], [tx, ty + 1], [tx + 1, ty + 1]])
-        if (y < H && x < W) g[y][x] = 10;                   // district pavement under each lot
-      b.dx = tx + .5; b.dy = ty + .5;
-    });
-    for (let y = H - gate; y < H; y++) for (let x = 0; x < W; x++) g[y][x] = 0;   // gate apron (street)
-    const plaza = { x: margin + cgx * gap + .5, y: margin + cgy * gap + .5 };
-    const props = [];
-    g.forEach((row, y) => row.forEach((code, x) => {        // greenery on leftover grass
-      const h = hash(`d${x},${y}`);
-      if (code === 2 && h % 4 === 0)
-        props.push({ kind: 'tree', x: x + .5, y: y + .5, dx: x + .5, dy: y + .5, seed: h });
-    }));
-    const streets = (city.co_edges || [])                   // co-commit edges between this district's buildings
-      .map(e => ({ a: city.byPath.get(e.a), b: city.byPath.get(e.b), w: e.w }))
-      .filter(s => s.a && s.b && s.a.component === compId && s.b.component === compId);
-    const wmax = streets.reduce((m, s) => Math.max(m, s.w), 1);
-    const nbr = (city.district_edges || [])                 // districts this one co-changes with
-      .filter(e => e.a === compId || e.b === compId)
-      .map(e => ({ id: e.a === compId ? e.b : e.a, w: e.w }))
-      .sort((a, b) => b.w - a.w).slice(0, 5)
-      .map(n => { const c = city.zone.components.find(z => z.id === n.id);
-                  return c && { name: c.name, color: c.color, w: n.w }; })
-      .filter(Boolean);
-    const clouds = city.clouds.filter(c => c.tether === compId);
-    const files = list.reduce((a, b) => a + (b.files || 1), 0);
-    const hot = list.filter(b => b.billboard).length;
-    const charter = `${ROLE[comp.kind] || comp.kind} · ${list.length} building${list.length === 1 ? '' : 's'}`
-      + ` · ${files} file${files === 1 ? '' : 's'}` + (hot ? ` · ${hot} hot` : '')
-      + (nbr.length ? ` · couples with ${nbr.slice(0, 3).map(n => n.name).join(', ')}` : '');
-    const d = { comp, W, H, ground: g, blocks: [block], buildings: list, byPath: city.byPath,
-                props, streets, wmax, nbr, clouds, plaza, gate, charter,
-                deps: [], docker: [], sortedRot: -1, hits: [], mouse: null };
-    d.items = [...list, ...props];
-    return d;
-  }
-
-  function drawStreets(ctx, cam, d) {
-    ctx.strokeStyle = mix('#3a2c3e', d.comp.color, .45);
-    for (const s of d.streets) {
-      const a = proj(cam, s.a.dx, s.a.dy), b = proj(cam, s.b.dx, s.b.dy);
-      ctx.lineWidth = Math.max(1.5, (1 + 3 * s.w / d.wmax) * cam.s);
-      ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
-    }
-  }
-
-  function drawGate(ctx, cam, d) {                          // labelled road stubs to coupled districts
-    if (!d.nbr.length) return;
-    const s = cam.s, y = d.H - d.gate / 2, wmax = d.nbr[0].w;
-    d.nbr.forEach((n, i) => {
-      const x = (i + .5) / d.nbr.length * d.W;
-      const a = proj(cam, x, y), b = proj(cam, x, d.H + 2);
-      ctx.strokeStyle = n.color;
-      ctx.lineWidth = Math.max(2, (1 + 3 * n.w / wmax) * s);
-      ctx.setLineDash([4 * s, 3 * s]);
-      ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = n.color;
-      ctx.fillRect(b.sx - 4 * s, b.sy, 8 * s, 4 * s);
-      ctx.fillStyle = 'rgba(243,207,217,.85)';
-      ctx.font = `${Math.max(7, 8 * s)}px Silkscreen, monospace`;
-      ctx.textAlign = 'center';
-      ctx.fillText(n.name.toUpperCase(), b.sx, b.sy + 14 * s);
-    });
-  }
-
-  function drawDistrict(ctx, cam, d, t) {
-    const R = cam.rot || 0;
-    if (d.sortedRot !== R) {                                // painter order over district coords
-      const k = dkey(R);
-      d.items.sort((a, b) => k({ x: a.dx, y: a.dy }) - k({ x: b.dx, y: b.dy }));
-      d.sortedRot = R;
-    }
-    d.hits = [];
-    CityScape.drawHorizon(ctx, R ? { ...cam, rot: 0 } : cam, d, t);
-    CityScape.drawGround(ctx, cam, d, t);
-    drawStreets(ctx, cam, d);
-    for (const it of d.items) {
-      if (it.kind) { if (!it.hidden) CityScape.drawProp(ctx, cam, it, t, d); }
-      else {                                                // shared building object: draw at district coords
-        const ox = it.x, oy = it.y; it.x = it.dx; it.y = it.dy;
-        drawBuilding(ctx, cam, it, t); it.x = ox; it.y = oy;
-      }
-    }
-    drawGate(ctx, cam, d);
-    for (const c of d.clouds) {
-      const a = proj(cam, d.plaza.x, d.plaza.y);
-      c.sx = a.sx; c.ax = a.sx; c.ay = a.sy;
-      c.sy = Math.min(c.band * Math.max(.8, cam.s), a.sy - 120 * cam.s);
-      drawCloud(ctx, cam, c, t);
-    }
-  }
-
-  return { layout, fit, draw, applyEvent, pick, roster, districtLayout, drawDistrict,
+  return { layout, fit, draw, applyEvent, pick, roster,
            proj, hash, shade, mix, near };
 })();

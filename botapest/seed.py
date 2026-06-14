@@ -210,15 +210,11 @@ def dead_files(repo: str, alive: set[str]) -> list[dict]:
 def seed(repo: str, zone: dict, exclude: set | None = None) -> dict:
     comp = {f: component_of(f, zone["components"]) for f in tracked(repo, exclude)}
     files = [f for f, c in comp.items() if c]
-
     group = {c["id"]: c.get("group") for c in zone["components"]}
-    bkey = lambda f: "/".join(f.split("/")[:group[comp[f]]]) if group[comp[f]] else f
-    bcomp = {bkey(f): comp[f] for f in files}             # building id -> its district
 
     commits = dict.fromkeys(files, 0)
     last = dict.fromkeys(files, 0)
     cocomp = {f: set() for f in files}
-    pairs: Counter = Counter()                            # co-commit weight between buildings
     timestamp = 0
     touched: list[str] = []
     for line in git(repo, "log", "--name-only", "--pretty=%ct").splitlines() + [""]:
@@ -229,11 +225,6 @@ def seed(repo: str, zone: dict, exclude: set | None = None) -> dict:
                 last[f] = max(last[f], timestamp)
                 if len(touched) <= 15:                  # mega-commits aren't coupling signal
                     cocomp[f] |= comps - {comp[f]}
-            if len(touched) <= 15:                      # buildings that changed together get an edge
-                keys = sorted({bkey(f) for f in touched})
-                for i in range(len(keys)):
-                    for j in range(i + 1, len(keys)):
-                        pairs[(keys[i], keys[j])] += 1
             touched = []
             if line.isdigit():
                 timestamp = int(line)
@@ -262,14 +253,6 @@ def seed(repo: str, zone: dict, exclude: set | None = None) -> dict:
         exts.setdefault(key, Counter())[Path(f).suffix.lstrip(".").lower()] += 1
     for key, b in buildings.items():
         b["ext"] = exts[key].most_common(1)[0][0]
-    co_edges = [{"a": a, "b": b, "w": w} for (a, b), w in pairs.items()
-                if w >= 2 and bcomp.get(a) and bcomp.get(a) == bcomp.get(b)]
-    cross: Counter = Counter()                            # roll building pairs up to district pairs
-    for (a, b), w in pairs.items():
-        ca, cb = bcomp.get(a), bcomp.get(b)
-        if ca and cb and ca != cb:
-            cross[tuple(sorted((ca, cb)))] += w
-    district_edges = [{"a": a, "b": b, "w": w} for (a, b), w in cross.items()]
 
     docker = docker_manifest(repo, comp)
     named = {c["name"].lower() for c in zone.get("clouds", [])}    # manual clouds win
@@ -277,5 +260,4 @@ def seed(repo: str, zone: dict, exclude: set | None = None) -> dict:
         [c for c in detect_clouds(repo, comp) if c["name"].lower() not in named]
     return {"zone": zone, "buildings": list(buildings.values()),
             "deps": parse_deps(repo, list(comp)), "docker": docker,
-            "dead": dead_files(repo, set(comp)),
-            "co_edges": co_edges, "district_edges": district_edges}
+            "dead": dead_files(repo, set(comp))}
