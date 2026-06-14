@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Small / simple repos now render as a **village**: a green commons with the
+  town hall and a well at its heart, neighborhoods arranged in a rosette with
+  dirt lanes as spokes, and a few taller cottages with warm-lit windows.
+- Farm life around the village: a fenced cattle paddock (cows in an organic
+  spread, with a UFO buzzing in circles overhead), a hay field, an animated
+  windmill, and a water-tower landmark.
+- `just town [repo]` recipe: serve a single repo as a city (small ones render
+  as a village) on :4243 with hot reload.
+
+### Changed
+- Street planning: every block now carves back-alleys so no building is
+  landlocked — each one has a street or open ground on at least one side.
+
+### Fixed
+- `just dev` / `just town` hung on Ctrl+C while a browser held the `/events`
+  SSE stream open. Streams now end on client disconnect / lifespan shutdown,
+  and the recipes set a graceful-shutdown timeout as the backstop.
+
 ## [0.6.0] - 2026-06-13
 
 ### Changed

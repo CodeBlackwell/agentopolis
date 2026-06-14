@@ -145,6 +145,26 @@ const CityScape = (() => {
       ctx.fillRect(sx + f * 4 * s, base - 8 * s, 3 * s, 3 * s);
       ctx.fillStyle = '#c97f8a';
       ctx.fillRect(sx + f * 5 * s, base - 6 * s, 1.5 * s, 1.5 * s);
+    } else if (p.kind === 'ufo') {                          // little saucer buzzing in circles over the herd
+      const a = t / 900 + p.seed;
+      const o = proj(cam, p.x + Math.cos(a) * 1.6, p.y + Math.sin(a) * 1.6);   // orbit in the ground plane
+      const cx = o.sx, cy = o.sy - (34 + Math.sin(t / 500 + p.seed) * 3) * s;  // float high, gentle bob
+      ctx.fillStyle = `rgba(126,222,255,${.05 + .04 * Math.sin(t / 400)})`;    // faint tractor beam
+      ctx.beginPath();
+      ctx.moveTo(cx - 2 * s, cy + 2 * s); ctx.lineTo(cx + 2 * s, cy + 2 * s);
+      ctx.lineTo(o.sx + 6 * s, o.sy); ctx.lineTo(o.sx - 6 * s, o.sy);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#6e7a82';                            // hull underside
+      ctx.beginPath(); ctx.ellipse(cx, cy + 1.5 * s, 9 * s, 2.4 * s, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#aab6bd';                            // hull top
+      ctx.beginPath(); ctx.ellipse(cx, cy, 9 * s, 3 * s, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(126,222,255,.85)';              // glass dome
+      ctx.beginPath(); ctx.ellipse(cx, cy - .5 * s, 4 * s, 3.6 * s, 0, Math.PI, Math.PI * 2); ctx.fill();
+      for (let i = 0; i < 4; i++) {                         // rim lights chase around
+        const lx = cx + Math.cos(i * Math.PI / 2 + a * 2) * 7 * s;
+        ctx.fillStyle = `rgba(255,${i % 2 ? 90 : 214},${i % 2 ? 90 : 120},${.45 + .45 * Math.sin(t / 200 + i)})`;
+        ctx.fillRect(lx - s, cy + 1.5 * s, 2 * s, 2 * s);
+      }
     } else if (p.kind === 'hay') {                          // little stack of square bales
       const bale = (bx, by) => {
         ctx.fillStyle = '#c9a23f';

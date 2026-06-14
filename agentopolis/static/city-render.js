@@ -327,6 +327,7 @@ const City = (() => {
     place('watertower', tower.x + .5, tower.y + .5); used.push(tower);
     const pad = claim();                                  // a fenced paddock of grazing cattle
     cluster('cow', pad, 1.4, 5);
+    place('ufo', pad.x + .5, pad.y + .5);                 // a little saucer buzzing above the herd
     for (let i = -2; i < 2; i++) for (const [x, y, dx, dy] of
       [[pad.x + i, pad.y - 2, 1, 0], [pad.x + i, pad.y + 2, 1, 0],
        [pad.x - 2, pad.y + i, 0, 1], [pad.x + 2, pad.y + i, 0, 1]])
