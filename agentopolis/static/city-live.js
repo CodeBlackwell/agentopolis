@@ -70,6 +70,21 @@ cityCanvas.addEventListener('mousedown', m =>
   cityDrag = { x: m.clientX, y: m.clientY, ix: m.clientX, iy: m.clientY, moved: false });
 window.addEventListener('mouseup', () => cityDrag = null);
 
+function tipAt(mx, my, cx, cy) {                           // shared by hover + touch long-press
+  const hit = cityState && City.pick(cityState, mx, my);
+  const tip = document.getElementById('tooltip');
+  if (hit && hit.scroll) {
+    City.roster(hit.tip, cx, cy);
+    tip.style.display = 'none';
+  } else if (hit) {
+    City.roster('');
+    tip.textContent = hit.tip || `${hit.path} · ${hit.floors} fl · ${hit.commits} commits`
+      + `${hit.scaffold ? ' · under construction' : ''}`;
+    tip.style.left = `${cx + 14}px`;
+    tip.style.top = `${cy + 14}px`;
+    tip.style.display = 'block';
+  } else { City.roster(''); tip.style.display = 'none'; }
+}
 cityCanvas.addEventListener('mousemove', m => {
   const r = cityCanvas.getBoundingClientRect();
   if (cityDrag) {
@@ -80,19 +95,13 @@ cityCanvas.addEventListener('mousemove', m => {
     cityDrag.x = m.clientX; cityDrag.y = m.clientY;
     return;
   }
-  const hit = cityState && City.pick(cityState,
-    (m.clientX - r.left) * (cityCanvas.width / r.width),
-    (m.clientY - r.top) * (cityCanvas.height / r.height));
-  const tip = document.getElementById('tooltip');
-  if (hit && hit.scroll) {
-    City.roster(hit.tip, m.clientX, m.clientY);
-    tip.style.display = 'none';
-  } else if (hit) {
-    City.roster('');
-    tip.textContent = hit.tip || `${hit.path} · ${hit.floors} fl · ${hit.commits} commits`
-      + `${hit.scaffold ? ' · under construction' : ''}`;
-    tip.style.left = `${m.clientX + 14}px`;
-    tip.style.top = `${m.clientY + 14}px`;
-    tip.style.display = 'block';
-  } else { City.roster(''); tip.style.display = 'none'; }
+  tipAt((m.clientX - r.left) * (cityCanvas.width / r.width),
+        (m.clientY - r.top) * (cityCanvas.height / r.height), m.clientX, m.clientY);
+});
+
+attachTouch(cityCanvas, {
+  pan: (dx, dy) => { cityCam.ox += dx; cityCam.oy += dy;
+                     document.getElementById('tooltip').style.display = 'none'; City.roster(''); },
+  pinch: (k, mx, my) => cityZoom(k, mx, my),
+  hold: tipAt,
 });

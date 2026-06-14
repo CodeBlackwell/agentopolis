@@ -41,7 +41,7 @@
              display: flex; align-items: center; justify-content: center; }
   /* contain-fit keeps box == content, so getBoundingClientRect mouse mapping stays exact */
   #map { max-width: 100%; max-height: 100%; width: auto; height: auto;
-         display: block; image-rendering: pixelated; cursor: grab;
+         display: block; image-rendering: pixelated; cursor: grab; touch-action: none;
          background: linear-gradient(#241020 0%, #3d1832 55%, #2a1024 100%); }
   #map:active { cursor: grabbing; }
 
@@ -143,7 +143,7 @@
   .dispatch { flex: 0 1 auto; min-width: 0; display: flex; flex-direction: column; }
   .dispatch .holder { flex: 1; min-height: 0; display: flex; justify-content: center; }
   #hotel { height: 100%; width: auto; max-width: 100%; display: block;
-           image-rendering: pixelated; background: #1a0a14; }
+           image-rendering: pixelated; background: #1a0a14; touch-action: none; }
   #ticker { flex: 1; min-width: 0; overflow-y: auto;
             background: rgba(42,16,36,.4); border: 1px solid var(--plum-soft);
             font-family: 'Silkscreen', monospace; font-size: 9px; color: var(--cream); }
@@ -173,6 +173,33 @@
                  box-shadow: 3px 3px 0 var(--plum); outline: none; }
   #forge input::placeholder { color: rgba(245,230,211,.5); }
   #forge input:focus { border-color: var(--cream); }
+
+  /* ---- phones: single column; the rail + event log fold into a slide-in drawer ---- */
+  #drawer-btn { display: none; position: absolute; bottom: 12px; right: 12px; z-index: 8;
+                cursor: pointer; background: var(--plum-soft); color: var(--cream);
+                border: 2px solid var(--gold); box-shadow: 3px 3px 0 var(--plum);
+                font-family: 'Silkscreen', monospace; font-size: 12px; padding: 10px 13px; }
+  #scrim { display: none; position: fixed; inset: 0; z-index: 19; background: rgba(26,10,20,.55); }
+  #scrim.open { display: block; }
+  @media (max-width: 720px) {
+    body { grid-template-columns: 1fr; grid-template-rows: 1fr 40vh;
+           grid-template-areas: "map" "dock"; padding: 8px; gap: 8px; }
+    header p:not(.demo-only) { display: none; }   /* mouse/wheel/Q-E hints don't apply on touch */
+    #side { display: block; position: fixed; top: 0; right: 0; height: 100%;
+            width: min(86vw, 320px); transform: translateX(100%);
+            transition: transform .3s ease; z-index: 20; overflow-y: auto; }
+    #side.open { transform: none; }
+    #side > #ticker { max-height: 38vh; margin-top: 8px; border: 1px solid var(--plum-soft); }
+    #drawer-btn { display: block; }
+    #dock { gap: 0; }
+    #tiers { top: 12px; right: 12px; }
+    #tiers button { padding: 8px 11px; font-size: 12px; }
+    #mapctl { top: 58px; right: 12px; }
+    #mapctl button { width: 42px; height: 42px; font-size: 18px; }
+    #back { top: 54px; left: 12px; padding: 9px 14px; }
+    #forge { bottom: 64px; }
+    #forge input { max-width: 86vw; }
+  }
 </style>
 </head>
 <body data-mode="{{MODE}}" data-hall-level="{{HALL_LEVEL}}" data-hall-name="{{HALL_NAME}}" data-demo="{{DEMO}}">
@@ -202,6 +229,7 @@
       <input name="url" autocomplete="off" spellcheck="false"
              placeholder="paste a public github url &rarr; build it as a city">
     </form>
+    <button id="drawer-btn" title="stats &amp; event log">&#9432; stats</button>
   </div>
 
   <div id="side">
@@ -240,14 +268,30 @@
 
   <div id="tooltip"></div>
   <div id="roster"></div>
+  <div id="scrim"></div>
   <script src="city-render.js"></script>
   <script src="city-scape.js"></script>
   <script src="render.js"></script>
   <script src="hall.js"></script>
   <script src="hall-tiers.js"></script>
+  <script src="touch.js"></script>
   <script>window.CITY_SRC = "{{CITY_SRC}}"; window.DEMO_CITY = "{{DEMO_CITY}}";</script>
   <script src="{{ENGINE}}"></script>
   <script src="hotel.js"></script>
+  <script>
+    // phones: a tap-toggle drawer holds the rail + event log; relocate #ticker into it on mobile
+    (() => {
+      const mq = matchMedia('(max-width: 720px)');
+      const side = document.getElementById('side'), dock = document.getElementById('dock');
+      const ticker = document.getElementById('ticker'), scrim = document.getElementById('scrim');
+      const btn = document.getElementById('drawer-btn');
+      const setOpen = o => { side.classList.toggle('open', o); scrim.classList.toggle('open', o); };
+      btn.addEventListener('click', () => setOpen(!side.classList.contains('open')));
+      scrim.addEventListener('click', () => setOpen(false));
+      const apply = () => { (mq.matches ? side : dock).appendChild(ticker); if (!mq.matches) setOpen(false); };
+      mq.addEventListener('change', apply); apply();
+    })();
+  </script>
   <script>
     if (location.hostname === 'localhost') {
       let _s = null;

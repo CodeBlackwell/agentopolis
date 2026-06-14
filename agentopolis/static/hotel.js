@@ -178,24 +178,33 @@ canvas.addEventListener('wheel', m => {
     (m.clientY - r.top) * (canvas.height / r.height));
 }, { passive: false });
 
-canvas.addEventListener('mousemove', m => {
-  const r = canvas.getBoundingClientRect();
-  const mx = ((m.clientX - r.left) * (canvas.width / r.width) - hallCam.ox) / hallCam.s;
-  const my = ((m.clientY - r.top) * (canvas.height / r.height) - hallCam.oy) / hallCam.s;
+function tipAt(mx, my, cx, cy) {                  // mx,my canvas-space; transform into hall world space
+  const wx = (mx - hallCam.ox) / hallCam.s, wy = (my - hallCam.oy) / hallCam.s;
   let hit = null;
   for (const av of avatars.values()) {
     const { sx, sy } = iso(av.x, av.y);
-    if (Math.abs(mx - sx) < 22 && my > sy - 40 && my < sy + 42) hit = av;
+    if (Math.abs(wx - sx) < 22 && wy > sy - 40 && wy < sy + 42) hit = av;
   }
   if (hit) {
     const secs = Math.round((performance.now() - (hit.since || performance.now())) / 1000);
     tooltip.textContent = `${hit.name}${hit.task ? ' · ' + hit.task : ''}`
       + ` · ${hit.waiting ? 'waiting on you' : hit.state}`
       + `${hit.activity ? ' · ' + hit.activity : ''} · ${secs}s`;
-    tooltip.style.left = `${m.clientX + 14}px`;
-    tooltip.style.top = `${m.clientY + 14}px`;
+    tooltip.style.left = `${cx + 14}px`;
+    tooltip.style.top = `${cy + 14}px`;
     tooltip.style.display = 'block';
   } else tooltip.style.display = 'none';
+}
+canvas.addEventListener('mousemove', m => {
+  const r = canvas.getBoundingClientRect();
+  tipAt((m.clientX - r.left) * (canvas.width / r.width),
+        (m.clientY - r.top) * (canvas.height / r.height), m.clientX, m.clientY);
+});
+
+attachTouch(canvas, {
+  pan: (dx, dy) => { hallCam.ox += dx; hallCam.oy += dy; tooltip.style.display = 'none'; },
+  pinch: (k, mx, my) => hallZoom(k, mx, my),
+  hold: tipAt,
 });
 
 const lamp = document.getElementById('lamp');

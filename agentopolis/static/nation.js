@@ -701,16 +701,18 @@ canvas.addEventListener('wheel', m => {
   zoom(m.deltaY < 0 ? 1.12 : 1 / 1.12, (m.clientX - r.left) * (canvas.width / r.width), (m.clientY - r.top) * (canvas.height / r.height));
 }, { passive: false });
 
-canvas.addEventListener('click', m => {
-  if (moved || trans) return;
-  const r = canvas.getBoundingClientRect();
-  const mx = (m.clientX - r.left) * (canvas.width / r.width), my = (m.clientY - r.top) * (canvas.height / r.height);
-  if (mode === 'city') return;                            // inside a city: no further drill-down
+function tapAt(mx, my) {                                   // shared by click + touch tap
+  if (trans || mode === 'city') return;                   // inside a city: no further drill-down
   const c = pickCity(mx, my);
   if (c) { drillIn(c); return; }                           // town → city; province → state focus; sea → unfocus
   const b = pickState(mx, my);
   if (b && b !== focusState) focusOn(b);
   else if (!b && focusState) unfocus();
+}
+canvas.addEventListener('click', m => {
+  if (moved) return;
+  const r = canvas.getBoundingClientRect();
+  tapAt((m.clientX - r.left) * (canvas.width / r.width), (m.clientY - r.top) * (canvas.height / r.height));
 });
 
 function pickCity(mx, my) {
@@ -723,17 +725,7 @@ function pickCity(mx, my) {
   return best;
 }
 
-canvas.addEventListener('mousemove', m => {
-  const r = canvas.getBoundingClientRect();
-  const kx = canvas.width / r.width, ky = canvas.height / r.height;
-  const mx = (m.clientX - r.left) * kx, my = (m.clientY - r.top) * ky;
-  if (drag) {
-    moved = true; mapTween = null;
-    const cam = mode === 'city' ? cityCam : mapCam;
-    cam.ox += (m.clientX - drag.x) * kx; cam.oy += (m.clientY - drag.y) * ky;
-    drag = { x: m.clientX, y: m.clientY };
-    return;
-  }
+function tipAt(mx, my, cx, cy) {                           // shared by hover + touch long-press
   let text = null;
   if (mode === 'city' && currentCity) {
     const b = City.pick(currentCity.cityState, mx, my);
@@ -744,8 +736,28 @@ canvas.addEventListener('mousemove', m => {
   }
   if (text) {
     tooltip.textContent = text;
-    tooltip.style.left = `${m.clientX + 14}px`; tooltip.style.top = `${m.clientY + 14}px`; tooltip.style.display = 'block';
+    tooltip.style.left = `${cx + 14}px`; tooltip.style.top = `${cy + 14}px`; tooltip.style.display = 'block';
   } else tooltip.style.display = 'none';
+}
+canvas.addEventListener('mousemove', m => {
+  const r = canvas.getBoundingClientRect();
+  const kx = canvas.width / r.width, ky = canvas.height / r.height;
+  if (drag) {
+    moved = true; mapTween = null;
+    const cam = mode === 'city' ? cityCam : mapCam;
+    cam.ox += (m.clientX - drag.x) * kx; cam.oy += (m.clientY - drag.y) * ky;
+    drag = { x: m.clientX, y: m.clientY };
+    return;
+  }
+  tipAt((m.clientX - r.left) * kx, (m.clientY - r.top) * ky, m.clientX, m.clientY);
+});
+
+attachTouch(canvas, {
+  pan: (dx, dy) => { moved = true; mapTween = null; tooltip.style.display = 'none';
+                     const cam = mode === 'city' ? cityCam : mapCam; cam.ox += dx; cam.oy += dy; },
+  pinch: (k, mx, my) => zoom(k, mx, my),
+  tap: tapAt,
+  hold: tipAt,
 });
 
 function stateName(id) { return (nation.blocks.find(b => b.st.id === id) || { st: {} }).st.name || id; }
