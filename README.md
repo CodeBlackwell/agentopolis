@@ -18,6 +18,7 @@ pan/zoom. The city re-seeds itself from git whenever HEAD moves.
 
 ```bash
 uv tool install agentopolis         # or: pipx install agentopolis
+                                    # or: brew install codeblackwell/tap/agentopolis
 agentopolis attach                  # one-time: fire-and-forget hooks into ~/.claude/settings.json
 
 cd ~/code/any-repo
