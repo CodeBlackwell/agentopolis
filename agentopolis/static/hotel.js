@@ -10,7 +10,6 @@ const TOOL_STATION = {
   Edit: 'workshop', Write: 'workshop', MultiEdit: 'workshop', NotebookEdit: 'workshop',
   WebSearch: 'telephone', WebFetch: 'telephone', Task: 'reception', TodoWrite: 'reception',
 };
-const SHIRTS = ['#c0392b', '#2980b9', '#27ae60', '#e67e22', '#8e44ad', '#16a085', '#d35400', '#e84393'];
 const HAIR = ['#2d1b12', '#6b3e1e', '#c9a227', '#3a3a3a'];
 const SPEED = 3.2;
 const SEATS = [[0, 0], [.55, 0], [0, .55], [.55, .55], [-.5, .3], [.3, -.5], [-.5, -.5], [.7, .35]];
@@ -26,7 +25,7 @@ function spawn(id, name, isAgent) {
   const [dx, dy] = STATIONS.door;
   const av = {
     id, name, isAgent, x: dx, y: dy, tx: dx, ty: dy, state: 'idle', pending: 'idle',
-    color: isAgent ? SHIRTS[hash(id) % SHIRTS.length] : '#d4a953',
+    color: '#d4a953', shirt: hash(id),         // shirt = stable slot; the room's palette picks the color
     hair: HAIR[hash(name) % HAIR.length], bubble: null, leaving: false,
   };
   avatars.set(id, av);

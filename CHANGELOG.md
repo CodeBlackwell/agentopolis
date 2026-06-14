@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-06-13
+
+### Changed
+- Renamed the project from Botapest to **Agentopolis**. The CLI is now
+  `agentopolis`, the PyPI package is `agentopolis`, the zoning manifests are
+  `.agentopolis.json` / `.agentopolis-nation.json`, and the dev env vars are
+  `AGENTOPOLIS_*`. Re-run `agentopolis attach` after upgrading.
+
 ## [0.5.0] - 2026-06-13
 
 ### Added

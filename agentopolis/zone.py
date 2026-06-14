@@ -1,4 +1,4 @@
-"""Zoning: use the repo's .botapest.json if present, else derive one.
+"""Zoning: use the repo's .agentopolis.json if present, else derive one.
 
 Auto-zoning maps each top-level directory to a component, guesses its
 layer from the name, and lumps root files into a Commons district.
@@ -64,7 +64,7 @@ def auto_zone(repo: str, exclude: set | None = None) -> dict:
 
 
 def load_zone(repo: str, zone_path: str | None, exclude: set | None = None) -> dict:
-    path = Path(zone_path) if zone_path else Path(repo) / ".botapest.json"
+    path = Path(zone_path) if zone_path else Path(repo) / ".agentopolis.json"
     if path.exists():
         return json.loads(path.read_text())
     return auto_zone(repo, exclude)

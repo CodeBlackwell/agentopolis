@@ -28,6 +28,14 @@ function setHallContext(level, name) {              // called by the map engine 
 }
 const drawHall = (ctx, level) => (HALLS[level] || HALLS.city).draw(ctx);
 const furnitureFor = level => (HALLS[level] || HALLS.city).furniture;
+
+// agents dress to match the room: civic browns, sage greens, tactical slate
+const OUTFITS = {
+  city:   ['#7a4a26', '#54320f', '#8a6d3b', '#a6884f', '#5e4630', '#9c6b3f', '#6e5e48', '#b08d57'],
+  state:  ['#4f6e52', '#6b8e5a', '#3f5247', '#8a9a5b', '#5d7c5f', '#7e8c50', '#9fae6f', '#4a5e3a'],
+  nation: ['#2b5543', '#3a4452', '#19384a', '#445e44', '#3a2b40', '#1f4a5e', '#4a6e5e', '#5e3a3a'],
+};
+const outfitFor = av => av.isAgent ? OUTFITS[hallLevel][av.shirt % OUTFITS[hallLevel].length] : av.color;
 window.addEventListener('DOMContentLoaded', () =>   // seed from the server-stamped body dataset
   setHallContext(document.body.dataset.hallLevel || 'city', document.body.dataset.hallName || ''));
 
@@ -69,9 +77,15 @@ function drawAvatar(ctx, av, t) {
   px(ctx, cx, base, 1, -4, 8, 4, '#2b1622');
   px(ctx, cx, base, -8, -13, 7, 9, '#3a3a4a');              // legs
   px(ctx, cx, base, 1, -13, 7, 9, '#3a3a4a');
-  px(ctx, cx, base, -10, -26, 20, 13, av.color);            // torso
-  px(ctx, cx, base, -14, -25, 4, 10, av.color);             // arms
-  px(ctx, cx, base, 10, -25, 4, 10, av.color);
+  const outfit = outfitFor(av);
+  const suited = av.isAgent && hallLevel === 'nation';      // national security: suits + glasses
+  px(ctx, cx, base, -10, -26, 20, 13, outfit);              // torso
+  px(ctx, cx, base, -14, -25, 4, 10, outfit);               // arms
+  px(ctx, cx, base, 10, -25, 4, 10, outfit);
+  if (suited) {
+    px(ctx, cx, base, -2, -26, 4, 13, '#ececf0');           // dress shirt
+    px(ctx, cx, base, -1, -26, 2, 10, '#8a2a33');           // tie
+  }
   px(ctx, cx, base, -14, -15, 4, 3, SKIN);                  // hands
   px(ctx, cx, base, 10, -15, 4, 3, SKIN);
   px(ctx, cx, base, -10, -40, 20, 14, SKIN);                // head
@@ -80,6 +94,14 @@ function drawAvatar(ctx, av, t) {
   px(ctx, cx, base, 7, -38, 3, 6, av.hair);
   px(ctx, cx, base, -5, -35, 2, 3, '#241510');              // eyes
   px(ctx, cx, base, 3, -35, 2, 3, '#241510');
+  if (suited) {                                             // wire-frame glasses
+    const G = '#1a1a22';
+    px(ctx, cx, base, -7, -36, 6, 1, G); px(ctx, cx, base, -7, -31, 6, 1, G);  // left lens
+    px(ctx, cx, base, -7, -36, 1, 6, G); px(ctx, cx, base, -2, -36, 1, 6, G);
+    px(ctx, cx, base, 1, -36, 6, 1, G);  px(ctx, cx, base, 1, -31, 6, 1, G);   // right lens
+    px(ctx, cx, base, 1, -36, 1, 6, G);  px(ctx, cx, base, 6, -36, 1, 6, G);
+    px(ctx, cx, base, -1, -35, 2, 1, G);                                       // bridge
+  }
   px(ctx, cx, base, -2, -30, 4, 2, '#b3795a');              // mouth
   ctx.restore();
   ctx.font = '8px Silkscreen, monospace';

@@ -2,7 +2,7 @@
 
 discover_repos() finds git repos one level under a root. summarize() reads
 cheap git stats per repo (no file-content reads, so it scales to dozens).
-load_nation() folds in an optional .botapest-nation.json that names the
+load_nation() folds in an optional .agentopolis-nation.json that names the
 states (repo clusters).
 """
 import json
@@ -96,7 +96,7 @@ def mother_nation(root: str) -> dict:
 
 
 def load_nation(root: str, manifest_path: str | None) -> dict:
-    path = Path(manifest_path) if manifest_path else Path(root) / ".botapest-nation.json"
+    path = Path(manifest_path) if manifest_path else Path(root) / ".agentopolis-nation.json"
     if not path.exists() and is_mother(root):   # an explicit manifest wins; a bare mother is a metropolis
         return mother_nation(root)
     repos = discover_repos(root)

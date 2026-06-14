@@ -1,4 +1,4 @@
-"""Botapest City — event relay + city seeding.
+"""Agentopolis — event relay + city seeding.
 
 Receives Claude Code hook payloads on POST /hook, normalizes them, and
 broadcasts to browsers over SSE at GET /events. GET /city-data.json
@@ -25,10 +25,10 @@ city = {"repo": ".", "zone_path": None}
 nation = {"root": None, "manifest": None}
 
 # dev mode: env vars survive uvicorn --reload cycles; cli.py still wins when used directly
-if _root := os.environ.get("BOTAPEST_ROOT"):
-    nation.update(root=_root, manifest=os.environ.get("BOTAPEST_MANIFEST"))
-if _repo := os.environ.get("BOTAPEST_REPO"):
-    city.update(repo=_repo, zone_path=os.environ.get("BOTAPEST_ZONE"))
+if _root := os.environ.get("AGENTOPOLIS_ROOT"):
+    nation.update(root=_root, manifest=os.environ.get("AGENTOPOLIS_MANIFEST"))
+if _repo := os.environ.get("AGENTOPOLIS_REPO"):
+    city.update(repo=_repo, zone_path=os.environ.get("AGENTOPOLIS_ZONE"))
 seeded: dict[str, dict] = {}        # repo path -> {head, data}, cached per git HEAD
 runner = None       # uvicorn.Server, set by cli — lets SSE streams end on Ctrl+C
 
@@ -150,7 +150,7 @@ def dev_stamp():
 
 @app.middleware("http")
 async def no_stale_assets(request: Request, call_next):
-    # static files change on every botapest upgrade; force revalidation (304s keep it cheap)
+    # static files change on every agentopolis upgrade; force revalidation (304s keep it cheap)
     response = await call_next(request)
     response.headers["Cache-Control"] = "no-cache"
     return response

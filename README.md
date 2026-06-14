@@ -1,4 +1,4 @@
-# Botapest City
+# Agentopolis
 
 A Habbo-style isometric visualization of Claude Code at work, in two views on
 one page. **The dispatch floor** (City Hall): every agent is a pixel worker —
@@ -17,21 +17,21 @@ pan/zoom. The city re-seeds itself from git whenever HEAD moves.
 ## Install & run
 
 ```bash
-uv tool install botapest            # or: pipx install botapest
-botapest attach                     # one-time: fire-and-forget hooks into ~/.claude/settings.json
+uv tool install agentopolis         # or: pipx install agentopolis
+agentopolis attach                  # one-time: fire-and-forget hooks into ~/.claude/settings.json
 
 cd ~/code/any-repo
-botapest                            # its city on http://localhost:4242
+agentopolis                         # its city on http://localhost:4242
 ```
 
 Open http://localhost:4242, then start any Claude Code session — new sessions
 report in automatically. No live session handy? http://localhost:4242/?demo
-runs a scripted day in the city. `botapest detach` removes the hooks (a backup
+runs a scripted day in the city. `agentopolis detach` removes the hooks (a backup
 of settings.json is written on attach). Flags: `--repo`, `--port`, `--zone`.
 
-**Zoning:** if the repo has a `.botapest.json` manifest it defines the city's
+**Zoning:** if the repo has a `.agentopolis.json` manifest it defines the city's
 components, layers, and clouds (see `city/maisight.json` for a full example);
-otherwise botapest auto-zones from the repo's top-level directories. For repo
+otherwise agentopolis auto-zones from the repo's top-level directories. For repo
 hackers: `just dev` serves ../maisight with its manifest.
 
 ## How it works

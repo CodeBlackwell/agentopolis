@@ -1,4 +1,4 @@
-// Botapest City lib — diamond-ring radial layout from zoning + git seed, iso drawing, live growth.
+// Agentopolis City lib — diamond-ring radial layout from zoning + git seed, iso drawing, live growth.
 // Pages talk to the `City` object; CityScape (loaded after) draws ground/water/props.
 const City = (() => {
   const HW = 26, HH = 13, FLOOR = 14;
@@ -54,7 +54,7 @@ const City = (() => {
   }
 
   // ---- city plan: the layout FORM follows the repo's structure. Three generators emit the
-  //      same blocks + ground contract; choosePlan picks one (or .botapest.json pins "plan"). ----
+  //      same blocks + ground contract; choosePlan picks one (or .agentopolis.json pins "plan"). ----
   // codes: 0 street, 1 avenue, 2 green, 3 plaza, 4 river, 5 bridge, 6 cemetery, 10+id district pavement
   function newBlock(state, comp, list) {
     const block = { comp, list, lots: [], next: 0,
@@ -258,7 +258,7 @@ const City = (() => {
                     byPath: new Map(), items: [], clouds: [], cityHall: null };
     const byComp = {};
     for (const b of data.buildings) (byComp[b.component] ??= []).push(b);
-    (PLANS[data.zone.plan] || choosePlan(data))(state, data, byComp);   // .botapest.json may pin "plan"
+    (PLANS[data.zone.plan] || choosePlan(data))(state, data, byComp);   // .agentopolis.json may pin "plan"
     addCemetery(state, data);
     sprinkle(state);
     state.deps = data.deps || [];

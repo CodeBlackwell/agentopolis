@@ -1,6 +1,6 @@
 // Nation view: a top-down pixel world map — each state a biome province, repos as town
 // icons keyed by archetype family. Click a city to fly-zoom + crossfade into its full
-// isometric Botapest city (the existing City engine). Zoom back out returns to the map.
+// isometric Agentopolis city (the existing City engine). Zoom back out returns to the map.
 const canvas = document.getElementById('map');
 const ctx = canvas.getContext('2d');
 const tooltip = document.getElementById('tooltip');

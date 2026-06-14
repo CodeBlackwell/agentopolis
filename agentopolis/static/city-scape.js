@@ -1,4 +1,4 @@
-// Environment for Botapest City: ground fabric, waterfront, horizon, street props.
+// Environment for Agentopolis City: ground fabric, waterfront, horizon, street props.
 const CityScape = (() => {
   const { proj, hash, near } = City;
 

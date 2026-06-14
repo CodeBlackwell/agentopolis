@@ -1,7 +1,9 @@
-"""botapest — run from any git repo to watch agents build its city."""
+"""agentopolis — run from any git repo to watch agents build its city."""
 import argparse
 import subprocess
+import threading
 import time
+import webbrowser
 
 import uvicorn
 
@@ -25,14 +27,15 @@ def free_port(port: int) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="botapest",
+        prog="agentopolis",
         description="Habbo-style visualization of Claude Code agents building your repo as a city.")
     parser.add_argument("command", nargs="?", default="serve", choices=["serve", "attach", "detach"],
                         help="serve the city (default), or attach/detach Claude Code hooks")
     parser.add_argument("--repo", default=".", help="git repo to map as the city (default: cwd)")
-    parser.add_argument("--zone", help="zoning manifest (default: <repo>/.botapest.json, else auto-zoned)")
+    parser.add_argument("--zone", help="zoning manifest (default: <repo>/.agentopolis.json, else auto-zoned)")
     parser.add_argument("--root", help="map every git repo under this dir as a nation of cities")
     parser.add_argument("--port", type=int, default=4242)
+    parser.add_argument("--no-open", action="store_true", help="don't open the city in a browser")
     args = parser.parse_args()
 
     if args.command == "attach":
@@ -46,7 +49,14 @@ def main() -> None:
         if root:
             server.configure_nation(root, None)
         where = f"nation: {root}" if root else f"repo: {args.repo}"
-        print(f"Botapest {'Nation' if root else 'City'} on http://localhost:{args.port} ({where})")
+        url = f"http://localhost:{args.port}"
+        print(f"Agentopolis {'Nation' if root else 'City'} on {url} ({where})")
+        if not hooks.is_attached():
+            print("tip: run `agentopolis attach` so Claude Code sessions report to the city")
+        if not args.no_open:
+            opener = threading.Timer(1, lambda: webbrowser.open(url))
+            opener.daemon = True
+            opener.start()
         # SSE streams watch runner.should_exit so open browsers don't block Ctrl+C;
         # the graceful-shutdown timeout is the backstop for any other slow request
         runner = uvicorn.Server(uvicorn.Config(server.app, port=args.port,

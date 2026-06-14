@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 SETTINGS = Path.home() / ".claude" / "settings.json"
-BACKUP = SETTINGS.with_suffix(".json.botapest.bak")
+BACKUP = SETTINGS.with_suffix(".json.agentopolis.bak")
 EVENTS = [
     "SessionStart",
     "UserPromptSubmit",
@@ -32,6 +32,13 @@ def has_hotel_hook(entries: list) -> bool:
         for entry in entries
         for hook in entry.get("hooks", [])
     )
+
+
+def is_attached() -> bool:
+    if not SETTINGS.exists():
+        return False
+    hooks = json.loads(SETTINGS.read_text()).get("hooks", {})
+    return any(has_hotel_hook(entries) for entries in hooks.values())
 
 
 def attach(port: int = 4242) -> None:
@@ -59,4 +66,4 @@ def detach() -> None:
         if not hooks[event]:
             del hooks[event]
     SETTINGS.write_text(json.dumps(settings, indent=2) + "\n")
-    print("detached — botapest hooks removed")
+    print("detached — agentopolis hooks removed")
