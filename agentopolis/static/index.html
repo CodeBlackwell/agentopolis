@@ -66,7 +66,7 @@
   }
   #back:hover { background: var(--gold); color: var(--plum); }
   #tiers {
-    position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+    position: absolute; top: 52px; left: 50%; transform: translateX(-50%);
     display: flex; align-items: center; gap: 6px; padding: 6px 8px;
     background: rgba(42,16,36,.82); border: 2px solid var(--gold); font-family: 'Silkscreen', monospace;
   }
@@ -180,7 +180,7 @@
     <canvas id="map" width="1280" height="720"></canvas>
     <header>
       <h1>Agentopolis <span class="m-nation">Nation</span><span class="m-city">City</span></h1>
-      <p class="m-nation">drag to pan &middot; scroll to zoom &middot; click a city to enter it &middot; Q/E to rotate inside</p>
+      <p class="m-nation">drag to pan &middot; scroll to zoom &middot; click a city to enter &middot; zoom out to leave &middot; Q/E rotate</p>
       <p class="m-city">scroll to zoom in &amp; out &middot; drag to pan &middot; the city builds itself</p>
       <p class="m-city demo-only"><a href="/?nation">&#9656; explore the whole BLACKBOX nation</a></p>
     </header>
@@ -245,7 +245,7 @@
   <script src="render.js"></script>
   <script src="hall.js"></script>
   <script src="hall-tiers.js"></script>
-  <script>window.CITY_SRC = "{{CITY_SRC}}";</script>
+  <script>window.CITY_SRC = "{{CITY_SRC}}"; window.DEMO_CITY = "{{DEMO_CITY}}";</script>
   <script src="{{ENGINE}}"></script>
   <script src="hotel.js"></script>
   <script>

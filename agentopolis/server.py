@@ -192,15 +192,13 @@ async def no_stale_assets(request: Request, call_next):
 
 @app.get("/")
 def root(request: Request) -> HTMLResponse:
-    # one shell, two map engines: stamp the mode + inject the matching engine script.
-    # ?forge=<github url> forces city mode pointed at the forge endpoint; the demo can also
-    # land straight on a showcase city (AGENTOPOLIS_DEMO_CITY); ?nation always returns the map.
+    # one shell, two map engines. ?forge=<github url> opens the city engine on the forge endpoint.
+    # Otherwise the showcase opens the nation map; AGENTOPOLIS_DEMO_CITY auto-drills into one city on
+    # load (so zoom-out + the tier breadcrumb still reach the nation), and ?nation skips the drill.
     forge = request.query_params.get("forge")
-    demo_city = showcase["dir"] and showcase["city"]
+    auto_city = bool(showcase["dir"] and showcase["city"]) and "nation" not in request.query_params
     if forge:
         mode, name, src = "city", forge.rstrip("/").split("/")[-1], "/forge?url=" + quote(forge, safe="")
-    elif demo_city and "nation" not in request.query_params:
-        mode, name, src = "city", demo_city, "city-data.json?repo=" + quote(demo_city, safe="")
     elif nation["root"]:
         mode, name, src = "nation", Path(nation["root"]).name, "city-data.json"
     else:
@@ -209,7 +207,8 @@ def root(request: Request) -> HTMLResponse:
     html = (Path(__file__).parent / "static" / "index.html").read_text()
     return HTMLResponse(html.replace("{{MODE}}", mode).replace("{{ENGINE}}", engine)
                         .replace("{{HALL_LEVEL}}", mode).replace("{{HALL_NAME}}", name)
-                        .replace("{{CITY_SRC}}", src).replace("{{DEMO}}", "1" if showcase["dir"] else ""))
+                        .replace("{{CITY_SRC}}", src).replace("{{DEMO}}", "1" if showcase["dir"] else "")
+                        .replace("{{DEMO_CITY}}", showcase["city"] if auto_city else ""))
 
 
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")

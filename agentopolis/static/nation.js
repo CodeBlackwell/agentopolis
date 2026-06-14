@@ -615,6 +615,7 @@ function startCity(c) {
   cityFitS = cityCam.s; cityCam.rot = 0;
   renderCityPanel(c); switchPanel('city');
   updateChrome();
+  if (window.startDemoLoop) window.startDemoLoop(c.cityState.buildings);   // demo: agents build THIS city
 }
 
 function frame(t) {
@@ -647,11 +648,16 @@ function frame(t) {
   requestAnimationFrame(frame);
 }
 
+// demo: animate whichever city is currently drilled in (city-live.js owns this in city mode)
+window.cityHandle = e => { if (currentCity && currentCity.cityState) City.applyEvent(currentCity.cityState, e); };
+
 async function init() {
   nation = layoutNation(await (await fetch('nation-data.json')).json());
   fitMap();
   updateChrome();
   requestAnimationFrame(frame);
+  const start = window.DEMO_CITY && nation.byRepo[window.DEMO_CITY];   // demo lands drilled into one city
+  if (start) drillIn(start);
 }
 
 // ---- controls ----

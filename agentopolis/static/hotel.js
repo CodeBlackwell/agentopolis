@@ -236,15 +236,16 @@ function buildScript(buildings) {
 }
 
 let demoTimer = null;
-window.startDemoLoop = startDemoLoop;            // city-live.js (separate scope) triggers it on city load
+window.startDemoLoop = startDemoLoop;            // city-live.js / nation.js (separate scopes) trigger it
 function startDemoLoop(buildings) {
   const forced = new URLSearchParams(location.search).has('demo');
   if (location.hostname === 'localhost' && !forced) return;   // local real-hook use: stay quiet
-  if (demoTimer) return;
+  if (demoTimer) clearInterval(demoTimer);       // restart on the newly-focused city's buildings
   const script = buildScript(buildings || []);
   let i = 0;
   demoTimer = setInterval(() => handle(script[i++ % script.length]), 2600);
 }
 
-if (document.body.dataset.mode === 'nation') startDemoLoop(null);   // city mode starts from city-live.js
+// nation mode drives the loop per drilled-in city (nation.js); only kick a generic loop when not auto-drilling
+if (document.body.dataset.mode === 'nation' && !window.DEMO_CITY) startDemoLoop(null);
 })();
