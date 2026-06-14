@@ -7,7 +7,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from .seed import git
+from .seed import tracked
 
 LAYERS = ["back", "mid", "front", "under"]
 FRONT = ("frontend", "front", "ui", "web", "client", "www", "app", "site", "landing", "docs", "doc", "examples")
@@ -43,8 +43,8 @@ def guess_layer(name: str) -> str:
     return "mid"
 
 
-def auto_zone(repo: str) -> dict:
-    files = git(repo, "ls-files").splitlines()
+def auto_zone(repo: str, exclude: set | None = None) -> dict:
+    files = tracked(repo, exclude)
     counts = Counter(f.split("/")[0] for f in files if "/" in f)
     components = []
     for i, (d, n) in enumerate(counts.most_common()):
@@ -63,8 +63,8 @@ def auto_zone(repo: str) -> dict:
             "components": components, "clouds": []}
 
 
-def load_zone(repo: str, zone_path: str | None) -> dict:
+def load_zone(repo: str, zone_path: str | None, exclude: set | None = None) -> dict:
     path = Path(zone_path) if zone_path else Path(repo) / ".botapest.json"
     if path.exists():
         return json.loads(path.read_text())
-    return auto_zone(repo)
+    return auto_zone(repo, exclude)

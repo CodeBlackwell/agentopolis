@@ -1,4 +1,6 @@
 // Hotel state machine: SSE events in, avatars move, ticker logs.
+// IIFE-scoped so its ctx/canvas/tooltip globals don't collide with nation.js when both load.
+(() => {
 const STATIONS = {
   reception: [5, 2], terminal: [9, 2], archive: [2, 4], workshop: [2, 9],
   telephone: [10, 8], lobby: [5, 6], door: [0, 7],
@@ -11,13 +13,12 @@ const TOOL_STATION = {
 const SHIRTS = ['#c0392b', '#2980b9', '#27ae60', '#e67e22', '#8e44ad', '#16a085', '#d35400', '#e84393'];
 const HAIR = ['#2d1b12', '#6b3e1e', '#c9a227', '#3a3a3a'];
 const SPEED = 3.2;
+const SEATS = [[0, 0], [.55, 0], [0, .55], [.55, .55], [-.5, .3], [.3, -.5], [-.5, -.5], [.7, .35]];
 
 const ctx = document.getElementById('hotel').getContext('2d');
 const ticker = document.getElementById('ticker');
 const avatars = new Map();
-const agentQueues = new Map();              // session -> spawned-but-unclaimed avatar ids
-const agentAvatars = new Map();             // `${session}:${agent_id}` -> avatar id
-let agentCount = 0;
+const pendingNames = new Map();             // session -> task descriptions awaiting their agent
 
 const hash = s => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
 
@@ -32,13 +33,36 @@ function spawn(id, name, isAgent) {
   return av;
 }
 
+function seat(av, station) {                 // lowest free offset so co-located avatars don't overlap
+  const taken = new Set();
+  for (const o of avatars.values())
+    if (o !== av && o.station === station && o.seat != null) taken.add(o.seat);
+  let i = 0;
+  while (taken.has(i) && i < SEATS.length - 1) i++;
+  return i;
+}
+
 function send(av, station, text) {
-  [av.tx, av.ty] = STATIONS[station];
+  const [bx, by] = STATIONS[station];
+  av.station = station;
+  av.seat = seat(av, station);
+  av.tx = Math.max(0, bx + SEATS[av.seat][0]);
+  av.ty = Math.max(0, by + SEATS[av.seat][1]);
   av.state = 'walking';
   av.pending = station === 'lobby' ? 'idle' : 'working';
   av.activity = text || null;
   av.since = performance.now();
   if (text) av.bubble = { text, t: performance.now() };
+}
+
+function done(av) {                          // a tool finished: stop working, hold position
+  av.pending = 'idle';
+  if (av.state === 'working') av.state = 'idle';
+}
+
+function stationFor(tool) {                  // route unknown/MCP tools instead of dumping them in the lobby
+  if (tool && tool.startsWith('mcp__')) return 'telephone';
+  return TOOL_STATION[tool] || 'reception';
 }
 
 function ensureMain(session) {
@@ -53,7 +77,7 @@ function checkout(av) {
 }
 
 function handle(e) {
-  cityHandle(e);                            // the skyline grows from the same events
+  if (typeof cityHandle === 'function') cityHandle(e);
   if (e.agent_id) handleAgent(e);
   else handleMain(e);
   tick(e);
@@ -64,11 +88,11 @@ function handleMain(e) {
   main.waiting = false;
   if (e.event === 'UserPromptSubmit') send(main, 'reception', e.detail);
   else if (e.event === 'PreToolUse' && (e.tool === 'Task' || e.tool === 'Agent')) {
-    const id = `agent:${e.session}:${agentCount++}`;
-    send(spawn(id, e.agent_type || 'agent', true), randomStation(), e.agent_name);
-    agentQueues.set(e.session, [...(agentQueues.get(e.session) || []), id]);
+    pendingNames.set(e.session, [...(pendingNames.get(e.session) || []), e.agent_name]);
+    send(main, 'reception', `dispatch: ${e.agent_name || 'agent'}`);
   } else if (e.event === 'PreToolUse')
-    send(main, TOOL_STATION[e.tool] || 'lobby', `${e.tool}${e.detail ? ': ' + e.detail : ''}`);
+    send(main, stationFor(e.tool), `${e.tool}${e.detail ? ': ' + e.detail : ''}`);
+  else if (e.event === 'PostToolUse') done(main);
   else if (e.event === 'Notification') {
     main.waiting = true;
     main.bubble = { text: e.detail || 'needs attention', t: performance.now() };
@@ -183,3 +207,4 @@ if (new URLSearchParams(location.search).has('demo')) {
   let i = 0;
   setInterval(() => handle(script[i++ % script.length]), 2600);
 }
+})();

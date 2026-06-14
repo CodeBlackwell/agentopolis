@@ -15,6 +15,8 @@ from pathlib import Path
 CLASS = re.compile(r"^\s*(export |abstract |public |final )*(class|interface|struct|trait)\b")
 IMPORT = re.compile(r"^\s*(import|from|require|use|#include)\b|=\s*require\(")
 TODO = re.compile(r"TODO|FIXME|HACK")
+FROM = re.compile(r"^\s*FROM\s+(\S+)", re.I)
+FROM_AS = re.compile(r"\bAS\s+(\S+)", re.I)
 
 # A dependency name (substring match) marks the district that declares it as a cloud client.
 DEP_CLOUDS = [
@@ -47,6 +49,13 @@ FILE_CLOUDS = [
 
 def git(repo: str, *args: str) -> str:
     return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True).stdout
+
+
+def tracked(repo: str, exclude: set | None = None) -> list[str]:
+    files = git(repo, "ls-files").splitlines()
+    if exclude:                                  # drop nested-repo dirs when seeding a mother's capital
+        files = [f for f in files if f.split("/", 1)[0] not in exclude]
+    return files
 
 
 def component_of(path: str, components: list) -> str | None:
@@ -123,6 +132,61 @@ def detect_clouds(repo: str, comp: dict[str, str | None]) -> list[dict]:
     return clouds
 
 
+def compose_services(repo: str, f: str) -> list[str]:
+    """Service keys under a compose file's top-level `services:` block (light indent parse, no yaml dep)."""
+    try:
+        lines = Path(repo, f).read_text(errors="ignore").splitlines()
+    except OSError:
+        return []
+    out: list[str] = []
+    in_services = indent = None
+    for line in lines:
+        body = line.strip()
+        if not body or body.startswith("#"):
+            continue
+        col = len(line) - len(line.lstrip())
+        if in_services is None:
+            in_services = body == "services:" or None
+        elif col == 0:                              # dedented out of the services block
+            break
+        else:
+            indent = col if indent is None else indent
+            if col == indent and body.endswith(":"):
+                out.append(body[:-1].strip())
+    return out
+
+
+def dockerfile_images(repo: str, f: str) -> list[str]:
+    out: list[str] = []
+    stages: set[str] = set()                        # multi-stage names so `FROM builder` isn't a base image
+    try:
+        for line in open(Path(repo, f), errors="ignore"):
+            m = FROM.match(line)
+            if not m:
+                continue
+            img = m.group(1).rsplit("/", 1)[-1].split("@")[0]
+            if img.lower() != "scratch" and img not in stages and img not in out:
+                out.append(img)
+            stage = FROM_AS.search(line)
+            if stage:
+                stages.add(stage.group(1))
+    except OSError:
+        pass
+    return out
+
+
+def docker_manifest(repo: str, files) -> list[dict]:
+    """Each compose/Dockerfile as a harbor ship; its items are the services / base images it runs."""
+    arts = []
+    for f in files:
+        name = f.rsplit("/", 1)[-1].lower()
+        if "compose.y" in name:
+            arts.append({"path": f, "kind": "compose", "items": compose_services(repo, f)})
+        elif "dockerfile" in name:
+            arts.append({"path": f, "kind": "image", "items": dockerfile_images(repo, f)})
+    return arts
+
+
 def dead_files(repo: str, alive: set[str]) -> list[dict]:
     died: dict[str, int] = {}                   # path -> deletion commit time (newest deletion wins)
     ts = 0
@@ -143,13 +207,18 @@ def dead_files(repo: str, alive: set[str]) -> list[dict]:
     return [{"path": p, "born": born.get(p), "died": d} for p, d in died.items()]
 
 
-def seed(repo: str, zone: dict) -> dict:
-    comp = {f: component_of(f, zone["components"]) for f in git(repo, "ls-files").splitlines()}
+def seed(repo: str, zone: dict, exclude: set | None = None) -> dict:
+    comp = {f: component_of(f, zone["components"]) for f in tracked(repo, exclude)}
     files = [f for f, c in comp.items() if c]
+
+    group = {c["id"]: c.get("group") for c in zone["components"]}
+    bkey = lambda f: "/".join(f.split("/")[:group[comp[f]]]) if group[comp[f]] else f
+    bcomp = {bkey(f): comp[f] for f in files}             # building id -> its district
 
     commits = dict.fromkeys(files, 0)
     last = dict.fromkeys(files, 0)
     cocomp = {f: set() for f in files}
+    pairs: Counter = Counter()                            # co-commit weight between buildings
     timestamp = 0
     touched: list[str] = []
     for line in git(repo, "log", "--name-only", "--pretty=%ct").splitlines() + [""]:
@@ -160,13 +229,17 @@ def seed(repo: str, zone: dict) -> dict:
                 last[f] = max(last[f], timestamp)
                 if len(touched) <= 15:                  # mega-commits aren't coupling signal
                     cocomp[f] |= comps - {comp[f]}
+            if len(touched) <= 15:                      # buildings that changed together get an edge
+                keys = sorted({bkey(f) for f in touched})
+                for i in range(len(keys)):
+                    for j in range(i + 1, len(keys)):
+                        pairs[(keys[i], keys[j])] += 1
             touched = []
             if line.isdigit():
                 timestamp = int(line)
         elif line in commits:
             touched.append(line)
 
-    group = {c["id"]: c.get("group") for c in zone["components"]}
     buildings: dict[str, dict] = {}
     exts: dict[str, Counter] = {}
     now = time.time()
@@ -189,10 +262,20 @@ def seed(repo: str, zone: dict) -> dict:
         exts.setdefault(key, Counter())[Path(f).suffix.lstrip(".").lower()] += 1
     for key, b in buildings.items():
         b["ext"] = exts[key].most_common(1)[0][0]
-    docker = sum(1 for f in comp if "dockerfile" in f.lower() or "compose.y" in f.lower())
+    co_edges = [{"a": a, "b": b, "w": w} for (a, b), w in pairs.items()
+                if w >= 2 and bcomp.get(a) and bcomp.get(a) == bcomp.get(b)]
+    cross: Counter = Counter()                            # roll building pairs up to district pairs
+    for (a, b), w in pairs.items():
+        ca, cb = bcomp.get(a), bcomp.get(b)
+        if ca and cb and ca != cb:
+            cross[tuple(sorted((ca, cb)))] += w
+    district_edges = [{"a": a, "b": b, "w": w} for (a, b), w in cross.items()]
+
+    docker = docker_manifest(repo, comp)
     named = {c["name"].lower() for c in zone.get("clouds", [])}    # manual clouds win
     zone["clouds"] = zone.get("clouds", []) + \
         [c for c in detect_clouds(repo, comp) if c["name"].lower() not in named]
     return {"zone": zone, "buildings": list(buildings.values()),
             "deps": parse_deps(repo, list(comp)), "docker": docker,
-            "dead": dead_files(repo, set(comp))}
+            "dead": dead_files(repo, set(comp)),
+            "co_edges": co_edges, "district_edges": district_edges}

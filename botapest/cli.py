@@ -5,7 +5,7 @@ import time
 
 import uvicorn
 
-from . import hooks, server
+from . import hooks, nation, server
 
 
 def free_port(port: int) -> None:
@@ -42,10 +42,11 @@ def main() -> None:
     else:
         free_port(args.port)
         server.configure(args.repo, args.zone)
-        if args.root:
-            server.configure_nation(args.root, None)
-        where = f"nation: {args.root}" if args.root else f"repo: {args.repo}"
-        print(f"Botapest {'Nation' if args.root else 'City'} on http://localhost:{args.port} ({where})")
+        root = args.root or (nation.is_mother(args.repo) and args.repo)   # a mother repo is a nation
+        if root:
+            server.configure_nation(root, None)
+        where = f"nation: {root}" if root else f"repo: {args.repo}"
+        print(f"Botapest {'Nation' if root else 'City'} on http://localhost:{args.port} ({where})")
         # SSE streams watch runner.should_exit so open browsers don't block Ctrl+C;
         # the graceful-shutdown timeout is the backstop for any other slow request
         runner = uvicorn.Server(uvicorn.Config(server.app, port=args.port,

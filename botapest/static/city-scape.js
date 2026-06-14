@@ -210,23 +210,64 @@ const CityScape = (() => {
     }
   }
 
-  function drawPort(ctx, cam, state, t) {                   // container ships per docker file
-    const s = cam.s;
-    for (let i = 0; i < Math.min(3, state.docker); i++) {
-      const p = proj(cam, state.W * .25 + i * 7, state.H + 2.2);
+  const SVC_COL = [['postgres', '#336791'], ['psql', '#336791'], ['db', '#336791'], ['sql', '#336791'],
+                   ['redis', '#c0395b'], ['cache', '#c0395b'], ['nginx', '#2e8b4f'], ['caddy', '#2e8b4f'],
+                   ['mongo', '#4a6b5c'], ['rabbit', '#e67e22'], ['queue', '#e67e22'], ['kafka', '#8e44ad'],
+                   ['worker', '#8e5d9f'], ['node', '#3c873a'], ['python', '#4b8bbe'], ['api', '#d4a953'],
+                   ['web', '#d4a953'], ['app', '#d4a953'], ['front', '#52e3d4']];
+  const svcColor = (name, seed) => {                        // recognized services get a signature colour
+    const n = (name || '').toLowerCase();
+    for (const [k, c] of SVC_COL) if (n.includes(k)) return c;
+    return CARS[seed % CARS.length];
+  };
+
+  function drawPort(ctx, cam, state, t) {                   // harbor: one ship per docker/compose file,
+    const s = cam.s, fleet = state.docker;                 // its cargo = the services / base images it runs
+    const N = Math.min(5, fleet.length);
+    let tx = state.W * .2;
+    for (let i = 0; i < N; i++) {
+      const art = fleet[i], cargo = art.items.length || 1, cols = Math.min(cargo, 5);
+      const hullW = 16 + cols * 7;
+      const p = proj(cam, tx, state.H + 2.4);
+      tx += 5 + cols;                                       // bigger stacks get a wider berth
       const sy = p.sy + Math.sin(t / 1200 + i * 2.1) * 1.5 * s;
-      ctx.fillStyle = '#2b2230';
-      ctx.fillRect(p.sx - 23 * s, sy, 46 * s, 9 * s);
-      ctx.fillStyle = '#d8c5a0';
-      ctx.fillRect(p.sx + 13 * s, sy - 8 * s, 7 * s, 8 * s);
-      for (let k = 0; k < 4; k++) {
-        ctx.fillStyle = CARS[(i * 4 + k) % CARS.length];
-        ctx.fillRect(p.sx + (-20 + k * 8) * s, sy - 6 * s, 7 * s, 6 * s);
+      ctx.fillStyle = '#2b2230';                            // hull
+      ctx.fillRect(p.sx - hullW * s, sy, hullW * 2 * s, 9 * s);
+      ctx.fillStyle = '#d8c5a0';                            // bridge
+      ctx.fillRect(p.sx + (hullW - 8) * s, sy - 8 * s, 7 * s, 8 * s);
+      const shown = Math.min(cargo, 10);                    // containers = services, two rows deep
+      for (let k = 0; k < shown; k++) {
+        const cx = -hullW + 3 + (k % 5) * 7, cy = -6 - Math.floor(k / 5) * 6;
+        ctx.fillStyle = svcColor(art.items[k], hash(art.items[k] || `${art.path}${k}`));
+        ctx.fillRect(p.sx + cx * s, sy + cy * s, 6 * s, 5 * s);
       }
-      ctx.fillStyle = `rgba(255,90,90,${.45 + .4 * Math.sin(t / 700 + i)})`;
-      ctx.fillRect(p.sx + 15.5 * s, sy - 11 * s, 2 * s, 2 * s);
-      hit(ctx, state, { x0: p.sx - 23 * s, x1: p.sx + 20 * s, y0: sy - 11 * s, y1: sy + 9 * s,
-                        tip: `container ship · ${state.docker} docker/compose file${state.docker > 1 ? 's' : ''}` }, s);
+      if (cargo > shown) {                                  // overflow: more services than fit on deck
+        ctx.fillStyle = 'rgba(243,207,217,.85)';
+        ctx.font = `${Math.max(6, 6 * s)}px Silkscreen, monospace`;
+        ctx.textAlign = 'left';
+        ctx.fillText(`+${cargo - shown}`, p.sx + (hullW - 9) * s, sy - 13 * s);
+      }
+      ctx.fillStyle = `rgba(255,90,90,${.45 + .4 * Math.sin(t / 700 + i)})`;   // mast light
+      ctx.fillRect(p.sx + (hullW - 6.5) * s, sy - 11 * s, 2 * s, 2 * s);
+      const file = art.path.split('/').pop();
+      if (s >= .8) {                                        // dock label once zoomed in
+        ctx.fillStyle = 'rgba(243,207,217,.85)';
+        ctx.font = `${Math.max(7, 7 * s)}px Silkscreen, monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText(file, p.sx, sy + 18 * s);
+      }
+      const what = art.kind === 'compose' ? `${art.items.length} service${art.items.length === 1 ? '' : 's'}`
+                                          : `image${art.items.length === 1 ? '' : 's'}`;
+      const list = art.items.length ? art.items.join(' · ') : '(none parsed)';
+      hit(ctx, state, { x0: p.sx - hullW * s, x1: p.sx + (hullW + 2) * s, y0: sy - 13 * s, y1: sy + 9 * s,
+                        tip: `${file} · ${what}: ${list}` }, s);
+    }
+    if (fleet.length > N) {                                 // note the ships left at sea
+      const p = proj(cam, state.W * .2, state.H + 4.6);
+      ctx.fillStyle = 'rgba(243,207,217,.7)';
+      ctx.font = `${Math.max(7, 8 * s)}px Silkscreen, monospace`;
+      ctx.textAlign = 'left';
+      ctx.fillText(`+${fleet.length - N} more docker files`, p.sx, p.sy);
     }
   }
 

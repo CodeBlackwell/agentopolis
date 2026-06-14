@@ -53,62 +53,54 @@ const City = (() => {
     ctx.fill();
   }
 
-  // ---- layout: concentric diamond rings around the civic plaza, districts as angular wedges ----
-  function layout(data) {
-    const state = { zone: data.zone, blocks: [], buildings: [], props: [],
-                    byPath: new Map(), items: [], clouds: [], cityHall: null };
-    const byComp = {};
-    for (const b of data.buildings) (byComp[b.component] ??= []).push(b);
+  // ---- city plan: the layout FORM follows the repo's structure. Three generators emit the
+  //      same blocks + ground contract; choosePlan picks one (or .botapest.json pins "plan"). ----
+  // codes: 0 street, 1 avenue, 2 green, 3 plaza, 4 river, 5 bridge, 6 cemetery, 10+id district pavement
+  function newBlock(state, comp, list) {
+    const block = { comp, list, lots: [], next: 0,
+                    pave: [mix('#57455a', comp.color, .22), mix('#4d3d50', comp.color, .22)] };
+    block.id = state.blocks.length;
+    state.blocks.push(block);
+    return block;
+  }
+  const centroid = b => {
+    b.lx = b.lots.reduce((a, l) => a + l.x, 0) / (b.lots.length || 1);
+    b.ly = b.lots.reduce((a, l) => a + l.y, 0) / (b.lots.length || 1);
+  };
+  const groupsOf = data =>                                  // [civic, ...one group per layer], non-empty
+    [data.zone.components.filter(c => c.kind === 'civic'),
+     ...data.zone.layers.map(l =>
+       data.zone.components.filter(c => c.layer === l && c.kind !== 'civic'))].filter(g => g.length);
+  const need = (comp, list) => Math.max(comp.kind === 'civic' ? 6 : 1, list.length) + 2;   // +2 spare lots
 
-    const groups = [data.zone.components.filter(c => c.kind === 'civic'),
-                    ...data.zone.layers.map(l =>
-                      data.zone.components.filter(c => c.layer === l && c.kind !== 'civic'))];
+  function paveRect(state, g, block, x0, y0, w, h) {
+    const plaza = block.comp.kind === 'civic';
+    for (let y = y0; y < y0 + h; y++)
+      for (let x = x0; x < x0 + w; x++) {
+        if (y < 0 || x < 0 || y >= state.H || x >= state.W) continue;
+        g[y][x] = plaza ? 3 : 10 + block.id;
+        block.lots.push({ x: x + .5, y: y + .5 });
+      }
+    centroid(block);
+  }
+
+  // ---- form A: concentric diamond rings around the civic plaza (hub-and-spoke repos) ----
+  function planRadial(state, data, byComp) {
     const annuli = [];
     let r = 2;                                              // rings 0-1 are the city-hall plaza
-    for (const comps of groups.filter(g => g.length)) {
+    for (const comps of groupsOf(data)) {
       const lists = comps.map(c => byComp[c.id] || []);
-      const need = lists.map(l => Math.max(1, l.length) + 2);   // +2 spare lots for live growth
-      const total = need.reduce((a, b) => a + b, 0);
+      const needs = lists.map((l, k) => need(comps[k], l));
+      const total = needs.reduce((a, b) => a + b, 0);
       const lanes = k => 8 * k - 4 - 4 * (Math.floor(k / 3) + Math.floor((k - 1) / 3));   // minus spokes + alleys
       let r1 = r, cap = 0;
       while (cap < total) { if ((r1 - r) % 3 !== 2) cap += lanes(r1); r1++; }    // every 3rd ring is a street
-      annuli.push({ comps, lists, need, r0: r, r1, layer: comps[0].layer, tiles: [] });
+      annuli.push({ comps, lists, need: needs, r0: r, r1, tiles: [] });
       r = r1 + 2 + hash(`canal${annuli.length}`) % 2;       // canal between annuli, 2-3 rings wide
     }
     const Rmax = r - 1, margin = 3, cx = margin + Rmax, cy = cx;
     state.W = state.H = 2 * Rmax + 2 * margin + 1;
-    if ((data.dead || []).length) {
-      state.graves = data.dead.map((d, i) =>
-        ({ kind: 'grave', path: d.path, born: d.born, died: d.died,
-           x: 2.5 + (i % 8) * 1.2, y: state.H + .7 + Math.floor(i / 8), seed: hash(d.path) }));
-      const fmt = ts => ts ? new Date(ts * 1000).toLocaleDateString() : '?';
-      const age = (a, b) => !a || !b ? '?'
-        : (b - a) >= 31536000 ? `${((b - a) / 31536000).toFixed(1)}y` : `${Math.round((b - a) / 86400)}d`;
-      state.graveTip = state.graves
-        .map(g => `🪦 ${g.path} · born ${fmt(g.born)} · died ${fmt(g.died)} · ${age(g.born, g.died)}`)
-        .join('\n');
-      state.cemetery = { y0: state.H, rows: Math.ceil(state.graves.length / 8), x1: Math.min(state.W - 1, 13) };
-      state.props.push(...state.graves);
-      state.H += state.cemetery.rows + 1;
-    }
-    state.deps = data.deps || [];
-    state.docker = data.docker || 0;
     state.cityHall = { x: cx + .5, y: cy + .5 };
-    buildGround(state, annuli, cx, cy, Rmax);
-    state.cuts = {                                          // repo-relative thresholds, no absolutes
-      commits: q(data.buildings.map(b => b.commits), 2 / 3),
-      imports: q(data.buildings.map(b => b.imports || 0), .9),
-      todos: q(data.buildings.map(b => b.todos || 0), .9) };
-    for (const block of state.blocks) fillBlock(state, block);
-    state.sortedRot = 0;
-    const k0 = dkey(0);
-    state.items = [...state.buildings, ...state.props].sort((a, b) => k0(a) - k0(b));
-    state.clouds = data.zone.clouds.map((c, i) => ({ name: c.name, tether: c.tether, band: 60 + (i % 2) * 52 }));
-    return state;
-  }
-
-  // codes: 0 street, 1 avenue, 2 green, 3 plaza, 4 river, 5 bridge, 6 cemetery, 10+i district pavement
-  function buildGround(state, annuli, cx, cy, Rmax) {
     const g = Array.from({ length: state.H }, () => new Array(state.W).fill(2));
     for (let y = 0; y < state.H; y++)
       for (let x = 0; x < state.W; x++) {
@@ -131,32 +123,158 @@ const City = (() => {
       let acc = 0, i0 = 0;
       ann.comps.forEach((comp, k) => {
         acc += ann.need[k];
-        const i1 = Math.round(ann.tiles.length * acc / total), id = state.blocks.length;
-        const block = { comp, list: ann.lists[k], lots: [], next: 0,
-                        pave: [mix('#57455a', comp.color, .22), mix('#4d3d50', comp.color, .22)] };
+        const i1 = Math.round(ann.tiles.length * acc / total);
+        const block = newBlock(state, comp, ann.lists[k]);
         const tiles = ann.tiles.slice(i0, i1).sort((t1, t2) => t1.r - t2.r || t1.a - t2.a);
         i0 = i1;
         let cap = tiles.length;                             // keep ≥2 spare lots for live growth
         for (const tl of tiles) {
           if (tl.r === ann.r1 - 1 && comp.kind !== 'civic' && cap > block.list.length + 2 &&
               hash(`c${tl.x},${tl.y}`) % 3 === 0) { cap--; continue; }   // ragged outskirts stay green
-          g[tl.y][tl.x] = comp.kind === 'civic' ? 3 : 10 + id;
+          g[tl.y][tl.x] = comp.kind === 'civic' ? 3 : 10 + block.id;
           block.lots.push({ x: tl.x + .5, y: tl.y + .5 });
         }
-        block.lx = block.lots.reduce((a, l) => a + l.x, 0) / block.lots.length;
-        block.ly = block.lots.reduce((a, l) => a + l.y, 0) / block.lots.length;
-        state.blocks.push(block);
+        centroid(block);
       });
     }
-    if (state.cemetery)
-      for (let r = 0; r < state.cemetery.rows; r++)
-        for (let x = 1; x < state.cemetery.x1; x++) g[state.cemetery.y0 + r][x] = 6;
-    g.forEach((row, y) => row.forEach((code, x) => {
+    state.ground = g;
+  }
+
+  // ---- form B: Manhattan grid of superblocks (many loosely-coupled districts) ----
+  function planGrid(state, data, byComp) {
+    const cells = groupsOf(data).flat().map(c => {
+      const list = byComp[c.id] || [], n = need(c, list);
+      const w = Math.max(2, Math.round(Math.sqrt(n * 1.4)));
+      return { comp: c, list, w, h: Math.max(2, Math.ceil(n / w)) };
+    });
+    const targetW = Math.max(Math.ceil(Math.sqrt(cells.reduce((a, c) => a + (c.w + 1) * (c.h + 1), 0))),
+                             ...cells.map(c => c.w));
+    const margin = 3, gap = 1;
+    let x = margin, y = margin, rowH = 0, maxX = margin;
+    for (const cell of cells) {                             // shelf-pack rectangles into roughly-square rows
+      if (x > margin && x + cell.w - margin > targetW) { x = margin; y += rowH + gap; rowH = 0; }
+      cell.x0 = x; cell.y0 = y;
+      x += cell.w + gap; rowH = Math.max(rowH, cell.h); maxX = Math.max(maxX, cell.x0 + cell.w);
+    }
+    state.W = maxX + margin; state.H = y + rowH + margin;
+    const g = Array.from({ length: state.H }, (_, yy) =>   // street interior, parkland border
+      Array.from({ length: state.W }, (_, xx) =>
+        xx < 2 || yy < 2 || xx >= state.W - 2 || yy >= state.H - 2 ? 2 : 0));
+    for (const cell of cells)
+      paveRect(state, g, newBlock(state, cell.comp, cell.list), cell.x0, cell.y0, cell.w, cell.h);
+    for (let yy = 0; yy < state.H; yy++)                    // every 4th street row becomes an avenue
+      for (let xx = 0; xx < state.W; xx++) if (g[yy][xx] === 0 && yy % 4 === 0) g[yy][xx] = 1;
+    state.ground = g;
+    const civic = state.blocks.find(b => b.comp.kind === 'civic') || state.blocks[0];
+    state.cityHall = { x: civic.lx, y: civic.ly };
+  }
+
+  // ---- form C: a boulevard with districts strung along it (few / strongly-layered repos) ----
+  function planSpine(state, data, byComp) {
+    const cells = groupsOf(data).flat().map(c => {          // ordered civic → back → mid → front → under
+      const list = byComp[c.id] || [], n = need(c, list);
+      const h = Math.max(2, Math.min(4, Math.round(Math.sqrt(n))));
+      return { comp: c, list, h, w: Math.max(2, Math.ceil(n / h)) };
+    });
+    const margin = 3, gap = 1, spineW = 2, maxDepth = Math.max(...cells.map(c => c.h));
+    const cyTop = margin + maxDepth;
+    state.H = cyTop + spineW + maxDepth + margin;
+    let x = margin, side = 0;
+    for (const cell of cells) {                             // alternate districts above / below the boulevard
+      cell.x0 = x; cell.y0 = side ? cyTop + spineW : cyTop - cell.h;
+      x += cell.w + gap; side ^= 1;
+    }
+    state.W = x + margin;
+    const g = Array.from({ length: state.H }, () => new Array(state.W).fill(2));
+    for (let y = cyTop; y < cyTop + spineW; y++)            // the boulevard runs the city's length
+      for (let xx = margin - 1; xx < state.W - margin + 1; xx++) g[y][xx] = 1;
+    for (const cell of cells)
+      paveRect(state, g, newBlock(state, cell.comp, cell.list), cell.x0, cell.y0, cell.w, cell.h);
+    state.ground = g;
+    const civic = state.blocks.find(b => b.comp.kind === 'civic') || state.blocks[0];
+    state.cityHall = { x: civic.lx, y: civic.ly };
+  }
+
+  const PLANS = { radial: planRadial, grid: planGrid, spine: planSpine };
+  const PIPE = ['back', 'mid', 'front'];                   // the data-flow stack; 'under' isn't a stage
+  // The FORM is a claim about structure the data must support: a measurable coupling hub (radial),
+  // a balanced full-stack split (spine), or peer modules with no center (grid). Order matters —
+  // size is only a legibility floor, never the shape decision. Thresholds sit in the data's gaps.
+  function choosePlan(data) {
+    const real = data.zone.components.filter(c => c.kind !== 'civic' && c.kind !== 'auto');
+    const n = real.length;
+    if (n <= 2) return planSpine;                           // too small for a macro-form to read
+
+    const wsum = {}, wt = {};                               // commit-weighted mean centrality per district
+    for (const b of data.buildings) {                       // (commit weight damps one-off mega-commit noise)
+      wsum[b.component] = (wsum[b.component] || 0) + b.centrality * b.commits;
+      wt[b.component] = (wt[b.component] || 0) + b.commits;
+    }
+    const coup = real.map(c => wt[c.id] ? wsum[c.id] / wt[c.id] : 0);
+    const mass = coup.reduce((a, b) => a + b, 0);
+    const dominance = mass ? Math.max(...coup) / mass * n : 0;   // 1 = even, → n = one district carries all
+    if (mass >= 5 && dominance >= 2.5) return planRadial;   // a hub we can actually see → rings orbit it
+
+    const tier = {};                                        // district counts per data-flow layer
+    for (const c of real) if (PIPE.includes(c.layer)) tier[c.layer] = (tier[c.layer] || 0) + 1;
+    const t = Object.values(tier);
+    const balanced = t.length >= 2 && Math.min(...t) / Math.max(...t) >= 0.4;
+    if (balanced && data.buildings.length <= 180) return planSpine;   // balanced stack, reads as one street
+
+    return planGrid;                                        // many peers / a stack too long for a boulevard
+  }
+
+  function addCemetery(state, data) {                       // dead files: graveyard rows below the city
+    if (!(data.dead || []).length) return;
+    const y0 = state.H;
+    state.graves = data.dead.map((d, i) =>
+      ({ kind: 'grave', path: d.path, born: d.born, died: d.died,
+         x: 2.5 + (i % 8) * 1.2, y: y0 + .7 + Math.floor(i / 8), seed: hash(d.path) }));
+    const fmt = ts => ts ? new Date(ts * 1000).toLocaleDateString() : '?';
+    const age = (a, b) => !a || !b ? '?'
+      : (b - a) >= 31536000 ? `${((b - a) / 31536000).toFixed(1)}y` : `${Math.round((b - a) / 86400)}d`;
+    state.graveTip = state.graves
+      .map(g => `🪦 ${g.path} · born ${fmt(g.born)} · died ${fmt(g.died)} · ${age(g.born, g.died)}`)
+      .join('\n');
+    const rows = Math.ceil(state.graves.length / 8);
+    state.cemetery = { y0, rows, x1: Math.min(state.W - 1, 13) };
+    for (let i = 0; i <= rows; i++) state.ground.push(new Array(state.W).fill(2));
+    for (let r = 0; r < rows; r++)
+      for (let x = 1; x < state.cemetery.x1; x++) state.ground[y0 + r][x] = 6;
+    state.props.push(...state.graves);
+    state.H = y0 + rows + 1;
+  }
+
+  function sprinkle(state) {                                // greenery + lamps from the finished ground fabric
+    state.ground.forEach((row, y) => row.forEach((code, x) => {
       const h = hash(`g${x},${y}`);
       if (code === 2 && h % 3 === 0) state.props.push({ kind: 'tree', x: x + .5, y: y + .5, seed: h });
       if (code === 1 && x % 6 === 3 && h % 2) state.props.push({ kind: 'lamp', x: x + .5, y: y + .6, seed: h });
     }));
-    state.ground = g;
+  }
+
+  function layout(data) {
+    const state = { zone: data.zone, blocks: [], buildings: [], props: [],
+                    byPath: new Map(), items: [], clouds: [], cityHall: null };
+    const byComp = {};
+    for (const b of data.buildings) (byComp[b.component] ??= []).push(b);
+    (PLANS[data.zone.plan] || choosePlan(data))(state, data, byComp);   // .botapest.json may pin "plan"
+    addCemetery(state, data);
+    sprinkle(state);
+    state.deps = data.deps || [];
+    state.docker = data.docker || [];
+    state.co_edges = data.co_edges || [];                   // co-commit coupling, surfaced at district zoom
+    state.district_edges = data.district_edges || [];
+    state.cuts = {                                          // repo-relative thresholds, no absolutes
+      commits: q(data.buildings.map(b => b.commits), 2 / 3),
+      imports: q(data.buildings.map(b => b.imports || 0), .9),
+      todos: q(data.buildings.map(b => b.todos || 0), .9) };
+    for (const block of state.blocks) fillBlock(state, block);
+    state.sortedRot = 0;
+    const k0 = dkey(0);
+    state.items = [...state.buildings, ...state.props].sort((a, b) => k0(a) - k0(b));
+    state.clouds = data.zone.clouds.map((c, i) => ({ name: c.name, tether: c.tether, band: 60 + (i % 2) * 52 }));
+    return state;
   }
 
   // file-type forms: ext picks the massing; district kind still owns color + dressing
@@ -606,7 +724,7 @@ const City = (() => {
       else drawBuilding(ctx, cam, it, t);
     }
     if (state.cityHall) drawCityHall(ctx, cam, state.cityHall.x, state.cityHall.y);
-    if (!opts.embedded && state.docker) CityScape.drawPort(ctx, cam, state, t);   // ships ride the rotating harbor
+    if (!opts.embedded && state.docker.length) CityScape.drawPort(ctx, cam, state, t);   // ships ride the rotating harbor
     if (opts.embedded) return;
     ctx.fillStyle = 'rgba(243,207,217,.6)';
     for (const block of state.blocks) {
@@ -660,5 +778,122 @@ const City = (() => {
     }
   }
 
-  return { layout, fit, draw, applyEvent, pick, roster, proj, hash, shade, mix, near };
+  // ---- District: drill into one component — its files as a neighborhood, streets = co-commit ----
+  // ---- coupling, road stubs = districts it co-changes with, clouds = the services it leans on. ----
+  const ROLE = { frontend: 'User-facing UI', api: 'Service gateway', storage: 'Data & persistence',
+                 infra: 'Build, deploy & tooling', tests: 'Tests & verification', docs: 'Documentation',
+                 service: 'Application logic', civic: 'City core', auto: 'Loose files' };
+
+  function districtLayout(city, compId) {
+    const comp = city.zone.components.find(c => c.id === compId);
+    const list = city.buildings.filter(b => b.component === compId)
+      .sort((a, b) => b.centrality - a.centrality || b.commits - a.commits || b.floors - a.floors);
+    const cols = Math.max(3, Math.ceil(Math.sqrt(list.length || 1)));
+    const rows = Math.max(1, Math.ceil(list.length / cols));
+    const gap = 2, margin = 3, gate = 3;                    // gap = street room; gate = apron at the south edge
+    const W = margin * 2 + cols * gap, H = margin * 2 + rows * gap + gate;
+    const cgx = (cols - 1) / 2, cgy = (rows - 1) / 2;        // grid centre → seat the coupling hubs downtown
+    const cells = [];
+    for (let cy = 0; cy < rows; cy++)
+      for (let cx = 0; cx < cols; cx++)
+        cells.push({ cx, cy, d: Math.hypot(cx - cgx, cy - cgy) });
+    cells.sort((a, b) => a.d - b.d);
+    const block = { id: 0, comp, pave: [mix('#57455a', comp.color, .22), mix('#4d3d50', comp.color, .22)] };
+    const g = Array.from({ length: H }, () => new Array(W).fill(2));
+    list.forEach((b, i) => {
+      const c = cells[i], tx = margin + c.cx * gap, ty = margin + c.cy * gap;
+      for (const [x, y] of [[tx, ty], [tx + 1, ty], [tx, ty + 1], [tx + 1, ty + 1]])
+        if (y < H && x < W) g[y][x] = 10;                   // district pavement under each lot
+      b.dx = tx + .5; b.dy = ty + .5;
+    });
+    for (let y = H - gate; y < H; y++) for (let x = 0; x < W; x++) g[y][x] = 0;   // gate apron (street)
+    const plaza = { x: margin + cgx * gap + .5, y: margin + cgy * gap + .5 };
+    const props = [];
+    g.forEach((row, y) => row.forEach((code, x) => {        // greenery on leftover grass
+      const h = hash(`d${x},${y}`);
+      if (code === 2 && h % 4 === 0)
+        props.push({ kind: 'tree', x: x + .5, y: y + .5, dx: x + .5, dy: y + .5, seed: h });
+    }));
+    const streets = (city.co_edges || [])                   // co-commit edges between this district's buildings
+      .map(e => ({ a: city.byPath.get(e.a), b: city.byPath.get(e.b), w: e.w }))
+      .filter(s => s.a && s.b && s.a.component === compId && s.b.component === compId);
+    const wmax = streets.reduce((m, s) => Math.max(m, s.w), 1);
+    const nbr = (city.district_edges || [])                 // districts this one co-changes with
+      .filter(e => e.a === compId || e.b === compId)
+      .map(e => ({ id: e.a === compId ? e.b : e.a, w: e.w }))
+      .sort((a, b) => b.w - a.w).slice(0, 5)
+      .map(n => { const c = city.zone.components.find(z => z.id === n.id);
+                  return c && { name: c.name, color: c.color, w: n.w }; })
+      .filter(Boolean);
+    const clouds = city.clouds.filter(c => c.tether === compId);
+    const files = list.reduce((a, b) => a + (b.files || 1), 0);
+    const hot = list.filter(b => b.billboard).length;
+    const charter = `${ROLE[comp.kind] || comp.kind} · ${list.length} building${list.length === 1 ? '' : 's'}`
+      + ` · ${files} file${files === 1 ? '' : 's'}` + (hot ? ` · ${hot} hot` : '')
+      + (nbr.length ? ` · couples with ${nbr.slice(0, 3).map(n => n.name).join(', ')}` : '');
+    const d = { comp, W, H, ground: g, blocks: [block], buildings: list, byPath: city.byPath,
+                props, streets, wmax, nbr, clouds, plaza, gate, charter,
+                deps: [], docker: [], sortedRot: -1, hits: [], mouse: null };
+    d.items = [...list, ...props];
+    return d;
+  }
+
+  function drawStreets(ctx, cam, d) {
+    ctx.strokeStyle = mix('#3a2c3e', d.comp.color, .45);
+    for (const s of d.streets) {
+      const a = proj(cam, s.a.dx, s.a.dy), b = proj(cam, s.b.dx, s.b.dy);
+      ctx.lineWidth = Math.max(1.5, (1 + 3 * s.w / d.wmax) * cam.s);
+      ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
+    }
+  }
+
+  function drawGate(ctx, cam, d) {                          // labelled road stubs to coupled districts
+    if (!d.nbr.length) return;
+    const s = cam.s, y = d.H - d.gate / 2, wmax = d.nbr[0].w;
+    d.nbr.forEach((n, i) => {
+      const x = (i + .5) / d.nbr.length * d.W;
+      const a = proj(cam, x, y), b = proj(cam, x, d.H + 2);
+      ctx.strokeStyle = n.color;
+      ctx.lineWidth = Math.max(2, (1 + 3 * n.w / wmax) * s);
+      ctx.setLineDash([4 * s, 3 * s]);
+      ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = n.color;
+      ctx.fillRect(b.sx - 4 * s, b.sy, 8 * s, 4 * s);
+      ctx.fillStyle = 'rgba(243,207,217,.85)';
+      ctx.font = `${Math.max(7, 8 * s)}px Silkscreen, monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(n.name.toUpperCase(), b.sx, b.sy + 14 * s);
+    });
+  }
+
+  function drawDistrict(ctx, cam, d, t) {
+    const R = cam.rot || 0;
+    if (d.sortedRot !== R) {                                // painter order over district coords
+      const k = dkey(R);
+      d.items.sort((a, b) => k({ x: a.dx, y: a.dy }) - k({ x: b.dx, y: b.dy }));
+      d.sortedRot = R;
+    }
+    d.hits = [];
+    CityScape.drawHorizon(ctx, R ? { ...cam, rot: 0 } : cam, d, t);
+    CityScape.drawGround(ctx, cam, d, t);
+    drawStreets(ctx, cam, d);
+    for (const it of d.items) {
+      if (it.kind) { if (!it.hidden) CityScape.drawProp(ctx, cam, it, t, d); }
+      else {                                                // shared building object: draw at district coords
+        const ox = it.x, oy = it.y; it.x = it.dx; it.y = it.dy;
+        drawBuilding(ctx, cam, it, t); it.x = ox; it.y = oy;
+      }
+    }
+    drawGate(ctx, cam, d);
+    for (const c of d.clouds) {
+      const a = proj(cam, d.plaza.x, d.plaza.y);
+      c.sx = a.sx; c.ax = a.sx; c.ay = a.sy;
+      c.sy = Math.min(c.band * Math.max(.8, cam.s), a.sy - 120 * cam.s);
+      drawCloud(ctx, cam, c, t);
+    }
+  }
+
+  return { layout, fit, draw, applyEvent, pick, roster, districtLayout, drawDistrict,
+           proj, hash, shade, mix, near };
 })();

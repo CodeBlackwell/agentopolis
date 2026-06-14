@@ -2,192 +2,256 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Botapest City</title>
+<title>Botapest</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🛎️</text></svg>">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Limelight&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --pink: #f3cfd9;
-    --pink-deep: #e8a8bd;
-    --plum: #3d1832;
-    --plum-soft: #5a2c4d;
-    --gold: #d4a953;
-    --cream: #f9efe3;
-  }
+  :root { --pink: #f3cfd9; --pink-deep: #e8a8bd; --plum: #3d1832; --plum-soft: #5a2c4d; --gold: #d4a953; --cream: #f9efe3; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* one shell, two modes: the server stamps <body data-mode>; the off-mode DOM hides */
+  body[data-mode="nation"] .m-city,
+  body[data-mode="city"] .m-nation { display: none !important; }
+
   body {
-    height: 100vh;
-    overflow: hidden;
+    height: 100vh; overflow: hidden; color: var(--plum);
     background: var(--pink);
-    background-image:
-      repeating-linear-gradient(45deg, transparent 0 22px, rgba(232,168,189,.35) 22px 44px);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 12px 16px 16px;
-    color: var(--plum);
+    background-image: repeating-linear-gradient(45deg, transparent 0 22px, rgba(232,168,189,.35) 22px 44px);
+    display: grid; gap: 12px; padding: 10px 14px 14px;
+    /* head spans both columns; map (primary) + rail; dispatch dock spans the floor */
+    grid-template-columns: 1fr 264px;
+    grid-template-rows: auto minmax(0, 1fr) minmax(0, 34vh);
+    grid-template-areas: "head head" "map rail" "dock dock";
   }
-  header { text-align: center; margin-bottom: 10px; }
-  header h1 {
-    font-family: 'Limelight', cursive;
-    font-size: clamp(20px, 2.6vw, 34px);
-    letter-spacing: .06em;
-    color: var(--plum);
-    text-shadow: 2px 2px 0 var(--gold);
+  header { grid-area: head; text-align: center; }
+  header h1 { font-family: 'Limelight', cursive; font-size: clamp(20px, 2.6vw, 32px);
+              letter-spacing: .06em; text-shadow: 2px 2px 0 var(--gold); }
+  header p { font-family: 'Silkscreen', monospace; font-size: 11px;
+             letter-spacing: .18em; text-transform: uppercase; }
+
+  /* every zone wears the same gilded exhibit frame */
+  .mapwrap, #side, #dock {
+    background: var(--plum); padding: 10px; border: 4px solid var(--gold);
+    box-shadow: 0 14px 30px rgba(61,24,50,.4), inset 0 0 0 2px var(--plum-soft);
   }
-  header .rule {
-    width: 320px; max-width: 70vw;
-    margin: 6px auto 4px;
-    border-top: 3px double var(--plum);
-  }
-  #main {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    gap: 14px;
-    justify-content: center;
-    align-items: flex-start;
-    width: 100%;
-  }
-  /* frame width derived from the height budget: canvases stack at 1140/1280 of width */
-  .frame {
-    width: min(calc((100vh - 160px) * 1.12), calc(100vw - 400px));
-  }
-  #citybg, #hotel { width: 100%; height: auto; }
-  header p {
-    font-family: 'Silkscreen', monospace;
-    font-size: 11px;
-    letter-spacing: .18em;
-    text-transform: uppercase;
-  }
-  #lamp { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
-          background: #c0392b; margin-right: 6px; vertical-align: 1px; }
-  #lamp.on { background: #27ae60; box-shadow: 0 0 6px #27ae60; }
-  .frame {
-    background: var(--plum);
-    padding: 14px;
-    border: 4px solid var(--gold);
-    box-shadow: 0 18px 40px rgba(61,24,50,.45), inset 0 0 0 2px var(--plum-soft);
-  }
-  canvas { display: block; image-rendering: pixelated; background: #2a1024; }
-  #citybg { background: linear-gradient(#241020 0%, #3d1832 60%, #2a1024 100%); cursor: grab; }
-  #citybg:active { cursor: grabbing; }
-  .mapwrap { position: relative; }
+  .mapwrap { grid-area: map; position: relative; min-height: 0; overflow: hidden;
+             display: flex; align-items: center; justify-content: center; }
+  /* contain-fit keeps box == content, so getBoundingClientRect mouse mapping stays exact */
+  #map { max-width: 100%; max-height: 100%; width: auto; height: auto;
+         display: block; image-rendering: pixelated; cursor: grab;
+         background: linear-gradient(#241020 0%, #3d1832 55%, #2a1024 100%); }
+  #map:active { cursor: grabbing; }
+
   #mapctl {
-    position: absolute; top: 10px; right: 10px;
-    display: grid; grid-template-columns: repeat(2, 26px); gap: 4px;
-    background: rgba(42,16,36,.82); border: 2px solid var(--gold); padding: 5px;
+    position: absolute; top: 24px; right: 24px;
+    display: grid; grid-template-columns: repeat(2, 28px); gap: 5px;
+    background: rgba(42,16,36,.82); border: 2px solid var(--gold); padding: 6px;
   }
   #mapctl button {
-    width: 26px; height: 26px; line-height: 1; cursor: pointer;
+    width: 28px; height: 28px; line-height: 1; cursor: pointer;
     background: var(--plum-soft); color: var(--cream); border: 1px solid var(--gold);
-    font-family: 'Silkscreen', monospace; font-size: 13px;
+    font-family: 'Silkscreen', monospace; font-size: 14px;
   }
   #mapctl button:hover { background: var(--gold); color: var(--plum); }
   #mapctl .wide { grid-column: span 2; width: auto; }
+
+  /* ---- nation-mode map chrome ---- */
+  #back {
+    position: absolute; top: 24px; left: 24px; display: none; cursor: pointer;
+    background: var(--plum-soft); color: var(--cream); border: 2px solid var(--gold);
+    font-family: 'Silkscreen', monospace; font-size: 12px; padding: 7px 12px;
+  }
+  #back:hover { background: var(--gold); color: var(--plum); }
+  #tiers {
+    position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+    background: rgba(42,16,36,.82); border: 2px solid var(--gold); font-family: 'Silkscreen', monospace;
+  }
+  #tiers button {
+    cursor: pointer; background: var(--plum-soft); color: var(--cream); border: 1px solid var(--gold);
+    font-family: inherit; font-size: 11px; padding: 5px 9px; text-transform: uppercase; letter-spacing: .04em;
+  }
+  #tiers button:hover { background: var(--gold); color: var(--plum); }
+  #tiers button.active { background: var(--gold); color: var(--plum); font-weight: 700; }
+  #tiers button.off { opacity: .38; pointer-events: none; }
+  #tiers .sep { color: var(--gold); font-size: 11px; }
+
+  /* ---- city-mode map chrome ---- */
+  #crumb {
+    position: absolute; top: 14px; left: 14px; display: none; max-width: 62%; z-index: 2;
+    background: rgba(42,16,36,.88); border: 2px solid var(--gold); padding: 6px 10px;
+    font-family: 'Silkscreen', monospace; font-size: 11px; color: var(--cream);
+  }
+  #crumb b { color: var(--gold); }
+  #crumb .back { cursor: pointer; color: var(--pink-deep); }
+  #crumb .back:hover { color: var(--gold); }
+  #crumbInfo { display: block; margin-top: 4px; font-size: 9px; color: var(--pink-deep); }
+
+  /* ---- side rail ---- */
+  #side { grid-area: rail; min-height: 0; display: flex; flex-direction: column; }
+  #panel-wrap { flex: 1; display: grid; min-height: 0; }
+  #panel-guide, #panel-city {
+    grid-area: 1/1; overflow-y: auto;
+    background: rgba(42,16,36,.96); border: 2px solid var(--gold);
+    box-shadow: 4px 4px 0 var(--plum-soft);
+    font-family: 'Silkscreen', monospace; font-size: 9px; color: var(--cream);
+    transition: opacity 0.35s;
+  }
+  .panel-hidden { opacity: 0; pointer-events: none; }
+
+  /* city-mode legend fills the rail */
+  #legend {
+    flex: 1; overflow-y: auto;
+    background: var(--cream); border: 3px solid var(--plum); box-shadow: 5px 5px 0 var(--plum);
+    font-family: 'Silkscreen', monospace; font-size: 9px; padding-bottom: 4px;
+  }
+  #legend .row { display: flex; align-items: center; gap: 8px; padding: 3px 10px; }
+  #legend .dclick { cursor: pointer; }
+  #legend .dclick:hover { background: var(--pink); }
+  #legend .chip { flex: 0 0 10px; height: 10px; border: 1px solid var(--plum-soft); }
+
   .plaque {
     background: var(--gold); color: var(--plum);
     font-family: 'Silkscreen', monospace; font-size: 10px;
-    letter-spacing: .22em; text-transform: uppercase;
-    text-align: center; padding: 4px 0; border: 2px solid var(--plum-soft);
+    letter-spacing: .2em; text-transform: uppercase; text-align: center;
+    padding: 6px 0; border-bottom: 2px solid var(--plum-soft);
+    position: sticky; top: 0; z-index: 1;
   }
-  #side {
-    width: clamp(230px, 21vw, 350px);
-    align-self: stretch;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-height: 0;
-  }
-  #legend {
-    background: var(--cream);
-    border: 3px solid var(--plum);
-    box-shadow: 5px 5px 0 var(--plum);
-    font-family: 'Silkscreen', monospace;
-    font-size: 9px;
-    padding-bottom: 4px;
-  }
-  #legend .row { display: flex; align-items: center; gap: 8px; padding: 3px 10px; }
-  #legend .chip {
-    flex: 0 0 10px; height: 10px;
-    border: 1px solid var(--plum-soft);
-  }
-  #ticker {
-    flex: 1;
-    min-height: 0;
-    background: var(--cream);
-    border: 3px solid var(--plum);
-    box-shadow: 5px 5px 0 var(--plum);
-    font-family: 'Silkscreen', monospace;
-    font-size: 10px;
-    overflow-y: auto;
-  }
-  #ticker div { padding: 4px 12px; border-bottom: 1px dashed var(--pink-deep); }
-  #ticker div:first-child { background: var(--pink); }
-  #ticker .t { color: var(--plum-soft); margin-right: 8px; }
-  #tooltip {
-    position: fixed; display: none; pointer-events: none; z-index: 10;
-    background: var(--cream); border: 2px solid var(--plum);
-    box-shadow: 3px 3px 0 var(--plum);
-    font-family: 'Silkscreen', monospace; font-size: 10px;
-    padding: 4px 8px; max-width: 360px; white-space: pre-line; line-height: 1.5;
-  }
-  #roster {
-    position: fixed; display: none; z-index: 11;
-    background: var(--cream); border: 2px solid var(--plum); box-shadow: 3px 3px 0 var(--plum);
-    font-family: 'Silkscreen', monospace; font-size: 10px; line-height: 1.6;
-    padding: 8px 10px; max-width: 380px; max-height: 50vh; overflow-y: auto;
-    white-space: pre-line; cursor: default;
-  }
+  .plaque.dock { position: static; margin: 0 0 8px; }
+  /* shared legend row styles (used inside the nation panels) */
+  #panel-guide h4, #panel-city .city-guide h4 {
+    font-size: 9px; letter-spacing: .12em; color: var(--gold);
+    padding: 7px 10px 3px; text-transform: uppercase; }
+  #panel-guide h4.title { display: none; }
+  .row { display: flex; align-items: center; gap: 7px; padding: 2px 10px; line-height: 1.45; }
+  .sub { opacity: .82; padding: 1px 10px 3px; line-height: 1.45; }
+  .chip { flex: 0 0 10px; height: 10px; border: 1px solid rgba(249,239,227,.5); }
+  .chip.ring { border-radius: 50%; background: none; border: 2px solid var(--gold); }
+  .chips { display: flex; gap: 3px; }
+
+  /* city hall panel (nation mode) */
+  #lamp { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+          background: #c0392b; margin-right: 5px; vertical-align: 1px; }
+  #lamp.on { background: #27ae60; box-shadow: 0 0 5px #27ae60; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+               padding: 10px 10px 6px; background: rgba(0,0,0,.2); }
+  .stat-cell { padding: 6px 8px; background: rgba(255,255,255,.04); }
+  .stat-label { display: block; color: var(--gold); font-size: 8px;
+                letter-spacing: .1em; text-transform: uppercase; margin-bottom: 3px; }
+  .stat-value { font-size: 12px; font-weight: 700; }
+  .city-tags { padding: 6px 10px 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .city-tag { background: var(--plum-soft); border: 1px solid var(--gold);
+              padding: 2px 7px; font-size: 8px; letter-spacing: .06em; }
+  .city-flags { padding: 4px 10px 6px; border-top: 1px dashed rgba(212,169,83,.3); }
+  .city-flags h4 { font-size: 8px; letter-spacing: .12em; color: var(--gold);
+                   text-transform: uppercase; padding-bottom: 4px; }
+  .flag-item { display: flex; align-items: center; gap: 7px; padding: 2px 0; }
+  .flag-dot { width: 9px; height: 9px; flex-shrink: 0; }
+
+  /* dock: dispatch floor (height-driven, ~2:1 panorama) beside a wide event ticker */
+  #dock { grid-area: dock; min-height: 0; display: flex; gap: 12px; }
+  .dispatch { flex: 0 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .dispatch .holder { flex: 1; min-height: 0; display: flex; justify-content: center; }
+  #hotel { height: 100%; width: auto; max-width: 100%; display: block;
+           image-rendering: pixelated; background: #1a0a14; }
+  #ticker { flex: 1; min-width: 0; overflow-y: auto;
+            background: rgba(42,16,36,.4); border: 1px solid var(--plum-soft);
+            font-family: 'Silkscreen', monospace; font-size: 9px; color: var(--cream); }
+  #ticker div { padding: 3px 10px; border-bottom: 1px dashed rgba(212,169,83,.2); }
+  #ticker div:first-child { background: rgba(255,255,255,.06); }
+  #ticker .t { color: var(--gold); margin-right: 6px; opacity: .7; }
+
+  #tooltip { position: fixed; display: none; pointer-events: none; z-index: 10;
+             background: var(--cream); border: 2px solid var(--plum);
+             box-shadow: 3px 3px 0 var(--plum); font-family: 'Silkscreen', monospace;
+             font-size: 10px; padding: 4px 8px; max-width: 460px; white-space: pre-line; line-height: 1.5; }
+  #roster { position: fixed; display: none; z-index: 11;
+            background: var(--cream); border: 2px solid var(--plum); box-shadow: 3px 3px 0 var(--plum);
+            font-family: 'Silkscreen', monospace; font-size: 10px; line-height: 1.6;
+            padding: 8px 10px; max-width: 380px; max-height: 50vh; overflow-y: auto;
+            white-space: pre-line; cursor: default; }
 </style>
 </head>
-<body>
+<body data-mode="{{MODE}}">
   <header>
-    <h1>Botapest City</h1>
-    <div class="rule"></div>
-    <p><span id="lamp"></span>the city builds itself &middot; agents at your service</p>
+    <h1>Botapest <span class="m-nation">Nation</span><span class="m-city">City</span></h1>
+    <p class="m-nation">drag to pan &middot; scroll to zoom &middot; click a city to enter it &middot; Q/E to rotate inside</p>
+    <p class="m-city">the city builds itself &middot; agents at your service</p>
   </header>
-  <div id="main">
-    <div class="frame">
-      <div class="mapwrap">
-        <canvas id="citybg" width="1280" height="500"></canvas>
-        <div id="mapctl">
-          <button data-act="rot-" title="rotate left (Q)">&#8634;</button>
-          <button data-act="rot+" title="rotate right (E)">&#8635;</button>
-          <button data-act="zoom+" title="zoom in">+</button>
-          <button data-act="zoom-" title="zoom out">&minus;</button>
-          <button data-act="reset" class="wide" title="reset view">reset</button>
-        </div>
-      </div>
-      <div class="plaque">city hall &middot; dispatch floor</div>
-      <canvas id="hotel" width="1280" height="640"></canvas>
+
+  <div class="mapwrap">
+    <canvas id="map" width="1280" height="720"></canvas>
+    <button id="back" class="m-nation" title="back to world map">&#8593; WORLD MAP</button>
+    <div id="tiers" class="m-nation">
+      <button data-tier="world">WORLD</button><span class="sep">&#9656;</span>
+      <button data-tier="state">STATE</button><span class="sep">&#9656;</span>
+      <button data-tier="city">CITY</button><span class="sep">&#9656;</span>
+      <button data-tier="district">DISTRICT</button>
     </div>
-    <div id="side">
-      <div id="legend">
-        <div class="plaque">field guide</div>
-        <div class="row"><span class="chip" style="background:#d4a953"></span>floors — lines of code + coupling</div>
-        <div class="row"><span class="chip" style="background:#ffd678"></span>lit windows — touched recently</div>
-        <div class="row"><span class="chip" style="background:#52e3d4"></span>billboard — district's hottest third</div>
-        <div class="row"><span class="chip" style="background:#7edeff"></span>antennas — import hub</div>
-        <div class="row"><span class="chip" style="background:#c98f4a"></span>crane — TODO debt</div>
-        <div class="row"><span class="chip" style="background:#1d5a72"></span>canals — layer boundaries</div>
-        <div class="row"><span class="chip" style="background:#c0395b"></span>freight train — package deps</div>
-        <div class="row"><span class="chip" style="background:#2b2230"></span>ships — docker files</div>
-        <div class="row"><span class="chip" style="background:#6e7178"></span>graves — deleted files</div>
-        <div class="row" style="border-top:1px dashed var(--pink-deep)">drag pan &middot; scroll zoom &middot; Q/E rotate</div>
-      </div>
-      <div id="ticker"></div>
+    <div id="crumb" class="m-city">
+      <span class="back" data-nav="city">&#9664; CITY</span> &#9656; <b id="crumbName"></b>
+      <span id="crumbInfo"></span>
+    </div>
+    <div id="mapctl">
+      <button data-act="rot-" title="rotate left (Q)">&#8634;</button>
+      <button data-act="rot+" title="rotate right (E)">&#8635;</button>
+      <button data-act="zoom+" title="zoom in">+</button>
+      <button data-act="zoom-" title="zoom out">&minus;</button>
+      <button data-act="reset" class="wide" title="reset view">reset</button>
     </div>
   </div>
+
+  <div id="side">
+    <div id="panel-wrap" class="m-nation">
+      <div id="panel-guide">
+        <div class="plaque">Field Guide</div>
+        <div id="panel-guide-body"></div>
+      </div>
+      <div id="panel-city" class="panel-hidden">
+        <div class="plaque" id="city-plaque">City</div>
+        <div id="panel-city-stats"></div>
+      </div>
+    </div>
+    <div id="legend" class="m-city">
+      <div class="plaque">field guide</div>
+      <div class="row"><span class="chip" style="background:#d4a953"></span>floors — lines of code + coupling</div>
+      <div class="row"><span class="chip" style="background:#ffd678"></span>lit windows — touched recently</div>
+      <div class="row"><span class="chip" style="background:#52e3d4"></span>billboard — district's hottest third</div>
+      <div class="row"><span class="chip" style="background:#7edeff"></span>antennas — import hub</div>
+      <div class="row"><span class="chip" style="background:#c98f4a"></span>crane — TODO debt</div>
+      <div class="row"><span class="chip" style="background:#1d5a72"></span>canals — layer boundaries</div>
+      <div class="row"><span class="chip" style="background:#c0395b"></span>freight train — package deps</div>
+      <div class="row"><span class="chip" style="background:#2b2230"></span>ships — docker services / images</div>
+      <div class="row"><span class="chip" style="background:#6e7178"></span>graves — deleted files</div>
+      <div class="row" style="border-top:1px dashed var(--pink-deep)">drag pan &middot; scroll zoom &middot; Q/E rotate</div>
+    </div>
+  </div>
+
+  <div id="dock">
+    <div class="dispatch">
+      <div class="plaque dock"><span id="lamp"></span>city hall &middot; dispatch floor</div>
+      <div class="holder"><canvas id="hotel" width="1280" height="640"></canvas></div>
+    </div>
+    <div id="ticker"></div>
+  </div>
+
   <div id="tooltip"></div>
   <div id="roster"></div>
   <script src="city-render.js"></script>
   <script src="city-scape.js"></script>
-  <script src="city-live.js"></script>
   <script src="render.js"></script>
   <script src="hall.js"></script>
+  <script src="{{ENGINE}}"></script>
   <script src="hotel.js"></script>
+  <script>
+    if (location.hostname === 'localhost') {
+      let _s = null;
+      setInterval(async () => {
+        try { const { s } = await fetch('/dev-stamp').then(r => r.json());
+              if (_s !== null && s !== _s) location.reload(); _s = s; } catch {}
+      }, 1500);
+    }
+  </script>
 </body>
 </html>

@@ -1,11 +1,11 @@
 // Nation view: a top-down pixel world map — each state a biome province, repos as town
 // icons keyed by archetype family. Click a city to fly-zoom + crossfade into its full
 // isometric Botapest city (the existing City engine). Zoom back out returns to the map.
-const canvas = document.getElementById('nation');
+const canvas = document.getElementById('map');
 const ctx = canvas.getContext('2d');
 const tooltip = document.getElementById('tooltip');
 const backBtn = document.getElementById('back');
-const tierBtn = { world: null, state: null, city: null };
+const tierBtn = { world: null, state: null, city: null, district: null };
 document.querySelectorAll('#tiers button').forEach(b => tierBtn[b.dataset.tier] = b);
 const { hash, shade } = City;
 const TILE = 22;                                           // top-down tile size in px at scale 1
@@ -304,8 +304,10 @@ function switchPanel(which) {
 
 function updateChrome() {                                  // back button + [World ▸ State ▸ City] breadcrumb
   backBtn.style.display = (mode === 'city' || focusState) ? 'block' : 'none';
-  backBtn.innerHTML = '&#8593; ' + (mode === 'city' ? (focusState ? focusState.st.name.toUpperCase() : 'WORLD MAP') : 'WORLD MAP');
-  const active = mode === 'city' ? 'city' : focusState ? 'state' : 'world';
+  const backLabel = districtState ? (currentCity.name || currentCity.repo).toUpperCase()
+                  : mode === 'city' ? (focusState ? focusState.st.name.toUpperCase() : 'WORLD MAP') : 'WORLD MAP';
+  backBtn.innerHTML = '&#8593; ' + backLabel;
+  const active = districtState ? 'district' : mode === 'city' ? 'city' : focusState ? 'state' : 'world';
   const sb = focusState || ((currentCity || lastCity) && blockOf((currentCity || lastCity).state));
   const cityT = currentCity || lastCity;
   const set = (tier, on, label) => {
@@ -316,6 +318,7 @@ function updateChrome() {                                  // back button + [Wor
   set('world', true, 'WORLD');
   set('state', !!sb, sb ? trunc(sb.st.name) : 'STATE');
   set('city', !!cityT, cityT ? trunc(cityT.name || cityT.repo) : 'CITY');
+  set('district', !!districtState, districtState ? trunc(districtState.comp.name) : 'DISTRICT');
   renderLegend();                                          // legend tracks the active tier
 }
 
@@ -328,7 +331,7 @@ function navState() {
   else focusOn(sb);
   updateChrome();
 }
-function navCity() { const c = currentCity || lastCity; if (c && mode !== 'city') drillIn(c); }
+function navCity() { if (districtState) return exitDistrict(); const c = currentCity || lastCity; if (c && mode !== 'city') drillIn(c); }
 
 // ---- top-down terrain ----
 function drawMapGround(t) {
@@ -669,10 +672,16 @@ async function init() {
 // ---- controls ----
 function zoom(k, mx = canvas.width / 2, my = canvas.height / 2) {
   if (trans) return;
-  const cam = mode === 'city' ? cityCam : mapCam;
+  const cam = districtState ? districtCam : mode === 'city' ? cityCam : mapCam;
   cam.ox = mx + (cam.ox - mx) * k; cam.oy = my + (cam.oy - my) * k; cam.s *= k;
-  if (mode === 'city') { if (cam.s < cityFitS * .55) drillOut(); }
-  else {
+  if (districtState) { if (cam.s < districtFitS * .55) exitDistrict(); }   // zoom out → back to the city
+  else if (mode === 'city') {
+    if (cam.s < cityFitS * .55) drillOut();
+    else if (k > 1) {                                   // zoom into a building → enter its district
+      const b = City.pick(currentCity.cityState, mx, my);
+      if (b && b.component && b.screen && (b.screen.y1 - b.screen.y0) > canvas.height * .5) enterDistrict(b.component);
+    }
+  } else {
     if (cam.s < worldCam().s) Object.assign(cam, worldCam());
     mapTween = null; if (focusState && mapCam.s < stateFitS * .7) unfocus();
     if (k > 1) {                                        // zoom in: drill once a city fills the view
@@ -681,18 +690,22 @@ function zoom(k, mx = canvas.width / 2, my = canvas.height / 2) {
     }
   }
 }
-const CTL = { 'rot-': () => mode === 'city' && (cityCam.rot = (cityCam.rot + 7) % 8),
-              'rot+': () => mode === 'city' && (cityCam.rot = (cityCam.rot + 1) % 8),
+const rotCam = () => districtState ? districtCam : cityCam;
+const CTL = { 'rot-': () => mode === 'city' && (rotCam().rot = (rotCam().rot + 7) % 8),
+              'rot+': () => mode === 'city' && (rotCam().rot = (rotCam().rot + 1) % 8),
               'zoom+': () => zoom(1.18), 'zoom-': () => zoom(1 / 1.18),
-              'reset': () => mode === 'city' ? drillOut() : focusState ? unfocus() : fitMap() };
+              'reset': () => mode === 'city' ? (districtState ? exitDistrict() : drillOut()) : focusState ? unfocus() : fitMap() };
 document.getElementById('mapctl').addEventListener('click', e => { const a = e.target.dataset.act; if (a && nation) CTL[a](); });
-backBtn.addEventListener('click', () => { if (mode === 'city') drillOut(); else if (focusState) unfocus(); });
+backBtn.addEventListener('click', () => { if (mode === 'city') { districtState ? exitDistrict() : drillOut(); } else if (focusState) unfocus(); });
 document.getElementById('tiers').addEventListener('click', e => {
   const tier = e.target.dataset.tier;
   if (!tier || !nation || trans) return;
-  ({ world: navWorld, state: navState, city: navCity })[tier]();
+  ({ world: navWorld, state: navState, city: navCity, district: () => {} })[tier]();
 });
-window.addEventListener('keydown', e => { if (mode === 'city' && (e.key === 'q' || e.key === 'e')) CTL[e.key === 'q' ? 'rot+' : 'rot-'](); });
+window.addEventListener('keydown', e => {
+  if (mode === 'city' && (e.key === 'q' || e.key === 'e')) CTL[e.key === 'q' ? 'rot+' : 'rot-']();
+  if (e.key === 'Escape' && districtState) exitDistrict();
+});
 
 let drag = null, moved = false;
 canvas.addEventListener('mousedown', m => { drag = { x: m.clientX, y: m.clientY }; moved = false; });
@@ -704,9 +717,15 @@ canvas.addEventListener('wheel', m => {
 }, { passive: false });
 
 canvas.addEventListener('click', m => {
-  if (moved || trans || mode !== 'map') return;
+  if (moved || trans) return;
   const r = canvas.getBoundingClientRect();
   const mx = (m.clientX - r.left) * (canvas.width / r.width), my = (m.clientY - r.top) * (canvas.height / r.height);
+  if (mode === 'city') {                                   // building → drill into its district interior
+    if (districtState) return;
+    const b = City.pick(currentCity.cityState, mx, my);
+    if (b && b.component) enterDistrict(b.component);
+    return;
+  }
   const c = pickCity(mx, my);
   if (c) { drillIn(c); return; }                           // town → city; province → state focus; sea → unfocus
   const b = pickState(mx, my);
@@ -730,14 +749,14 @@ canvas.addEventListener('mousemove', m => {
   const mx = (m.clientX - r.left) * kx, my = (m.clientY - r.top) * ky;
   if (drag) {
     moved = true; mapTween = null;
-    const cam = mode === 'city' ? cityCam : mapCam;
+    const cam = districtState ? districtCam : mode === 'city' ? cityCam : mapCam;
     cam.ox += (m.clientX - drag.x) * kx; cam.oy += (m.clientY - drag.y) * ky;
     drag = { x: m.clientX, y: m.clientY };
     return;
   }
   let text = null;
   if (mode === 'city' && currentCity) {
-    const b = City.pick(currentCity.cityState, mx, my);
+    const b = City.pick(districtState || currentCity.cityState, mx, my);
     if (b) text = b.tip || `${b.path} · ${b.floors} fl · ${b.loc} loc · ${b.commits} commits`;
   } else if (mode === 'map') {
     const c = pickCity(mx, my);
