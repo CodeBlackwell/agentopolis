@@ -122,10 +122,23 @@ function randomStation() {
   return names[Math.floor(Math.random() * names.length)];
 }
 
+function logLine(e) {                       // plain-language action, or null for noise the user can't act on
+  if (e.event === 'UserPromptSubmit') return e.detail ? `asked: ${e.detail}` : 'new request';
+  if (e.event === 'Notification') return `⚠ ${e.detail || 'needs your attention'}`;
+  if (e.event === 'Stop') return 'finished — at your leisure';
+  if (e.event === 'PreToolUse') {
+    if (e.tool === 'Task' || e.tool === 'Agent') return `dispatched ${e.agent_name || 'an agent'}`;
+    return e.detail ? `${e.tool}: ${e.detail}` : e.tool;
+  }
+  return null;                              // PostToolUse, SessionStart/End, SubagentStop, etc.
+}
+
 function tick(e) {
+  const text = logLine(e);
+  if (!text) return;
   const line = document.createElement('div');
   const time = new Date().toLocaleTimeString();
-  line.innerHTML = `<span class="t">${time}</span>${e.event}${e.tool ? ' · ' + e.tool : ''}${e.detail ? ' · ' + e.detail : ''}`;
+  line.innerHTML = `<span class="t">${time}</span>${text}`;
   ticker.prepend(line);
   while (ticker.children.length > 40) ticker.lastChild.remove();
 }
