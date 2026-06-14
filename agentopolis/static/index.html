@@ -160,15 +160,29 @@
             font-family: 'Silkscreen', monospace; font-size: 10px; line-height: 1.6;
             padding: 8px 10px; max-width: 380px; max-height: 50vh; overflow-y: auto;
             white-space: pre-line; cursor: default; }
+
+  #forge { display: none; position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 9; }
+  body[data-mode="nation"] #forge, body[data-demo="1"] #forge { display: block; }
+  .demo-only { display: none; }
+  body[data-demo="1"] .demo-only { display: block; }
+  .demo-only a { color: var(--gold); text-decoration: none; }
+  .demo-only a:hover { color: var(--cream); }
+  #forge input { width: 420px; max-width: 64vw; padding: 7px 11px;
+                 font-family: 'Silkscreen', monospace; font-size: 10px; color: var(--cream);
+                 background: rgba(42,16,36,.88); border: 2px solid var(--gold);
+                 box-shadow: 3px 3px 0 var(--plum); outline: none; }
+  #forge input::placeholder { color: rgba(245,230,211,.5); }
+  #forge input:focus { border-color: var(--cream); }
 </style>
 </head>
-<body data-mode="{{MODE}}" data-hall-level="{{HALL_LEVEL}}" data-hall-name="{{HALL_NAME}}">
+<body data-mode="{{MODE}}" data-hall-level="{{HALL_LEVEL}}" data-hall-name="{{HALL_NAME}}" data-demo="{{DEMO}}">
   <div class="mapwrap">
     <canvas id="map" width="1280" height="720"></canvas>
     <header>
       <h1>Agentopolis <span class="m-nation">Nation</span><span class="m-city">City</span></h1>
       <p class="m-nation">drag to pan &middot; scroll to zoom &middot; click a city to enter it &middot; Q/E to rotate inside</p>
-      <p class="m-city">the city builds itself &middot; agents at your service</p>
+      <p class="m-city">scroll to zoom in &amp; out &middot; drag to pan &middot; the city builds itself</p>
+      <p class="m-city demo-only"><a href="/?nation">&#9656; explore the whole BLACKBOX nation</a></p>
     </header>
     <button id="back" class="m-nation" title="back to world map">&#8593; WORLD MAP</button>
     <div id="tiers" class="m-nation">
@@ -183,6 +197,11 @@
       <button data-act="zoom-" title="zoom out">&minus;</button>
       <button data-act="reset" class="wide" title="reset view">reset</button>
     </div>
+    <form id="forge"
+          onsubmit="location.href='/?forge='+encodeURIComponent(this.url.value.trim());return false">
+      <input name="url" autocomplete="off" spellcheck="false"
+             placeholder="paste a public github url &rarr; build it as a city">
+    </form>
   </div>
 
   <div id="side">
@@ -226,6 +245,7 @@
   <script src="render.js"></script>
   <script src="hall.js"></script>
   <script src="hall-tiers.js"></script>
+  <script>window.CITY_SRC = "{{CITY_SRC}}";</script>
   <script src="{{ENGINE}}"></script>
   <script src="hotel.js"></script>
   <script>

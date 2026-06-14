@@ -34,6 +34,7 @@ def main() -> None:
     parser.add_argument("--repo", default=".", help="git repo to map as the city (default: cwd)")
     parser.add_argument("--zone", help="zoning manifest (default: <repo>/.agentopolis.json, else auto-zoned)")
     parser.add_argument("--root", help="map every git repo under this dir as a nation of cities")
+    parser.add_argument("--showcase", help="serve a baked showcase dir (nation fixtures, no live git)")
     parser.add_argument("--port", type=int, default=4242)
     parser.add_argument("--no-open", action="store_true", help="don't open the city in a browser")
     args = parser.parse_args()
@@ -44,11 +45,15 @@ def main() -> None:
         hooks.detach()
     else:
         free_port(args.port)
-        server.configure(args.repo, args.zone)
-        root = args.root or (nation.is_mother(args.repo) and args.repo)   # a mother repo is a nation
-        if root:
-            server.configure_nation(root, None)
-        where = f"nation: {root}" if root else f"repo: {args.repo}"
+        if args.showcase:
+            server.configure_showcase(args.showcase)
+            root, where = True, f"showcase: {args.showcase}"
+        else:
+            server.configure(args.repo, args.zone)
+            root = args.root or (nation.is_mother(args.repo) and args.repo)   # a mother repo is a nation
+            if root:
+                server.configure_nation(root, None)
+            where = f"nation: {root}" if root else f"repo: {args.repo}"
         url = f"http://localhost:{args.port}"
         print(f"Agentopolis {'Nation' if root else 'City'} on {url} ({where})")
         if not hooks.is_attached():

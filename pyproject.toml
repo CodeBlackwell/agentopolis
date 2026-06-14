@@ -22,5 +22,11 @@ agentopolis = "agentopolis.cli:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# showcase/ (baked demo fixtures) and bake.py (local-only fixture generator) ship
+# with the Docker demo via COPY, never to CLI users — keep them out of both artifacts
 [tool.hatch.build.targets.wheel]
 packages = ["agentopolis"]
+exclude = ["agentopolis/showcase", "agentopolis/bake.py"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["agentopolis/showcase", "agentopolis/bake.py"]

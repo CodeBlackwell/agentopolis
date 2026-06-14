@@ -7,13 +7,16 @@ seeds the configured repo's city on demand (cached per git HEAD).
 import asyncio
 import json
 import os
+import threading
 from collections import deque
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import forge as forge_mod
 from .nation import CAPITAL, discover_repos, is_mother, load_nation
 from .seed import git, seed
 from .zone import load_zone
@@ -23,8 +26,13 @@ subscribers: set[asyncio.Queue] = set()
 history: deque = deque(maxlen=100)
 city = {"repo": ".", "zone_path": None}
 nation = {"root": None, "manifest": None}
+showcase = {"dir": os.environ.get("AGENTOPOLIS_SHOWCASE"),    # serve baked fixtures, no live git
+            "city": os.environ.get("AGENTOPOLIS_DEMO_CITY")}  # demo-only: land on this city, not the nation
+forge_gate = threading.BoundedSemaphore(2)                    # cap concurrent clones on a public box
 
 # dev mode: env vars survive uvicorn --reload cycles; cli.py still wins when used directly
+if showcase["dir"]:                              # showcase is nation mode fed by fixtures
+    nation.update(root=json.loads((Path(showcase["dir"]) / "nation.json").read_text())["root"])
 if _root := os.environ.get("AGENTOPOLIS_ROOT"):
     nation.update(root=_root, manifest=os.environ.get("AGENTOPOLIS_MANIFEST"))
 if _repo := os.environ.get("AGENTOPOLIS_REPO"):
@@ -39,6 +47,11 @@ def configure(repo: str, zone_path: str | None) -> None:
 
 def configure_nation(root: str, manifest: str | None) -> None:
     nation.update(root=root, manifest=manifest)
+
+
+def configure_showcase(directory: str) -> None:
+    showcase["dir"] = directory                  # nation mode, but data comes from baked fixtures
+    nation.update(root=json.loads((Path(directory) / "nation.json").read_text())["root"], manifest=None)
 
 
 def seed_cached(repo: str, zone_path: str | None = None, exclude: set | None = None) -> dict:
@@ -104,11 +117,16 @@ async def hook(request: Request) -> dict:
 
 @app.get("/nation-data.json")
 def nation_data() -> dict:
+    if d := showcase["dir"]:
+        return json.loads((Path(d) / "nation.json").read_text())
     return load_nation(nation["root"], nation["manifest"])
 
 
 @app.get("/city-data.json")
 def city_data(repo: str | None = None):
+    if d := showcase["dir"]:
+        f = Path(d) / "cities" / ((repo or "_capital").replace("/", "%2F") + ".json")
+        return json.loads(f.read_text()) if f.exists() else Response(status_code=404)
     root = nation["root"]
     if repo:                                    # nation drill-down
         if root and repo == CAPITAL and is_mother(root):   # the mother's own glue, minus its subrepos
@@ -117,6 +135,22 @@ def city_data(repo: str | None = None):
             return Response(status_code=404)
         return seed_cached(str(Path(root) / repo))
     return seed_cached(city["repo"], city["zone_path"])
+
+
+@app.get("/forge")
+def forge_city(url: str):
+    if url in forge_mod.forged:                  # cache hit: skip the clone gate entirely
+        return forge_mod.forged[url]
+    if not forge_gate.acquire(blocking=False):
+        return Response(status_code=429)
+    try:
+        return forge_mod.forge(url)
+    except ValueError:
+        return Response(status_code=400)
+    except Exception:
+        return Response(status_code=502)
+    finally:
+        forge_gate.release()
 
 
 @app.get("/events")
@@ -157,15 +191,25 @@ async def no_stale_assets(request: Request, call_next):
 
 
 @app.get("/")
-def root() -> HTMLResponse:
-    # one shell, two map engines: stamp the mode + inject the matching engine script
-    mode = "nation" if nation["root"] else "city"
+def root(request: Request) -> HTMLResponse:
+    # one shell, two map engines: stamp the mode + inject the matching engine script.
+    # ?forge=<github url> forces city mode pointed at the forge endpoint; the demo can also
+    # land straight on a showcase city (AGENTOPOLIS_DEMO_CITY); ?nation always returns the map.
+    forge = request.query_params.get("forge")
+    demo_city = showcase["dir"] and showcase["city"]
+    if forge:
+        mode, name, src = "city", forge.rstrip("/").split("/")[-1], "/forge?url=" + quote(forge, safe="")
+    elif demo_city and "nation" not in request.query_params:
+        mode, name, src = "city", demo_city, "city-data.json?repo=" + quote(demo_city, safe="")
+    elif nation["root"]:
+        mode, name, src = "nation", Path(nation["root"]).name, "city-data.json"
+    else:
+        mode, name, src = "city", Path(city["repo"]).resolve().name, "city-data.json"
     engine = "nation.js" if mode == "nation" else "city-live.js"
-    level = "nation" if mode == "nation" else "city"     # first paint; nation.js refines as you drill
-    name = Path(nation["root"] if mode == "nation" else city["repo"]).resolve().name
     html = (Path(__file__).parent / "static" / "index.html").read_text()
     return HTMLResponse(html.replace("{{MODE}}", mode).replace("{{ENGINE}}", engine)
-                        .replace("{{HALL_LEVEL}}", level).replace("{{HALL_NAME}}", name))
+                        .replace("{{HALL_LEVEL}}", mode).replace("{{HALL_NAME}}", name)
+                        .replace("{{CITY_SRC}}", src).replace("{{DEMO}}", "1" if showcase["dir"] else ""))
 
 
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")

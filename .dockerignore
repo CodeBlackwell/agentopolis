@@ -1,0 +1,7 @@
+.venv/
+.git/
+dist/
+__pycache__/
+.playwright-mcp/
+*.jpeg
+city/

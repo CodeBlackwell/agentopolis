@@ -8,6 +8,18 @@ dev:
     @sleep 1 && open http://localhost:4242 &
     exec env AGENTOPOLIS_ROOT=.. .venv/bin/uvicorn agentopolis.server:app --reload --reload-dir agentopolis --port 4242 --log-level warning
 
+# Re-bake the BLACKBOX showcase fixtures (run before deploy when repos change)
+bake:
+    .venv/bin/python -m agentopolis.bake
+
+# Deploy the hosted demo to Hetzner. Fixtures (private project data) never touch
+# public git — they rsync straight to the host between the pull and the rebuild.
+deploy:
+    git push origin master
+    ssh root@5.78.198.79 'cd /opt/agentopolis && git pull'
+    rsync -az --delete agentopolis/showcase/ root@5.78.198.79:/opt/agentopolis/agentopolis/showcase/
+    ssh root@5.78.198.79 'cd /opt/agentopolis && docker compose up -d --build'
+
 # Install hooks into ~/.claude/settings.json (new sessions report in)
 attach:
     uv run agentopolis attach

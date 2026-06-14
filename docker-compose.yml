@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    container_name: agentopolis-app
+    restart: unless-stopped
+    networks:
+      - web
+
+networks:
+  web:
+    external: true
+    name: web

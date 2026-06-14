@@ -1,0 +1,16 @@
+FROM python:3.12-slim
+
+# git: forge clones public repos at request time
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY . /app
+RUN pip install --no-cache-dir .
+
+# showcase mode: serve the baked BLACKBOX fixtures, no live git on this repo.
+# the demo lands on one impressive city; ?nation still opens the full map.
+ENV AGENTOPOLIS_SHOWCASE=/app/agentopolis/showcase
+ENV AGENTOPOLIS_DEMO_CITY=SPICE
+EXPOSE 8000
+CMD ["uvicorn", "agentopolis.server:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -204,29 +204,47 @@ source.onopen = () => lamp.classList.add('on');
 source.onerror = () => lamp.classList.remove('on');
 source.onmessage = m => handle(JSON.parse(m.data));
 
-if (new URLSearchParams(location.search).has('demo')) {
-  const script = [
-    { event: 'SessionStart', session: 'demo1234' },
-    { event: 'UserPromptSubmit', session: 'demo1234', detail: 'build me a hotel' },
-    { event: 'PreToolUse', session: 'demo1234', tool: 'Read', detail: 'server.py' },
-    { event: 'PostToolUse', session: 'demo1234', tool: 'Read' },
-    { event: 'PreToolUse', session: 'demo1234', tool: 'Agent', agent_type: 'Explore', agent_name: 'survey the lobby' },
-    { event: 'PreToolUse', session: 'demo1234', agent_id: 'scout01', agent_type: 'Explore', tool: 'Grep', detail: 'lobby' },
-    { event: 'PreToolUse', session: 'demo1234', tool: 'Edit', detail: 'app.py', path: 'backend/api/app.py' },
-    { event: 'PreToolUse', session: 'demo1234', tool: 'Agent', agent_type: 'Plan', agent_name: 'draw blueprints' },
-    { event: 'PreToolUse', session: 'demo1234', agent_id: 'plan01', agent_type: 'Plan', tool: 'Read', detail: 'render.js' },
-    { event: 'PostToolUse', session: 'demo1234', agent_id: 'scout01', agent_type: 'Explore', tool: 'Grep' },
-    { event: 'Notification', session: 'demo1234', detail: 'permission needed: Bash' },
-    { event: 'PreToolUse', session: 'demo1234', tool: 'Bash', detail: 'just test' },
-    { event: 'PreToolUse', session: 'demo1234', agent_id: 'scout01', agent_type: 'Explore', tool: 'WebSearch', detail: 'habbo furni' },
-    { event: 'PostToolUse', session: 'demo1234', tool: 'Bash' },
-    { event: 'SubagentStop', session: 'demo1234', agent_id: 'scout01' },
-    { event: 'PreToolUse', session: 'demo1234', tool: 'Write', detail: 'skyline.tsx', path: 'frontend/src/reading/skyline.tsx' },
-    { event: 'SubagentStop', session: 'demo1234', agent_id: 'plan01' },
-    { event: 'PreToolUse', session: 'demo1234', tool: 'Bash', detail: 'git commit -m ship', commit: true },
-    { event: 'Stop', session: 'demo1234' },
+// Seeded loop: agents build the real city on a timer (no live Claude session needed).
+// Reads the loaded city's hottest buildings so the skyline that lights up is the actual one.
+function buildScript(buildings) {
+  const s = 'demo';
+  const base = p => (p || '').split('/').pop();
+  const top = [...buildings].sort((a, b) => (b.commits || 0) - (a.commits || 0)).slice(0, 8);
+  const fallback = [{ path: 'app', component: 'core' }, { path: 'lib', component: 'core' }];
+  const pool = top.length ? top : fallback;
+  const at = n => pool[n % pool.length];
+  const read = b => [{ event: 'PreToolUse', session: s, tool: 'Read', detail: base(b.path), path: b.path },
+                     { event: 'PostToolUse', session: s, tool: 'Read' }];
+  const edit = (b, tool) => ({ event: 'PreToolUse', session: s, tool, detail: base(b.path), path: b.path });
+  return [
+    { event: 'SessionStart', session: s },
+    { event: 'UserPromptSubmit', session: s, detail: `ship the ${at(0).component} feature` },
+    ...read(at(0)), ...read(at(1)),
+    { event: 'PreToolUse', session: s, tool: 'Agent', agent_type: 'Explore', agent_name: `survey ${at(2).component}` },
+    { event: 'PreToolUse', session: s, agent_id: 'scout01', agent_type: 'Explore', tool: 'Grep', detail: at(2).component },
+    { event: 'PreToolUse', session: s, agent_id: 'scout01', agent_type: 'Explore', tool: 'Read', detail: base(at(3).path), path: at(3).path },
+    { event: 'PostToolUse', session: s, agent_id: 'scout01', agent_type: 'Explore', tool: 'Read' },
+    edit(at(0), 'Edit'), { event: 'PostToolUse', session: s, tool: 'Edit' },
+    { event: 'Notification', session: s, detail: 'permission needed: Bash' },
+    { event: 'PreToolUse', session: s, tool: 'Bash', detail: 'just test' },
+    { event: 'PostToolUse', session: s, tool: 'Bash' },
+    edit(at(4), 'Write'), { event: 'SubagentStop', session: s, agent_id: 'scout01' },
+    edit(at(5), 'Edit'),
+    { event: 'PreToolUse', session: s, tool: 'Bash', detail: 'git commit -m ship', commit: true },
+    { event: 'Stop', session: s },
   ];
-  let i = 0;
-  setInterval(() => handle(script[i++ % script.length]), 2600);
 }
+
+let demoTimer = null;
+window.startDemoLoop = startDemoLoop;            // city-live.js (separate scope) triggers it on city load
+function startDemoLoop(buildings) {
+  const forced = new URLSearchParams(location.search).has('demo');
+  if (location.hostname === 'localhost' && !forced) return;   // local real-hook use: stay quiet
+  if (demoTimer) return;
+  const script = buildScript(buildings || []);
+  let i = 0;
+  demoTimer = setInterval(() => handle(script[i++ % script.length]), 2600);
+}
+
+if (document.body.dataset.mode === 'nation') startDemoLoop(null);   // city mode starts from city-live.js
 })();

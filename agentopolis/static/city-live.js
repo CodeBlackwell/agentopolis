@@ -4,8 +4,9 @@ const cityCtx = cityCanvas.getContext('2d');
 const cityCam = { ox: 0, oy: 0, s: 1 };
 let cityState = null;
 
-fetch('city-data.json').then(r => r.json()).then(data => {
+fetch(window.CITY_SRC || 'city-data.json').then(r => r.json()).then(data => {
   cityState = City.layout(data);
+  if (typeof startDemoLoop === 'function') startDemoLoop(data.buildings);
   const legend = document.getElementById('legend');
   const controls = legend.lastElementChild;
   const add = (cls, html, comp) => {
