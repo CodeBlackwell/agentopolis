@@ -198,7 +198,8 @@ def root(request: Request) -> HTMLResponse:
     forge = request.query_params.get("forge")
     auto_city = bool(showcase["dir"] and showcase["city"]) and "nation" not in request.query_params
     if forge:
-        mode, name, src = "city", forge.rstrip("/").split("/")[-1], "/forge?url=" + quote(forge, safe="")
+        name = forge.rstrip("/").split("/")[-1].removesuffix(".git")   # heading: "<repo> City"
+        mode, src = "city", "/forge?url=" + quote(forge, safe="")
     elif nation["root"]:
         mode, name, src = "nation", Path(nation["root"]).name, "city-data.json"
     else:
