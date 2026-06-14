@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /forge
+Disallow: /events
+Disallow: /hook
+Disallow: /city-data.json
+Disallow: /nation-data.json
+Disallow: /dev-stamp
+
+Sitemap: https://agentopolis.codeblackwell.ai/sitemap.xml
