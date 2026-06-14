@@ -48,7 +48,9 @@ FILE_CLOUDS = [
 
 
 def git(repo: str, *args: str) -> str:
-    return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True).stdout
+    # quotepath=false: emit unicode/spaced paths literally, not C-escaped octal (\342\200\224)
+    return subprocess.run(["git", "-C", repo, "-c", "core.quotepath=false", *args],
+                          capture_output=True, text=True).stdout
 
 
 def tracked(repo: str, exclude: set | None = None) -> list[str]:

@@ -1,9 +1,10 @@
 """Bake a static showcase from a workspace (run locally, never on the server).
 
 Seeds the nation + each city once and writes fixtures the server serves with
-zero live git. Private cities are sanitized: real shape + stats, but file
-paths are anonymized so nothing private leaks. Near-duplicate repos
-(specter-1, specter-1-private, specter-1-wave2 ...) collapse to one city.
+zero live git. The fixtures carry real paths + stats (gitignored and rsynced
+to the host, never public git); only docker image/service names are normalized
+so private registries aren't named. Near-duplicate repos (specter-1,
+specter-1-private, specter-1-wave2 ...) collapse to one city.
 
     python -m agentopolis.bake [WORKSPACE_ROOT] [OUT_DIR]
 """
@@ -13,13 +14,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-from .nation import discover_repos, load_nation
+from .nation import load_nation
 from .seed import seed
 from .zone import load_zone
-
-# Only these ship real file paths; everything else is sanitized (safe default).
-PUBLIC = {"PROVE", "PANEL", "veridatum", "bloodtrail", "codeblackwell.github.io",
-          "botapest", "code-review-graph", "C.R.A.C.K."}
 
 VARIANT = re.compile(r"-(private|integration|wave\d+|mvp)$")
 
@@ -45,16 +42,28 @@ def dedup(nat: dict) -> dict:
     return nat
 
 
-def anonymize(data: dict) -> dict:
-    """Strip a private city to district + shape: real stats, fake file names."""
-    for i, b in enumerate(data["buildings"]):
-        b["path"] = f"{b['component']}/{i:03d}"
-    data["dead"] = [{"path": f"deleted/{i}", "born": d.get("born"), "died": d.get("died")}
-                    for i, d in enumerate(data["dead"])]
-    # keep the harbor (a ship per docker file) but hide the service / image names it runs
-    data["docker"] = [{"kind": d["kind"], "items": [], "path": f"ship-{i}"}
-                      for i, d in enumerate(data["docker"])]
-    return data
+# Well-known public images/services keep their name; anything else (private registries,
+# project-specific images) is redacted so the public demo never names them.
+KNOWN_IMAGES = {
+    "postgres", "postgresql", "timescaledb", "pgvector", "mysql", "mariadb", "redis",
+    "valkey", "mongo", "mongodb", "memcached", "clickhouse", "nginx", "caddy", "traefik",
+    "httpd", "node", "python", "golang", "go", "rust", "ruby", "php", "openjdk", "java",
+    "deno", "bun", "alpine", "ubuntu", "debian", "busybox", "scratch", "neo4j",
+    "elasticsearch", "opensearch", "qdrant", "weaviate", "rabbitmq", "kafka", "nats",
+    "minio", "vault", "consul", "etcd", "grafana", "prometheus", "loki", "ollama",
+    "localstack", "selenium", "mailhog", "adminer", "pgadmin", "supabase",
+}
+
+
+def image_family(name: str) -> str:
+    base = name.split(":")[0].rsplit("/", 1)[-1].lower()    # drop tag + registry/org prefix
+    return base if base in KNOWN_IMAGES else "service"
+
+
+def protect_docker(data: dict) -> None:
+    """Keep recognizable image/service families; redact custom names (count is preserved)."""
+    for d in data["docker"]:
+        d["items"] = [image_family(it) for it in d.get("items", [])]
 
 
 def build_nation(root: str) -> dict:
@@ -78,10 +87,9 @@ def main() -> None:
     for c in nat["cities"]:
         repo = c["repo"]
         data = seed(str(Path(root) / repo), load_zone(str(Path(root) / repo), None))
-        if repo not in PUBLIC:
-            data = anonymize(data)
+        protect_docker(data)
         (out / "cities" / f"{repo}.json").write_text(json.dumps(data))
-        print(f"  {'pub ' if repo in PUBLIC else 'priv'} {repo} ({len(data['buildings'])} buildings)")
+        print(f"  {repo} ({len(data['buildings'])} buildings)")
 
     print(f"baked {len(nat['cities'])} cities → {out}")
 
