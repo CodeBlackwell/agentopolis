@@ -104,35 +104,49 @@ function drawAvatar(ctx, av, t) {
   }
   px(ctx, cx, base, -2, -30, 4, 2, '#b3795a');              // mouth
   ctx.restore();
-  ctx.font = '8px Silkscreen, monospace';
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#1a0a16';
-  ctx.fillRect(cx - ctx.measureText(av.name).width / 2 - 3, feet - bob - 76, ctx.measureText(av.name).width + 6, 11);
-  ctx.fillStyle = av.isAgent ? '#f3cfd9' : '#d4a953';
-  ctx.fillText(av.name, cx, feet - bob - 67);
-  return { cx, top: feet - bob - 78 };
+  return { cx, nameY: feet - bob - 68, top: feet - bob - 80 };   // name + bubble drawn later in screen space
 }
 
-function drawBubble(ctx, cx, top, text, age) {
+function drawBubble(ctx, cx, top, text, age, view) {     // cx/top are screen-space; view = internal px per CSS px
   const alpha = age < 3500 ? 1 : Math.max(0, 1 - (age - 3500) / 1200);
   if (alpha <= 0) return;
   ctx.globalAlpha = alpha;
-  ctx.font = '9px Silkscreen, monospace';
-  const w = Math.min(ctx.measureText(text).width + 14, 230);
-  const x = Math.max(8, Math.min(cx - w / 2, 1280 - w - 8)), y = top - 24;
+  const f = 11 * view, pad = 6 * view, h = f + pad * 1.4;
+  ctx.font = `${f}px Silkscreen, monospace`;
+  ctx.textAlign = 'left';
+  const w = Math.min(ctx.measureText(text).width + pad * 2, 320 * view);
+  const x = Math.max(2, Math.min(cx - w / 2, ctx.canvas.width - w - 2)), y = top - h;
   ctx.fillStyle = '#fffdf7';
   ctx.strokeStyle = '#3d1832';
-  ctx.lineWidth = 2;
-  ctx.fillRect(x, y, w, 18);
-  ctx.strokeRect(x, y, w, 18);
+  ctx.lineWidth = 2 * view;
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeRect(x, y, w, h);
   ctx.beginPath();
-  ctx.moveTo(cx - 4, y + 18); ctx.lineTo(cx + 4, y + 18); ctx.lineTo(cx, y + 24);
+  ctx.moveTo(cx - 4 * view, y + h); ctx.lineTo(cx + 4 * view, y + h); ctx.lineTo(cx, y + h + 6 * view);
   ctx.closePath();
   ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#3d1832';
-  ctx.textAlign = 'left';
-  ctx.fillText(text, x + 7, y + 13, w - 14);
+  ctx.fillText(text, x + pad, y + h - pad, w - pad * 2);
   ctx.globalAlpha = 1;
+}
+
+// Names + dialogue in screen space: the dock downscales the canvas, so size them to a constant
+// on-screen px (matching the office placards) instead of the tiny world-space text.
+function drawSpeech(ctx, labels, t) {
+  const view = ctx.canvas.width / (ctx.canvas.clientWidth || ctx.canvas.width);
+  const toX = wx => wx * hallCam.s + hallCam.ox, toY = wy => wy * hallCam.s + hallCam.oy;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.font = `${11 * view}px Silkscreen, monospace`;
+  ctx.textAlign = 'center';
+  for (const L of labels) {                                // name placard above each head
+    const x = toX(L.cx), y = toY(L.nameY), w = ctx.measureText(L.av.name).width + 6 * view;
+    ctx.fillStyle = '#1a0a16';
+    ctx.fillRect(x - w / 2, y - 11 * view, w, 15 * view);
+    ctx.fillStyle = L.av.isAgent ? '#f3cfd9' : '#d4a953';
+    ctx.fillText(L.av.name, x, y);
+  }
+  for (const L of labels)                                  // bubbles last so they sit above the names
+    if (L.av.bubble) drawBubble(ctx, toX(L.cx), toY(L.top), L.av.bubble.text, t - L.av.bubble.t, view);
 }
 
 function render(ctx, avatars, t) {
@@ -144,14 +158,12 @@ function render(ctx, avatars, t) {
     ...furnitureFor(hallLevel).map(f => ({ depth: f.x + f.y, draw: () => { const a = anchor(f); f.draw(ctx, a.cx, a.base); } })),
     ...avatars.map(av => ({ depth: av.x + av.y + .5, av })),
   ].sort((a, b) => a.depth - b.depth);
-  const bubbles = [];
+  const labels = [];
   for (const item of items) {
-    if (item.av) {
-      const pos = drawAvatar(ctx, item.av, t);
-      if (item.av.bubble) bubbles.push({ ...pos, ...item.av.bubble });
-    } else item.draw();
+    if (item.av) labels.push({ av: item.av, ...drawAvatar(ctx, item.av, t) });
+    else item.draw();
   }
-  for (const b of bubbles) drawBubble(ctx, b.cx, b.top, b.text, t - b.t);
+  drawSpeech(ctx, labels, t);
   drawOfficeLabels(ctx);
 }
 
