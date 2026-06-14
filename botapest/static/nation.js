@@ -315,6 +315,9 @@ function updateChrome() {                                  // back button + [Wor
   set('state', !!sb, sb ? trunc(sb.st.name) : 'STATE');
   set('city', !!cityT, cityT ? trunc(cityT.name || cityT.repo) : 'CITY');
   renderLegend();                                          // legend tracks the active tier
+  if (typeof setHallContext === 'function')                // dispatch floor reskins to the active tier
+    setHallContext(active === 'world' ? 'nation' : active,
+      active === 'world' ? nation.root : active === 'state' ? sb.st.name : (cityT.name || cityT.repo));
 }
 
 // snap navigation used by the breadcrumb (always reachable: up a tier, or back to the last city)

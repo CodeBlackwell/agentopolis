@@ -161,8 +161,11 @@ def root() -> HTMLResponse:
     # one shell, two map engines: stamp the mode + inject the matching engine script
     mode = "nation" if nation["root"] else "city"
     engine = "nation.js" if mode == "nation" else "city-live.js"
+    level = "nation" if mode == "nation" else "city"     # first paint; nation.js refines as you drill
+    name = Path(nation["root"] if mode == "nation" else city["repo"]).resolve().name
     html = (Path(__file__).parent / "static" / "index.html").read_text()
-    return HTMLResponse(html.replace("{{MODE}}", mode).replace("{{ENGINE}}", engine))
+    return HTMLResponse(html.replace("{{MODE}}", mode).replace("{{ENGINE}}", engine)
+                        .replace("{{HALL_LEVEL}}", level).replace("{{HALL_NAME}}", name))
 
 
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")

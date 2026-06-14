@@ -15,6 +15,22 @@ function hallZoom(k, mx = 640, my = 320) {                  // zoom toward the c
   hallCam.s = s;
 }
 
+// ---- hall tier: the dispatch floor reskins to match the map's drill level ----
+const HALL_TITLE = { nation: 'national security · situation room',
+                     state: 'state house · dispatch floor',
+                     city: 'city hall · dispatch floor' };
+let hallLevel = 'city', hallName = '';
+function setHallContext(level, name) {              // called by the map engine as you drill in/out
+  if (HALLS[level]) hallLevel = level;
+  if (name) hallName = name;
+  const el = document.getElementById('hallTitle');
+  if (el) el.textContent = `${hallName} · ${HALL_TITLE[hallLevel]}`;
+}
+const drawHall = (ctx, level) => (HALLS[level] || HALLS.city).draw(ctx);
+const furnitureFor = level => (HALLS[level] || HALLS.city).furniture;
+window.addEventListener('DOMContentLoaded', () =>   // seed from the server-stamped body dataset
+  setHallContext(document.body.dataset.hallLevel || 'city', document.body.dataset.hallName || ''));
+
 function diamond(ctx, sx, sy) {
   ctx.beginPath();
   ctx.moveTo(sx, sy);
@@ -101,9 +117,9 @@ function render(ctx, avatars, t) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, 1280, 640);
   ctx.setTransform(hallCam.s, 0, 0, hallCam.s, hallCam.ox, hallCam.oy);
-  drawHall(ctx);
+  drawHall(ctx, hallLevel);
   const items = [
-    ...FURNITURE.map(f => ({ depth: f.x + f.y, draw: () => { const a = anchor(f); f.draw(ctx, a.cx, a.base); } })),
+    ...furnitureFor(hallLevel).map(f => ({ depth: f.x + f.y, draw: () => { const a = anchor(f); f.draw(ctx, a.cx, a.base); } })),
     ...avatars.map(av => ({ depth: av.x + av.y + .5, av })),
   ].sort((a, b) => a.depth - b.depth);
   const bubbles = [];
@@ -114,4 +130,24 @@ function render(ctx, avatars, t) {
     } else item.draw();
   }
   for (const b of bubbles) drawBubble(ctx, b.cx, b.top, b.text, t - b.t);
+  drawOfficeLabels(ctx);
+}
+
+// Office placards drawn in screen space: the canvas is downscaled to fit the dock, so labels are
+// sized in internal px to hit ~11px on screen and stay constant — legible without zooming.
+function drawOfficeLabels(ctx) {
+  const view = ctx.canvas.width / (ctx.canvas.clientWidth || ctx.canvas.width);   // internal px per CSS px
+  const fontPx = 11 * view, pad = 5 * view;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.font = `${fontPx}px Silkscreen, monospace`;
+  ctx.textAlign = 'center';
+  for (const o of (HALLS[hallLevel] || HALLS.city).offices) {
+    const { sx, sy } = iso(o.x, o.y);
+    const x = sx * hallCam.s + hallCam.ox, y = (sy - 78) * hallCam.s + hallCam.oy;
+    const w = ctx.measureText(o.text).width + pad * 2;
+    ctx.fillStyle = '#3d1832';
+    ctx.fillRect(x - w / 2, y - fontPx, w, fontPx + pad);
+    ctx.fillStyle = '#d4a953';
+    ctx.fillText(o.text, x, y - pad * .4);
+  }
 }

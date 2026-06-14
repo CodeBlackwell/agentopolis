@@ -162,7 +162,7 @@
             white-space: pre-line; cursor: default; }
 </style>
 </head>
-<body data-mode="{{MODE}}">
+<body data-mode="{{MODE}}" data-hall-level="{{HALL_LEVEL}}" data-hall-name="{{HALL_NAME}}">
   <div class="mapwrap">
     <canvas id="map" width="1280" height="720"></canvas>
     <header>
@@ -213,7 +213,7 @@
 
   <div id="dock">
     <div class="dispatch">
-      <div class="plaque dock"><span id="lamp"></span>city hall &middot; dispatch floor</div>
+      <div class="plaque dock"><span id="lamp"></span><span id="hallTitle">city hall &middot; dispatch floor</span></div>
       <div class="holder"><canvas id="hotel" width="1280" height="640"></canvas></div>
     </div>
     <div id="ticker"></div>
@@ -225,6 +225,7 @@
   <script src="city-scape.js"></script>
   <script src="render.js"></script>
   <script src="hall.js"></script>
+  <script src="hall-tiers.js"></script>
   <script src="{{ENGINE}}"></script>
   <script src="hotel.js"></script>
   <script>
