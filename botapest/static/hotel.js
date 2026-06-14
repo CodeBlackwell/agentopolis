@@ -102,21 +102,19 @@ function handleMain(e) {
 }
 
 function handleAgent(e) {                   // events fired inside a subagent
-  const key = `${e.session}:${e.agent_id}`;
+  const id = `agent:${e.session}:${e.agent_id}`;
   if (e.event === 'SubagentStop') {
-    const id = agentAvatars.get(key) || (agentQueues.get(e.session) || []).shift();
-    agentAvatars.delete(key);
-    if (id && avatars.has(id)) checkout(avatars.get(id));
+    if (avatars.has(id)) checkout(avatars.get(id));
     return;
   }
-  let id = agentAvatars.get(key);
-  if (!id || !avatars.has(id)) {            // claim oldest unclaimed spawn, else walk in
-    id = (agentQueues.get(e.session) || []).shift()
-      || spawn(`agent:${key}`, e.agent_type || 'agent', true).id;
-    agentAvatars.set(key, id);
+  let av = avatars.get(id);
+  if (!av) {                                // first sight of this agent: spawn it with its real identity
+    av = spawn(id, e.agent_type || 'agent', true);
+    av.task = (pendingNames.get(e.session) || []).shift() || null;
   }
   if (e.event === 'PreToolUse')
-    send(avatars.get(id), TOOL_STATION[e.tool] || 'lobby', `${e.tool}${e.detail ? ': ' + e.detail : ''}`);
+    send(av, stationFor(e.tool), `${e.tool}${e.detail ? ': ' + e.detail : ''}`);
+  else if (e.event === 'PostToolUse') done(av);
 }
 
 function randomStation() {
@@ -171,7 +169,8 @@ canvas.addEventListener('mousemove', m => {
   }
   if (hit) {
     const secs = Math.round((performance.now() - (hit.since || performance.now())) / 1000);
-    tooltip.textContent = `${hit.name} · ${hit.waiting ? 'waiting on you' : hit.state}`
+    tooltip.textContent = `${hit.name}${hit.task ? ' · ' + hit.task : ''}`
+      + ` · ${hit.waiting ? 'waiting on you' : hit.state}`
       + `${hit.activity ? ' · ' + hit.activity : ''} · ${secs}s`;
     tooltip.style.left = `${m.clientX + 14}px`;
     tooltip.style.top = `${m.clientY + 14}px`;
@@ -190,14 +189,17 @@ if (new URLSearchParams(location.search).has('demo')) {
     { event: 'SessionStart', session: 'demo1234' },
     { event: 'UserPromptSubmit', session: 'demo1234', detail: 'build me a hotel' },
     { event: 'PreToolUse', session: 'demo1234', tool: 'Read', detail: 'server.py' },
+    { event: 'PostToolUse', session: 'demo1234', tool: 'Read' },
     { event: 'PreToolUse', session: 'demo1234', tool: 'Agent', agent_type: 'Explore', agent_name: 'survey the lobby' },
     { event: 'PreToolUse', session: 'demo1234', agent_id: 'scout01', agent_type: 'Explore', tool: 'Grep', detail: 'lobby' },
     { event: 'PreToolUse', session: 'demo1234', tool: 'Edit', detail: 'app.py', path: 'backend/api/app.py' },
     { event: 'PreToolUse', session: 'demo1234', tool: 'Agent', agent_type: 'Plan', agent_name: 'draw blueprints' },
     { event: 'PreToolUse', session: 'demo1234', agent_id: 'plan01', agent_type: 'Plan', tool: 'Read', detail: 'render.js' },
+    { event: 'PostToolUse', session: 'demo1234', agent_id: 'scout01', agent_type: 'Explore', tool: 'Grep' },
     { event: 'Notification', session: 'demo1234', detail: 'permission needed: Bash' },
     { event: 'PreToolUse', session: 'demo1234', tool: 'Bash', detail: 'just test' },
     { event: 'PreToolUse', session: 'demo1234', agent_id: 'scout01', agent_type: 'Explore', tool: 'WebSearch', detail: 'habbo furni' },
+    { event: 'PostToolUse', session: 'demo1234', tool: 'Bash' },
     { event: 'SubagentStop', session: 'demo1234', agent_id: 'scout01' },
     { event: 'PreToolUse', session: 'demo1234', tool: 'Write', detail: 'skyline.tsx', path: 'frontend/src/reading/skyline.tsx' },
     { event: 'SubagentStop', session: 'demo1234', agent_id: 'plan01' },
