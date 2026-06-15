@@ -4,6 +4,30 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-06-15
+
+### Added
+- **Git-history time-lapse** (`?timelapse`, and forged repos by default): replay
+  a repo's history as a city that climbs the formation ladder — village →
+  radial / spine → grid — as it grows past structural thresholds, instead of
+  filling in one static layout. Small repos stay a village the whole way;
+  "born big" repos start at their settled formation.
+- Incremental demolish-and-rebuild transitions between formations, with three
+  switchable styles (hybrid / slide / rebuild) in the transport bar, plus
+  ground and dressing cross-fades so a re-form reads as continuous growth.
+- Village dressing survives the climb: the well becomes a fountain, the herd a
+  city farm (barn + silo), and the windmill + water tower persist as relics —
+  migrating to a stable outskirts edge each time the city re-forms.
+
+### Changed
+- The time-lapse no longer fills in a single EvoStreets layout; EvoStreets
+  remains available only as the static `?plan=evostreets` option.
+
+### Fixed
+- No second ground-up rebuild of every building after a formation transition.
+- Storage-tank rooftops no longer throw on certain camera rotations
+  (negative ellipse radius).
+
 ## [0.7.0] - 2026-06-14
 
 ### Added
