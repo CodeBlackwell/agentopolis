@@ -11,34 +11,44 @@ const CityScape = (() => {
     ctx.fill();
   }
 
+  // Cross-fade between two grounds during a formation re-form (state._groundFade), else paint plainly.
   function drawGround(ctx, cam, state, t) {
-    for (let y = 0; y < state.H; y++) {
-      for (let x = 0; x < state.W; x++) {
-        const code = state.ground[y][x], alt = (x + y) % 2;
-        if (code <= 1) tile(ctx, cam, x, y, alt ? '#241622' : '#211420');
-        else if (code === 2) tile(ctx, cam, x, y, alt ? '#2c4a34' : '#28432f');
-        else if (code === 3) tile(ctx, cam, x, y, alt ? '#e3d2b2' : '#d8c5a0');
+    const f = state._groundFade;
+    if (f) {
+      ctx.globalAlpha = 1 - f.k; paintGround(ctx, cam, f.from, t, f.dx, f.dy);   // old fabric dissolves out
+      ctx.globalAlpha = f.k; paintGround(ctx, cam, state, t, 0, 0);              // new fabric fades in
+      ctx.globalAlpha = 1;
+    } else paintGround(ctx, cam, state, t, 0, 0);
+  }
+
+  function paintGround(ctx, cam, st, t, ox, oy) {           // st.ground at grid offset (ox,oy) for frame alignment
+    for (let y = 0; y < st.H; y++) {
+      for (let x = 0; x < st.W; x++) {
+        const code = st.ground[y][x], alt = (x + y) % 2, gx = x + ox, gy = y + oy;
+        if (code <= 1) tile(ctx, cam, gx, gy, alt ? '#241622' : '#211420');
+        else if (code === 2) tile(ctx, cam, gx, gy, alt ? '#2c4a34' : '#28432f');
+        else if (code === 3) tile(ctx, cam, gx, gy, alt ? '#e3d2b2' : '#d8c5a0');
         else if (code === 4) {
-          tile(ctx, cam, x, y, alt ? '#1d5a72' : '#1a5168');
+          tile(ctx, cam, gx, gy, alt ? '#1d5a72' : '#1a5168');
           if ((x * 7 + y * 11) % 4 === 0) {                 // canal shimmer
-            const p = proj(cam, x + .5, y + .5);
+            const p = proj(cam, gx + .5, gy + .5);
             ctx.strokeStyle = `rgba(190,228,238,${Math.max(0, .16 + .13 * Math.sin(t / 650 + x * 1.7 + y))})`;
             ctx.lineWidth = Math.max(1, cam.s);
             ctx.beginPath(); ctx.moveTo(p.sx - 5 * cam.s, p.sy); ctx.lineTo(p.sx + 5 * cam.s, p.sy); ctx.stroke();
           }
         } else if (code === 5) {
-          tile(ctx, cam, x, y, alt ? '#3b2c39' : '#372a35');
-          const a = proj(cam, x, y), b = proj(cam, x, y + 1), c = proj(cam, x + 1, y), d = proj(cam, x + 1, y + 1);
+          tile(ctx, cam, gx, gy, alt ? '#3b2c39' : '#372a35');
+          const a = proj(cam, gx, gy), b = proj(cam, gx, gy + 1), c = proj(cam, gx + 1, gy), d = proj(cam, gx + 1, gy + 1);
           ctx.strokeStyle = 'rgba(212,169,83,.55)';         // chain-bridge rails
           ctx.lineWidth = Math.max(1, 1.2 * cam.s);
           ctx.beginPath();
           ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy);
           ctx.moveTo(c.sx, c.sy); ctx.lineTo(d.sx, d.sy);
           ctx.stroke();
-        } else if (code === 6) tile(ctx, cam, x, y, alt ? '#27392c' : '#233428');
-        else tile(ctx, cam, x, y, state.blocks[code - 10].pave[alt]);
+        } else if (code === 6) tile(ctx, cam, gx, gy, alt ? '#27392c' : '#233428');
+        else tile(ctx, cam, gx, gy, st.blocks[code - 10].pave[alt]);
         if (code === 1 && x % 2) {                          // avenue lane dash
-          const a = proj(cam, x + .25, y + .5), b = proj(cam, x + .75, y + .5);
+          const a = proj(cam, gx + .25, gy + .5), b = proj(cam, gx + .75, gy + .5);
           ctx.strokeStyle = 'rgba(212,169,83,.3)';
           ctx.lineWidth = Math.max(1, cam.s);
           ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
@@ -237,6 +247,37 @@ const CityScape = (() => {
       ctx.fillRect(sx - 3 * s, base - 4.5 * s, 6 * s, 3 * s);
       ctx.fillStyle = '#8a3a2e';
       ctx.fillRect(sx - 6 * s, base - 15 * s, 12 * s, 3 * s);
+    } else if (p.kind === 'fountain') {                    // the village well, grown into a civic fountain
+      ctx.fillStyle = '#8a93a0';                           // stone basin
+      ctx.fillRect(sx - 7 * s, base - 3 * s, 14 * s, 4 * s);
+      ctx.fillStyle = '#6e7785';
+      ctx.fillRect(sx - 7 * s, base - 1 * s, 14 * s, 2 * s);
+      ctx.fillStyle = '#9aa6b3';                           // central pedestal
+      ctx.fillRect(sx - 1.5 * s, base - 9 * s, 3 * s, 6 * s);
+      const jet = (4 + Math.sin(t / 300 + p.seed) * 1.5) * s;
+      ctx.fillStyle = 'rgba(126,200,255,.8)';              // jets, gently pulsing
+      ctx.fillRect(sx - s, base - 9 * s - jet, 2 * s, jet);
+      for (const dx of [-3, 3]) ctx.fillRect(sx + dx * s, base - 6 * s - jet * .6, 1.5 * s, jet * .6);
+      ctx.fillStyle = 'rgba(126,200,255,.5)';              // pooled water in the basin
+      ctx.fillRect(sx - 6 * s, base - 2.5 * s, 12 * s, 1.5 * s);
+    } else if (p.kind === 'cityfarm') {                    // the herd, grown into a city farm: silo + barn
+      ctx.fillStyle = '#c9b893';                           // silo
+      ctx.fillRect(sx - 11 * s, base - 13 * s, 4 * s, 13 * s);
+      ctx.fillStyle = '#8a93a0';
+      ctx.beginPath(); ctx.arc(sx - 9 * s, base - 13 * s, 2 * s, Math.PI, 0); ctx.fill();
+      ctx.fillStyle = '#9c3b32';                           // barn body
+      ctx.fillRect(sx - 7 * s, base - 10 * s, 14 * s, 10 * s);
+      ctx.fillStyle = '#7d2e27';                           // shaded gable side
+      ctx.fillRect(sx + 2 * s, base - 10 * s, 5 * s, 10 * s);
+      ctx.fillStyle = '#d8c5a0';                           // gambrel roof
+      ctx.beginPath();
+      ctx.moveTo(sx - 8 * s, base - 10 * s); ctx.lineTo(sx + 8 * s, base - 10 * s);
+      ctx.lineTo(sx + 4 * s, base - 16 * s); ctx.lineTo(sx - 4 * s, base - 16 * s); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e8e2d6';                           // white-trimmed door
+      ctx.fillRect(sx - 2.5 * s, base - 6 * s, 5 * s, 6 * s);
+      ctx.strokeStyle = '#9c3b32'; ctx.lineWidth = Math.max(1, .6 * s);
+      ctx.beginPath(); ctx.moveTo(sx, base - 6 * s); ctx.lineTo(sx, base);
+      ctx.moveTo(sx - 2.5 * s, base - 3 * s); ctx.lineTo(sx + 2.5 * s, base - 3 * s); ctx.stroke();
     } else if (p.kind === 'crates') {
       ctx.fillStyle = '#9c6b35';
       ctx.fillRect(sx - 6 * s, base - 6 * s, 6 * s, 6 * s);

@@ -80,6 +80,7 @@ const City = (() => {
     for (let y = y0; y < y0 + h; y++)
       for (let x = x0; x < x0 + w; x++) {
         if (y < 0 || x < 0 || y >= state.H || x >= state.W) continue;
+        if (state.reserved && state.reserved.has(x + ',' + y)) { g[y][x] = 2; continue; }   // relic plot: stay green
         if (!plaza && w >= 4 && (x - x0) % 3 === 2) { g[y][x] = 0; continue; }   // back-alley: no lot is landlocked
         g[y][x] = plaza ? 3 : 10 + block.id;
         block.lots.push({ x: x + .5, y: y + .5 });
@@ -104,6 +105,7 @@ const City = (() => {
     const Rmax = r - 1, margin = 3, cx = margin + Rmax, cy = cx;
     state.W = state.H = 2 * Rmax + 2 * margin + 1;
     state.cityHall = { x: cx + .5, y: cy + .5 };
+    state.origin = { x: cx + .5, y: cy + .5 };             // shared frame anchor
     const g = Array.from({ length: state.H }, () => new Array(state.W).fill(2));
     for (let y = 0; y < state.H; y++)
       for (let x = 0; x < state.W; x++) {
@@ -132,6 +134,7 @@ const City = (() => {
         i0 = i1;
         let cap = tiles.length;                             // keep ≥2 spare lots for live growth
         for (const tl of tiles) {
+          if (state.reserved && state.reserved.has(tl.x + ',' + tl.y)) continue;   // relic plot: leave greenery
           if (tl.r === ann.r1 - 1 && comp.kind !== 'civic' && cap > block.list.length + 2 &&
               hash(`c${tl.x},${tl.y}`) % 3 === 0) { cap--; continue; }   // ragged outskirts stay green
           g[tl.y][tl.x] = comp.kind === 'civic' ? 3 : 10 + block.id;
@@ -170,6 +173,7 @@ const City = (() => {
     state.ground = g;
     const civic = state.blocks.find(b => b.comp.kind === 'civic') || state.blocks[0];
     state.cityHall = { x: civic.lx, y: civic.ly };
+    state.origin = { x: state.W / 2, y: state.H / 2 };     // shared frame anchor (map center)
   }
 
   // ---- form C: a boulevard with districts strung along it (few / strongly-layered repos) ----
@@ -196,6 +200,7 @@ const City = (() => {
     state.ground = g;
     const civic = state.blocks.find(b => b.comp.kind === 'civic') || state.blocks[0];
     state.cityHall = { x: civic.lx, y: civic.ly };
+    state.origin = { x: state.W / 2, y: state.H / 2 };     // shared frame anchor (map center)
   }
 
   // ---- form D: a green commons ringed by neighborhoods, dirt lanes as spokes (small / simple repos) ----
@@ -217,6 +222,7 @@ const City = (() => {
     const c = R + Math.ceil(ext / 2) + 3;                   // center; map spans the far wing + a tree margin
     state.W = state.H = 2 * c + 1;
     state.cityHall = { x: c + .5, y: c + .5 };
+    state.origin = { x: c + .5, y: c + .5 };               // shared frame anchor: relics keep stable coords
     const g = Array.from({ length: state.H }, () => new Array(state.W).fill(2));
     for (let y = 0; y < state.H; y++)
       for (let x = 0; x < state.W; x++) {
@@ -311,6 +317,7 @@ const City = (() => {
     state.ground = g;
     state.groundBirth = gb;                                // time-lapse reveals tiles as their buildings arrive
     state.cityHall = { x: margin + .5, y: margin - 1.5 };  // trailhead of the main boulevard, in parkland
+    state.origin = { x: state.W / 2, y: state.H / 2 };     // shared frame anchor
   }
 
   const PLANS = { radial: planRadial, grid: planGrid, spine: planSpine, village: planVillage,
@@ -319,12 +326,8 @@ const City = (() => {
   // The FORM is a claim about structure the data must support: a measurable coupling hub (radial),
   // a balanced full-stack split (spine), or peer modules with no center (grid). Order matters —
   // size is only a legibility floor, never the shape decision. Thresholds sit in the data's gaps.
-  function choosePlan(data) {
+  function statsOf(data) {                                  // the metrics the formation thresholds read
     const real = data.zone.components.filter(c => c.kind !== 'civic' && c.kind !== 'auto');
-    const n = real.length;
-    if (n <= 2 || data.buildings.length <= 40) return planVillage;   // a hamlet: a green ringed by
-                                                            // neighborhoods reads alive where a macro-form can't
-
     const wsum = {}, wt = {};                               // commit-weighted mean centrality per district
     for (const b of data.buildings) {                       // (commit weight damps one-off mega-commit noise)
       wsum[b.component] = (wsum[b.component] || 0) + b.centrality * b.commits;
@@ -332,17 +335,39 @@ const City = (() => {
     }
     const coup = real.map(c => wt[c.id] ? wsum[c.id] / wt[c.id] : 0);
     const mass = coup.reduce((a, b) => a + b, 0);
-    const dominance = mass ? Math.max(...coup) / mass * n : 0;   // 1 = even, → n = one district carries all
-    if (mass >= 5 && dominance >= 2.5) return planRadial;   // a hub we can actually see → rings orbit it
-
+    const dominance = mass ? Math.max(...coup) / mass * real.length : 0;   // 1 even → n one district carries all
     const tier = {};                                        // district counts per data-flow layer
     for (const c of real) if (PIPE.includes(c.layer)) tier[c.layer] = (tier[c.layer] || 0) + 1;
     const t = Object.values(tier);
-    const balanced = t.length >= 2 && Math.min(...t) / Math.max(...t) >= 0.4;
-    if (balanced && data.buildings.length <= 180) return planSpine;   // balanced stack, reads as one street
-
-    return planGrid;                                        // many peers / a stack too long for a boulevard
+    return { n: real.length, nbuild: data.buildings.length, mass, dominance,
+             balanced: t.length >= 2 && Math.min(...t) / Math.max(...t) >= 0.4 };
   }
+
+  // The ladder of formations a repo climbs as it grows. First whose enters() holds wins (same
+  // precedence + thresholds as the old choosePlan). The time-lapse walks this over history.
+  const FORMATIONS = [
+    { id: 'village', plan: planVillage, enters: s => s.n <= 2 || s.nbuild <= 40 },   // hamlet: green + neighborhoods
+    { id: 'radial',  plan: planRadial,  enters: s => s.mass >= 5 && s.dominance >= 2.5 },  // a hub rings orbit
+    { id: 'spine',   plan: planSpine,   enters: s => s.balanced && s.nbuild <= 180 },      // balanced stack → boulevard
+    { id: 'grid',    plan: planGrid,    enters: () => true },                              // many peers (fallback)
+  ];
+  function chooseFormation(data) {
+    const s = statsOf(data);
+    return FORMATIONS.find(f => f.enters(s)) || FORMATIONS[FORMATIONS.length - 1];
+  }
+  const choosePlan = data => chooseFormation(data).plan;    // back-compat: layout() still calls choosePlan
+
+  // What each piece of village dressing becomes as the city outgrows the hamlet (time-lapse transitions).
+  const FATES = {
+    windmill:   { fate: 'relic',     place: 'outskirts' },                 // travels with the farm
+    cow:        { fate: 'transform', place: 'outskirts', into: 'cityfarm' },
+    well:       { fate: 'transform', place: 'anchor',    into: 'fountain' },
+    watertower: { fate: 'relic',     place: 'anchor' },
+    tree:       { fate: 'relic',     place: 'anchor' },
+    hay:        { fate: 'demolish' },
+    fence:      { fate: 'demolish' },
+    ufo:        { fate: 'demolish' },
+  };
 
   function addCemetery(state, data) {                       // dead files: graveyard rows below the city
     if (!(data.dead || []).length) return;
@@ -371,6 +396,32 @@ const City = (() => {
       if (code === 2 && h % 3 === 0) state.props.push({ kind: 'tree', x: x + .5, y: y + .5, seed: h });
       if (code === 1 && x % 6 === 3 && h % 2) state.props.push({ kind: 'lamp', x: x + .5, y: y + .6, seed: h });
     }));
+  }
+
+  // Find a clear parkland tile, ranked & filtered — reused by relic/outskirts placement so a feature
+  // never lands on a road, off-map, or atop another. opts: {near, prefer:'open'|'outer', minRoom,
+  // ring:{min,max} (radius from origin), avoid:[{x,y,r}]}. Returns {x,y,room,rr} or null.
+  function clearPocket(state, opts = {}) {
+    const grass = (x, y) => !!(state.ground[y] && state.ground[y][x] === 2);
+    const o = state.origin || { x: state.W / 2, y: state.H / 2 };
+    const cands = [];
+    for (let y = 1; y < state.H - 1; y++)                   // includes the perimeter green belt (the outskirts)
+      for (let x = 1; x < state.W - 1; x++) {
+        if (!grass(x, y)) continue;
+        let room = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) room += grass(x + dx, y + dy) ? 1 : 0;
+        if (room < (opts.minRoom || 0)) continue;
+        const rr = Math.hypot(x + .5 - o.x, y + .5 - o.y);
+        if (opts.ring && (rr < opts.ring.min || rr > opts.ring.max)) continue;
+        if ((opts.avoid || []).some(a => Math.hypot(x + .5 - a.x, y + .5 - a.y) <= (a.r || 3))) continue;
+        cands.push({ x, y, room, rr });
+      }
+    if (!cands.length) return null;
+    const near = opts.near;
+    cands.sort((a, b) => opts.prefer === 'outer' ? b.rr - a.rr
+      : near ? Math.hypot(a.x - near.x, a.y - near.y) - Math.hypot(b.x - near.x, b.y - near.y)
+      : b.room - a.room);
+    return cands[0];
   }
 
   function villageDressing(state) {                       // pasture life: a fenced herd, a hay field, farm landmarks
@@ -427,9 +478,10 @@ const City = (() => {
   function layout(data) {
     const state = { zone: data.zone, blocks: [], buildings: [], props: [],
                     byPath: new Map(), items: [], clouds: [], cityHall: null };
+    state.reserved = data.reserved || null;                 // relic cells the plan must route around
     const byComp = {};
     for (const b of data.buildings) (byComp[b.component] ??= []).push(b);
-    (PLANS[data.zone.plan] || choosePlan(data))(state, data, byComp);   // .agentopolis.json may pin "plan"
+    (data._planFn || PLANS[data.zone.plan] || choosePlan(data))(state, data, byComp);   // _planFn pins a formation per epoch
     addCemetery(state, data);
     sprinkle(state);
     if (state.village && state.cityHall) {                  // a well anchors the green commons
@@ -454,10 +506,12 @@ const City = (() => {
   const FORM = { md: 'house', rst: 'house', txt: 'house',
                  json: 'shed', yml: 'shed', yaml: 'shed', toml: 'shed', lock: 'shed',
                  cfg: 'shed', ini: 'shed', html: 'storefront', css: 'storefront',
-                 sh: 'garage', sql: 'silo' };
-  const RANK = { storefront: 1, shed: 2, garage: 2, silo: 2, house: 3 };   // towers downtown, houses outermost
-  const FCAP = { house: 1, shed: 1, garage: 1, storefront: 2, silo: 3 };
-  const FFOOT = { house: .5, shed: .55, garage: .6, storefront: .9, silo: .6 };
+                 sh: 'garage', sql: 'silo',
+                 env: 'vault', pem: 'vault', key: 'vault', crt: 'vault', cert: 'vault',
+                 p12: 'vault', pfx: 'vault', jks: 'vault', keystore: 'vault', gpg: 'vault', asc: 'vault' };
+  const RANK = { storefront: 1, vault: 1, shed: 2, garage: 2, silo: 2, house: 3 };   // towers downtown, houses outermost
+  const FCAP = { house: 1, shed: 1, garage: 1, storefront: 2, silo: 3, vault: 2 };
+  const FFOOT = { house: .5, shed: .55, garage: .6, storefront: .9, silo: .6, vault: .7 };
 
   function fillBlock(state, block) {
     const under = block.comp.layer === 'under';
@@ -590,6 +644,7 @@ const City = (() => {
   function drawBuilding(ctx, cam, b, t) {
     if (b.ruined) {                                        // collapse for ~700ms, then settle to a husk
       const k = b._collapseAt ? (t - b._collapseAt) / 700 : 1;
+      if (b._demolishing) return k < 1 ? drawCollapse(ctx, cam, b, k) : undefined;   // moving out: no husk left
       return k < 1 ? drawCollapse(ctx, cam, b, k) : drawRuin(ctx, cam, b);
     }
     const pop = b.born ? Math.min(1, (t - b.born) / 600) : 1;
@@ -761,6 +816,28 @@ const City = (() => {
       }
     },
     silo: ARCH.storage,                                     // sql: domed tank
+    vault(ctx, cam, b, base, top, h) {                      // secrets/keys: windowless, reinforced band + round door
+      if (h <= 0) return;                                   // mid-reveal in time-lapse: body hasn't risen yet
+      const s = cam.s;
+      ctx.strokeStyle = shade(b.color, .35);                // reinforced band wrapping both visible faces
+      ctx.lineWidth = Math.max(1.5, 2.5 * s);
+      ctx.beginPath();
+      ctx.moveTo(base[3].sx, base[3].sy - h * .62);
+      ctx.lineTo(base[2].sx, base[2].sy - h * .62);
+      ctx.lineTo(base[1].sx, base[1].sy - h * .62);
+      ctx.stroke();
+      const c = lerp(base[2], base[1], .5), cy = c.sy - h * .42;   // round vault door on the front face
+      const r = Math.min(h * .3, Math.abs(base[1].sx - base[2].sx) * .17);
+      ctx.fillStyle = shade(b.color, .4);
+      ctx.beginPath(); ctx.ellipse(c.sx, cy, r, r * .88, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = shade(b.color, 1.2); ctx.lineWidth = Math.max(1, 1.2 * s);
+      ctx.beginPath(); ctx.ellipse(c.sx, cy, r * .58, r * .5, 0, 0, Math.PI * 2); ctx.stroke();
+      for (let i = 0; i < 4; i++) {                         // spoked handle
+        const a = i * Math.PI / 2 + .5;
+        ctx.beginPath(); ctx.moveTo(c.sx, cy);
+        ctx.lineTo(c.sx + Math.cos(a) * r * .55, cy + Math.sin(a) * r * .48); ctx.stroke();
+      }
+    },
   };
 
   const LANG = { py: '#3776ab', js: '#e8c41c', jsx: '#e8c41c', ts: '#3178c6', tsx: '#3178c6',
@@ -933,8 +1010,12 @@ const City = (() => {
     CityScape.drawGround(ctx, cam, state, t);
     if (!opts.embedded && state.deps.length) CityScape.drawStation(ctx, cam, state, t);   // freight hugs the grid
     for (const it of state.items) {
-      if (it.kind) { if (!it.hidden) CityScape.drawProp(ctx, cam, it, t, state); }
-      else drawBuilding(ctx, cam, it, t);
+      if (it.kind) {                                        // _alpha lets a transition cross-fade dressing
+        if (it.hidden) continue;
+        if (it._alpha !== undefined) ctx.globalAlpha = it._alpha;
+        CityScape.drawProp(ctx, cam, it, t, state);
+        ctx.globalAlpha = 1;
+      } else drawBuilding(ctx, cam, it, t);
     }
     if (state.cityHall) drawCityHall(ctx, cam, state.cityHall.x, state.cityHall.y);
     if (!opts.embedded && state.docker.length) CityScape.drawPort(ctx, cam, state, t);   // ships ride the rotating harbor
@@ -992,5 +1073,5 @@ const City = (() => {
   }
 
   return { layout, fit, draw, applyEvent, pick, roster,
-           proj, hash, shade, mix, near };
+           proj, hash, shade, mix, near, chooseFormation, FORMATIONS, FATES, clearPocket };
 })();

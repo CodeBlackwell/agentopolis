@@ -244,21 +244,22 @@ def root(request: Request) -> HTMLResponse:
     # one shell, two map engines. ?forge=<github url> opens the city engine on the forge endpoint.
     # Otherwise the showcase opens the nation map; AGENTOPOLIS_DEMO_CITY auto-drills into one city on
     # load (so zoom-out + the tier breadcrumb still reach the nation), and ?nation skips the drill.
-    forge = request.query_params.get("forge")
-    timelapse = "timelapse" in request.query_params
-    auto_city = bool(showcase["dir"] and showcase["city"]) and "nation" not in request.query_params
+    qp = request.query_params
+    forge = qp.get("forge")
+    auto_city = bool(showcase["dir"] and showcase["city"]) and "nation" not in qp
     timeline_src = "timeline.json"
+    movie = False
     if forge:
         name = forge.rstrip("/").split("/")[-1].removesuffix(".git")   # heading: "<repo> City"
         mode = "city"
-        src = ("/forge-timelapse?url=" if timelapse else "/forge?url=") + quote(forge, safe="")
+        movie = "static" not in qp           # a forged repo plays its history by default; ?static = the quick city
+        src = ("/forge-timelapse?url=" if movie else "/forge?url=") + quote(forge, safe="")
     elif nation["root"]:
         mode, name, src = "nation", Path(nation["root"]).name, "city-data.json"
     else:
         mode, name, src = "city", Path(city["repo"]).resolve().name, "city-data.json"
-    engine = "nation.js" if mode == "nation" else "city-live.js"
-    if mode == "city" and timelapse:                 # replay git history over the layout
-        engine = "city-timelapse.js"
+        movie = "timelapse" in qp            # a local city replays its history only on request
+    engine = "nation.js" if mode == "nation" else ("city-timelapse.js" if movie else "city-live.js")
     html = (Path(__file__).parent / "static" / "index.html").read_text()
     return HTMLResponse(html.replace("{{MODE}}", mode).replace("{{ENGINE}}", engine)
                         .replace("{{HALL_LEVEL}}", mode).replace("{{HALL_NAME}}", name)

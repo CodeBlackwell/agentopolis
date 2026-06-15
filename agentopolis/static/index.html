@@ -79,6 +79,12 @@
     font-family: 'Silkscreen', monospace; font-size: 12px; padding: 7px 12px;
   }
   #back:hover { background: var(--gold); color: var(--plum); }
+  /* city-mode: jump into the git-history time-lapse of this repo (removed by the time-lapse engine itself) */
+  #replay { display: none; cursor: pointer; pointer-events: auto; margin-top: 9px;
+            background: var(--plum-soft); color: var(--cream); border: 2px solid var(--gold);
+            font-family: 'Silkscreen', monospace; font-size: 11px; padding: 6px 11px; }
+  #replay:hover { background: var(--gold); color: var(--plum); }
+  body[data-mode="city"] #replay { display: inline-block; }
   #tiers {
     position: absolute; top: 24px; right: 24px;
     display: flex; align-items: center; gap: 6px; padding: 6px 8px;
@@ -225,6 +231,8 @@
       <button id="back" class="m-nation" title="back to world map">&#8593; WORLD MAP</button>
       <p class="m-city">scroll to zoom in &amp; out &middot; drag to pan &middot; the city builds itself</p>
       <p class="m-city demo-only"><a href="/?nation">&#9656; explore the whole BLACKBOX nation</a></p>
+      <button id="replay" class="m-city" title="replay this repo's git history as a time-lapse"
+              onclick="location.search='?timelapse'">&#9654; replay history</button>
     </header>
     <div id="tiers" class="m-nation">
       <button data-tier="world">WORLD</button><span class="sep">&#9656;</span>
