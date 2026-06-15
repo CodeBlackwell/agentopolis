@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import FastAPI, Request, Response
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -33,6 +34,7 @@ async def lifespan(_app: "FastAPI"):
 
 
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(GZipMiddleware, minimum_size=1024)   # timeline JSON compresses ~10x on the wire
 subscribers: set[asyncio.Queue] = set()
 history: deque = deque(maxlen=100)
 city = {"repo": ".", "zone_path": None}
@@ -172,8 +174,8 @@ def timeline_data(repo: str | None = None):
 
 @app.get("/forge")
 def forge_city(url: str):
-    if url in forge_mod.forged:                  # cache hit: skip the clone gate entirely
-        return forge_mod.forged[url]
+    if (hit := forge_mod.peek(url)) is not None:  # memory or disk cache: skip the clone gate entirely
+        return hit
     if not forge_gate.acquire(blocking=False):
         return Response(status_code=429)
     try:
@@ -188,8 +190,8 @@ def forge_city(url: str):
 
 @app.get("/forge-timelapse")
 def forge_timelapse_city(url: str):              # full-history clone → {data, timeline} bundle
-    if url in forge_mod.forged_tl:
-        return forge_mod.forged_tl[url]
+    if (hit := forge_mod.peek_tl(url)) is not None:
+        return hit
     if not forge_gate.acquire(blocking=False):
         return Response(status_code=429)
     try:

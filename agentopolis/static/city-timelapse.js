@@ -481,6 +481,7 @@ function advance(to) {                                    // forward play: birth
 }
 
 function loop(t) {
+  if (state) state.skyPhase = (ptr + 1) / commits.length;  // history walks dawn → night as the city ages
   if (transition) {                                        // a formation re-form is playing: hold the playhead
     if (drawTransition(t)) seek(transition.at);             // settle at full height (seek snaps floors; tween won't regrow)
     last = 0; requestAnimationFrame(loop); return;

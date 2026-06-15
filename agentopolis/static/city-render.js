@@ -659,6 +659,14 @@ const City = (() => {
     quad(ctx, base[3], base[2], top[2], top[3], shade(b.color, .55));
     quad(ctx, base[2], base[1], top[1], top[2], shade(b.color, .75));
     quad(ctx, top[0], top[1], top[2], top[3], shade(b.color, 1.05));
+    if (pop === 1 && h > 6 * cam.s) {                       // rim light: warm sun-catch on the lit-face silhouette
+      ctx.strokeStyle = 'rgba(255,226,165,.4)';
+      ctx.lineWidth = Math.max(1, cam.s);
+      ctx.beginPath();
+      ctx.moveTo(top[2].sx, top[2].sy); ctx.lineTo(top[1].sx, top[1].sy);   // sunlit roofline
+      ctx.lineTo(base[1].sx, base[1].sy);                                   // leading vertical edge
+      ctx.stroke();
+    }
     const form = FORMS[b.form];
     if (h > 14 * cam.s && !form && b.arch !== 'storage' && b.arch !== 'docs')
       drawWindows(ctx, cam, base, h, b, t);
@@ -997,6 +1005,31 @@ const City = (() => {
     ctx.fillText(cloud.name, x, sy - 24 * s);
   }
 
+  const SKY = [[0, '#3a2c4e', '#7a4e5a'], [.34, '#4a5878', '#9a8a8e'],     // dawn → day → dusk → night
+               [.67, '#33263f', '#b5654d'], [1, '#0e0a1a', '#241830']];     // [phase, sky-top, horizon]
+  function paintSky(ctx, phase) {                          // vertical gradient behind the whole scene
+    let a = SKY[0], b = SKY[SKY.length - 1];
+    for (let i = 1; i < SKY.length; i++) if (phase <= SKY[i][0]) { a = SKY[i - 1]; b = SKY[i]; break; }
+    const k = b[0] === a[0] ? 0 : (phase - a[0]) / (b[0] - a[0]);
+    const g = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
+    g.addColorStop(0, mix(a[1], b[1], k)); g.addColorStop(1, mix(a[2], b[2], k));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  }
+
+  function drawBirds(ctx, t) {                              // a slow flock drifting across the sky behind the skyline
+    const W = ctx.canvas.width, H = ctx.canvas.height, skyY = H * .16;
+    ctx.strokeStyle = 'rgba(40,28,46,.45)';
+    ctx.lineWidth = 1.3;
+    for (let i = 0; i < 5; i++) {
+      const x = (t / 55 + i * 95) % (W + 80) - 40;          // drift left→right, looping
+      const y = skyY + i * 10 + Math.sin(t / 600 + i) * 4;  // gentle vertical bob
+      const w = 4 + (i % 2), flap = Math.sin(t / 180 + i * 1.7) * 2;
+      ctx.beginPath();
+      ctx.moveTo(x - w, y + flap); ctx.lineTo(x, y); ctx.lineTo(x + w, y + flap);
+      ctx.stroke();
+    }
+  }
+
   function draw(ctx, cam, state, t, opts = {}) {
     const R = cam.rot || 0;
     if (state.sortedRot !== R) {                            // painter's order follows the camera
@@ -1007,7 +1040,9 @@ const City = (() => {
     state.hits = [];                                        // hover targets rebuilt each frame
     const flat = R ? { ...cam, rot: 0 } : cam;              // only the distant horizon stays screen-anchored
     if (!opts.embedded) {                                   // embedded = one city blooming inside the nation map
+      paintSky(ctx, state.skyPhase != null ? state.skyPhase : .67);   // movie drives the cycle; live city = dusk
       CityScape.drawHorizon(ctx, flat, state, t);
+      drawBirds(ctx, t);                                    // flock drifts over the horizon, behind the city
       CityScape.drawWater(ctx, cam, state, t);
     }
     CityScape.drawGround(ctx, cam, state, t);
