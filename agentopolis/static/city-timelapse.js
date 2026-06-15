@@ -13,6 +13,7 @@ let ptr = -1, playing = false, speed = 12, acc = 0, last = 0, slider = null, lab
 
 const citySrc = window.CITY_SRC || 'city-data.json';
 const isForge = citySrc.includes('forge-timelapse');
+window.MOVIE = true;                                      // tell hotel.js to stand down: no dispatch floor in a movie
 document.getElementById('replay')?.remove();             // already in the movie; drop the entry button
 const loading = showLoading();
 
@@ -39,7 +40,9 @@ const loading = showLoading();
   layouts = buildEpochLayouts(data, epochs);             // one fixed layout per epoch; snapshots b._epochPos
   setEpoch(0);                                           // activate the first formation
   buildLegend(data);
+  citySampleNote(data);
   buildTransport();
+  buildExplain();                                        // the dispatch floor becomes a live, repo-specific legend
   seek(-1);
   loading.remove();
   speed = autoSpeed();                                    // size playback to ~finish in 20s regardless of repo size
@@ -443,6 +446,7 @@ function recompute(i) {                                   // set targets + visib
         + `   (${i + 1}/${commits.length})  ·  ${layouts[epochIndex].ep.formation.id}`
       : `0/${commits.length}`;
   }
+  renderExplain(shown, i);                               // refresh the live legend for this commit
 }
 
 function seek(i) {                                        // scrub / init: snap instantly, no tween or collapse
@@ -515,16 +519,20 @@ function setPlay(p) {
 
 // ---- transport bar (built in JS so the shared shell stays untouched) ----
 function buildTransport() {
-  const css = `#transport{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:9;
-    display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(42,16,36,.9);
+  // the bar lives in the map frame's flow, just below the canvas; the canvas yields a fixed strip for it
+  // so the single view never scrolls. Fixed outer width + ellipsis label keep it from jittering per frame.
+  const css = `.mapwrap.tl-mode{flex-direction:column;gap:8px}
+    .mapwrap.tl-mode #map{max-height:calc(100% - 56px)}
+    #transport{flex:0 0 auto;align-self:center;width:min(680px,100%);box-sizing:border-box;
+    display:flex;align-items:center;gap:10px;padding:7px 12px;background:rgba(42,16,36,.9);
     border:2px solid var(--gold);box-shadow:3px 3px 0 var(--plum);font-family:'Silkscreen',monospace;
-    color:var(--cream);font-size:10px;max-width:92vw}
+    color:var(--cream);font-size:10px}
     #transport button{cursor:pointer;background:var(--plum-soft);color:var(--cream);border:1px solid var(--gold);
-    font:inherit;width:30px;height:26px}#transport button:hover{background:var(--gold);color:var(--plum)}
-    #tl-seek{width:min(40vw,360px);accent-color:var(--gold)}
+    font:inherit;width:30px;height:26px;flex:0 0 auto}#transport button:hover{background:var(--gold);color:var(--plum)}
+    #tl-seek{flex:3 1 auto;min-width:120px;accent-color:var(--gold)}
     #transport input[type=range]{accent-color:var(--gold)}
-    #transport select{background:var(--plum-soft);color:var(--cream);border:1px solid var(--gold);font:inherit}
-    #tl-label{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}`;
+    #transport select{flex:0 0 auto;background:var(--plum-soft);color:var(--cream);border:1px solid var(--gold);font:inherit}
+    #tl-label{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}`;
   document.head.appendChild(document.createElement('style')).textContent = css;
   const bar = document.createElement('div');
   bar.id = 'transport';
@@ -539,7 +547,9 @@ function buildTransport() {
        TRANSITION_MODES.map(m => `<option value="${m}"${m === transMode ? ' selected' : ''}>${m}</option>`).join('') +
     `</select>` +
     `<span id="tl-label"></span>`;
-  document.querySelector('.mapwrap').appendChild(bar);
+  const wrap = document.querySelector('.mapwrap');
+  wrap.classList.add('tl-mode');                          // column layout: canvas on top, bar in the strip below
+  wrap.appendChild(bar);
   slider = bar.querySelector('#tl-seek');
   label = bar.querySelector('#tl-label');
   bar.querySelector('#tl-play').onclick = () => setPlay(!playing);
@@ -560,6 +570,89 @@ function buildLegend(data) {
   plaque('districts');
   for (const b of state.blocks)
     add(`<span class="chip" style="background:${b.comp.color}"></span>${b.comp.name.toLowerCase()}`);
+}
+
+// ---- explanation box: the dispatch floor becomes a live, repo-specific legend in movie mode ----
+// Every card is filled from THIS commit's city. The shape card spells out the actual metrics
+// (mass / dominance / layer balance) that picked the formation — the viewer sees the secret sauce,
+// not a generic label. District + landmark cards appear/disappear as the history makes them true.
+const KIND_ROLE = { civic: 'the town center & shared root files', frontend: 'UI, views & client code',
+  storage: 'data, models & persistence', api: 'service endpoints & contracts',
+  infra: 'CI, tooling, docker & scripts', tests: 'the quality-assurance quarter',
+  docs: 'documentation & examples', service: 'application modules', auto: 'loose root files' };
+const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const card = (title, html, chip) => `<div class="xcard"><h5>${chip
+  ? `<span class="chip" style="background:${chip}"></span>` : ''}${esc(title)}</h5><p>${html}</p></div>`;
+
+function buildExplain() {
+  const dock = document.getElementById('dock');
+  if (!dock) return;
+  document.querySelector('#dock .dispatch')?.style.setProperty('display', 'none');   // retire the agent floor
+  document.getElementById('ticker')?.style.setProperty('display', 'none');
+  const css = `#explain{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start;
+    overflow-y:auto;padding:2px}
+    .xcard{flex:1 1 150px;min-width:140px;max-width:230px;background:rgba(42,16,36,.96);
+    border:2px solid var(--gold);box-shadow:4px 4px 0 var(--plum-soft);display:flex;flex-direction:column}
+    .xcard.live{flex:1 1 230px;max-width:320px}
+    .xcard h5{background:var(--gold);color:var(--plum);font:700 10px 'Silkscreen',monospace;
+    letter-spacing:.1em;text-transform:uppercase;padding:5px 8px;display:flex;align-items:center;gap:6px}
+    .xcard h5 .chip{width:10px;height:10px;flex:0 0 10px;border:1px solid var(--plum)}
+    .xcard p{font:9px 'Silkscreen',monospace;color:var(--cream);line-height:1.55;padding:7px 9px;margin:0}
+    .xcard .em{color:var(--gold)}
+    #explain .stat-grid{margin:0}`;
+  document.head.appendChild(document.createElement('style')).textContent = css;
+  const box = document.createElement('div'); box.id = 'explain';
+  dock.appendChild(box);
+}
+
+function formationCard(id, s) {                            // the secret sauce, in this repo's own numbers
+  const layers = Object.entries(s.tiers).map(([k, v]) => `${k} ${v}`).join(' · ') || '—';
+  const why = {
+    village: `Only <span class="em">${pl(s.n, 'core district')}</span> and ${s.nbuild} files — below the downtown
+      threshold (≤2 districts or ≤40 files). A green hamlet of neighborhoods, no center yet.`,
+    radial: `<span class="em">${esc(s.hubName || 'one district')}</span> carries
+      <span class="em">${s.dominance.toFixed(1)}×</span> its even share of the repo's coupling
+      (mass ${s.mass.toFixed(1)} ≥ 5, dominance ${s.dominance.toFixed(1)} ≥ 2.5) — the city orbits it in rings.`,
+    spine: `The data-flow layers are <span class="em">balanced</span> (${layers}) at ${s.nbuild} files (≤180) —
+      a full-stack boulevard stacks them back-to-front.`,
+    grid: `<span class="em">${pl(s.n, 'peer district')}</span> with no dominant coupling hub
+      (dominance ${s.dominance.toFixed(1)} < 2.5) and no balanced layer stack — a downtown grid of equals.`,
+  };
+  const title = { village: 'Small Town', radial: 'Radial', spine: 'Spine', grid: 'Grid' }[id] || id;
+  return card('Shape · ' + title, why[id] || '');
+}
+
+function renderExplain(shown, i) {
+  const box = document.getElementById('explain');
+  if (!box || !state) return;
+  const c = commits[i], id = layouts[epochIndex].ep.formation.id;
+  const s = City.statsOf({ zone: state.zone, buildings: shown });
+  const perDist = {};                                     // standing buildings per district at this commit
+  for (const b of shown) perDist[b.component] = (perDist[b.component] || 0) + 1;
+  const districts = state.zone.components                 // hub first (the secret-sauce protagonist), then by size
+    .filter(d => d.kind !== 'auto' && perDist[d.id])
+    .sort((a, b) => (b.id === s.hub) - (a.id === s.hub) || perDist[b.id] - perDist[a.id]);
+  const hubs = shown.filter(b => b.hub).length, debts = shown.filter(b => b.debt).length;
+  const graves = state.buildings.filter(b => b.death !== undefined && i >= b.death).length;
+  const stat = (l, v) => `<div class="stat-cell"><span class="stat-label">${l}</span><span class="stat-value">${v}</span></div>`;
+  const cards = [
+    `<div class="xcard live"><h5>${esc(state.zone.repo || 'city')} · live</h5><div class="stat-grid">`
+      + stat('commit', `${i + 1}/${commits.length}`) + stat('date', c ? new Date(c.ts * 1000).toLocaleDateString() : '—')
+      + stat('buildings', shown.length) + stat('districts', districts.length)
+      + stat('shape', id) + stat('files gone', graves) + `</div></div>`,
+    formationCard(id, s),
+  ];
+  for (const d of districts)
+    cards.push(card(d.name, `<span class="em">${pl(perDist[d.id], 'file')}</span> · ${KIND_ROLE[d.kind] || d.kind}`
+      + (d.id === s.hub ? ' · <span class="em">★ coupling hub</span>' : ''), d.color));
+  if (hubs) cards.push(card('Import Hubs', `Antennas mark ${pl(hubs, 'file')} in the repo's top 10% by imports — the wiring others lean on.`));
+  if (debts) cards.push(card('TODO Debt', `Cranes hang over ${pl(debts, 'file')} in the top 10% by TODO / FIXME count.`));
+  if (state.deps.length) cards.push(card('Freight Rail', `${state.deps.length} package deps ride the freight line — read from the manifest.`));
+  if (state.docker.length) cards.push(card('Docker Harbor', `${pl(state.docker.length, 'container service')} moored at the harbor — from compose / Dockerfiles.`));
+  if (graves) cards.push(card('Graveyard', `${pl(graves, 'file')} deleted across history so far — headstones below the city.`));
+  if (c) cards.push(card('Now Playing', `<span class="em">${esc(new Date(c.ts * 1000).toLocaleDateString())}</span> · ${esc(c.author)}<br>"${esc(c.subject)}"`));
+  box.innerHTML = cards.join('');
 }
 
 // ---- interaction (compact: pan / zoom / rotate) ----
@@ -589,4 +682,26 @@ window.addEventListener('mousemove', m => {
   cam.ox += (m.clientX - drag.x) * (tlCanvas.width / r.width);
   cam.oy += (m.clientY - drag.y) * (tlCanvas.height / r.height);
   drag.x = m.clientX; drag.y = m.clientY;
+});
+
+// ---- hover tooltips: same building inspector as the live city (City.pick over the drawn state) ----
+function tipAt(mx, my, cx, cy) {
+  const hit = state && City.pick(state, mx, my);
+  const tip = document.getElementById('tooltip');
+  if (hit && hit.scroll) { City.roster(hit.tip, cx, cy); tip.style.display = 'none'; }
+  else if (hit) {
+    City.roster('');
+    tip.textContent = hit.tip || `${hit.path} · ${hit.floors | 0} fl · ${hit.commits} commits`
+      + `${hit.scaffold ? ' · under construction' : ''}`;
+    tip.style.left = `${cx + 14}px`; tip.style.top = `${cy + 14}px`; tip.style.display = 'block';
+  } else { City.roster(''); tip.style.display = 'none'; }
+}
+tlCanvas.addEventListener('mousemove', m => {
+  if (drag) return;
+  const r = tlCanvas.getBoundingClientRect();
+  tipAt((m.clientX - r.left) * (tlCanvas.width / r.width),
+        (m.clientY - r.top) * (tlCanvas.height / r.height), m.clientX, m.clientY);
+});
+tlCanvas.addEventListener('mouseleave', () => {
+  document.getElementById('tooltip').style.display = 'none'; City.roster('');
 });

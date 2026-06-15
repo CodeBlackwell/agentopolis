@@ -336,10 +336,12 @@ const City = (() => {
     const coup = real.map(c => wt[c.id] ? wsum[c.id] / wt[c.id] : 0);
     const mass = coup.reduce((a, b) => a + b, 0);
     const dominance = mass ? Math.max(...coup) / mass * real.length : 0;   // 1 even → n one district carries all
+    const hub = real.length ? real[coup.indexOf(Math.max(...coup))] : null;   // the district the rings would orbit
     const tier = {};                                        // district counts per data-flow layer
     for (const c of real) if (PIPE.includes(c.layer)) tier[c.layer] = (tier[c.layer] || 0) + 1;
     const t = Object.values(tier);
-    return { n: real.length, nbuild: data.buildings.length, mass, dominance,
+    return { n: real.length, nbuild: data.buildings.length, mass, dominance, tiers: tier,
+             hub: hub && hub.id, hubName: hub && hub.name,
              balanced: t.length >= 2 && Math.min(...t) / Math.max(...t) >= 0.4 };
   }
 
@@ -1116,5 +1118,18 @@ const City = (() => {
   }
 
   return { layout, fit, draw, applyEvent, pick, roster,
-           proj, hash, shade, mix, near, chooseFormation, FORMATIONS, FATES, clearPocket };
+           proj, hash, shade, mix, near, chooseFormation, statsOf, FORMATIONS, FATES, clearPocket };
 })();
+
+// Huge repos are sampled server-side; tell the viewer the city is a representative slice, not the whole repo.
+function citySampleNote(data) {
+  const s = data.sample, legend = document.getElementById('legend');
+  if (!s || !legend) return;
+  const of = part => `${part.shown.toLocaleString()} of ${(part.shown + part.dropped).toLocaleString()}`;
+  const parts = [s.files && of(s.files) + ' files', s.buildings && of(s.buildings) + ' buildings'].filter(Boolean);
+  const el = document.createElement('div');
+  el.className = 'row';
+  el.style.borderTop = '1px dashed var(--pink-deep)';
+  el.textContent = 'large repo · showing ' + parts.join(' · ');
+  legend.appendChild(el);
+}

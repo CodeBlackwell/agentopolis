@@ -1,6 +1,7 @@
 // Hotel state machine: SSE events in, avatars move, ticker logs.
 // IIFE-scoped so its ctx/canvas/tooltip globals don't collide with nation.js when both load.
 (() => {
+if (window.MOVIE) return;                  // movie mode replaces the dispatch floor with the explanation box
 const STATIONS = {
   reception: [5, 2], terminal: [9, 2], archive: [2, 4], workshop: [2, 9],
   telephone: [10, 8], lobby: [5, 6], door: [0, 7],
