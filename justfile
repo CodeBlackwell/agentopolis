@@ -15,6 +15,14 @@ town repo=".":
     @sleep 1 && open http://localhost:4243 &
     exec env AGENTOPOLIS_REPO={{repo}} .venv/bin/uvicorn agentopolis.server:app --reload --reload-dir agentopolis --port 4243 --log-level warning --timeout-graceful-shutdown 1
 
+# Time-lapse a repo's git history as a growing city (QA). Local path or GitHub URL.
+# e.g. `just movie ../PROVE`   or   `just movie https://github.com/chalk/ansi-styles`
+movie repo=".":
+    -lsof -ti :4244 | xargs kill -9 2>/dev/null
+    @echo "Agentopolis Movie on http://localhost:4244 ({{repo}})"
+    @sleep 1 && case "{{repo}}" in http*) open "http://localhost:4244/?forge={{repo}}&timelapse";; *) open "http://localhost:4244/?timelapse";; esac &
+    @case "{{repo}}" in http*) R="." ;; *) R="{{repo}}" ;; esac; exec env AGENTOPOLIS_REPO="$R" .venv/bin/uvicorn agentopolis.server:app --reload --reload-dir agentopolis --port 4244 --log-level warning --timeout-graceful-shutdown 1
+
 # Re-bake the BLACKBOX showcase fixtures (run before deploy when repos change)
 bake:
     .venv/bin/python -m agentopolis.bake

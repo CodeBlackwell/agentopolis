@@ -235,7 +235,86 @@ const City = (() => {
     state.village = true;
   }
 
-  const PLANS = { radial: planRadial, grid: planGrid, spine: planSpine, village: planVillage };
+  // ---- form E: EvoStreets — the directory tree as a street network. Files line their dir's street
+  //      in birth order; sub-dirs branch perpendicular (axis alternates by depth). Append-stable:
+  //      a building's spot is a pure function of its path + birth rank, so it never moves as the
+  //      repo grows — which lets the time-lapse reveal it in its final place. ----
+  function streetTree(buildings) {
+    const root = { dirs: new Map(), files: [] };
+    for (const b of buildings) {
+      const segs = b.path.split('/');
+      let node = root;
+      for (let i = 0; i < segs.length - 1; i++)
+        node = node.dirs.get(segs[i]) || node.dirs.set(segs[i], { dirs: new Map(), files: [], seg: segs[i] }).get(segs[i]);
+      node.files.push(b);
+    }
+    return root;
+  }
+  const byBirth = (a, b) => (a.birth ?? 0) - (b.birth ?? 0) || (a.path < b.path ? -1 : 1);
+  function measureStreet(node) {                          // bottom-up: len (along street) + thick (across)
+    node.files.sort(byBirth);
+    node.bw = Math.max(1, Math.round(Math.sqrt(node.files.length)));   // file block runs bw wide
+    let cursor = node.files.length ? node.bw + 2 : 1, perp = Math.ceil(node.files.length / node.bw);
+    node.minBirth = node.files[0]?.birth ?? Infinity;     // earliest file → when this street first appears
+    node.kids = [...node.dirs.values()].sort((a, b) => (a.files[0]?.birth ?? 0) - (b.files[0]?.birth ?? 0));
+    for (const k of node.kids) {
+      measureStreet(k);
+      k.a0 = cursor; cursor += k.thick + 1;                // child branch consumes parent-along = child.thick
+      perp = Math.max(perp, 1 + k.len);                    // and extends parent-perp = child.len
+      node.minBirth = Math.min(node.minBirth, k.minBirth);
+    }
+    node.len = cursor; node.thick = 1 + perp;              // +1 for the street row at perp 0
+  }
+  // top-down: emit absolute street + lot cells, and record each dir's geometry (for the time-lapse's
+  // per-street re-zoning contraction): the axis it branches along, that branch coordinate, its footprint
+  // (thick) along the parent, and its subtree bounding box.
+  function assignStreet(node, ox, oy, axis, paint, lot, streets, dirPath, parentAxis, branchAlong) {
+    const A = (a, p) => axis === 0 ? { x: ox + a, y: oy + p } : { x: ox + p, y: oy + a };
+    const box = { x0: ox, y0: oy, x1: ox, y1: oy };
+    const grow = (x, y) => { if (x < box.x0) box.x0 = x; if (y < box.y0) box.y0 = y; if (x > box.x1) box.x1 = x; if (y > box.y1) box.y1 = y; };
+    for (let a = 0; a < node.len; a++) { const c = A(a, 0); paint(c.x, c.y, node.minBirth); grow(c.x, c.y); }
+    node.files.forEach((b, i) => { const c = A(1 + i % node.bw, 1 + Math.floor(i / node.bw)); lot(b, c.x, c.y); grow(c.x, c.y); });
+    for (const k of node.kids) {
+      const o = A(k.a0, 1);
+      const kb = assignStreet(k, o.x, o.y, 1 - axis, paint, lot, streets,
+                              dirPath ? dirPath + '/' + k.seg : k.seg, axis, (axis === 0 ? ox : oy) + k.a0);
+      grow(kb.x0, kb.y0); grow(kb.x1, kb.y1);
+    }
+    if (streets && dirPath) streets[dirPath] = { axis: parentAxis, branchAlong, thick: node.thick, bbox: box };
+    return box;
+  }
+  function planEvostreets(state, data, byComp) {
+    const root = streetTree(data.buildings);
+    measureStreet(root);
+    const margin = 3;
+    state.W = root.len + 2 * margin; state.H = root.thick + 2 * margin;
+    const g = Array.from({ length: state.H }, () => new Array(state.W).fill(2));
+    const gb = Array.from({ length: state.H }, () => new Array(state.W).fill(Infinity));  // per-tile reveal birth
+    const inb = (x, y) => x >= 0 && y >= 0 && x < state.W && y < state.H;
+    const cell = {}, streets = {};
+    assignStreet(root, margin, margin, 0,
+      (x, y, birth) => { if (inb(x, y)) { if (g[y][x] === 2) g[y][x] = 0; if (birth < gb[y][x]) gb[y][x] = birth; } },
+      (b, x, y) => { cell[b.path] = { x, y }; }, streets, '', 0, margin);
+    state.streets = streets;                               // dir-path -> {axis, branchAlong, thick, bbox}
+    for (const comp of data.zone.components) {             // one block per component; lots in birth order
+      const list = (byComp[comp.id] || []).filter(b => cell[b.path]).sort(byBirth);
+      if (!list.length) continue;
+      const block = newBlock(state, comp, list);
+      block.ordered = true;                                // fillBlock must keep this lot↔building pairing
+      for (const b of list) {
+        const c = cell[b.path];
+        if (inb(c.x, c.y)) { g[c.y][c.x] = 10 + block.id; gb[c.y][c.x] = b.birth ?? Infinity; }
+        block.lots.push({ x: c.x + .5, y: c.y + .5 });
+      }
+      centroid(block);
+    }
+    state.ground = g;
+    state.groundBirth = gb;                                // time-lapse reveals tiles as their buildings arrive
+    state.cityHall = { x: margin + .5, y: margin - 1.5 };  // trailhead of the main boulevard, in parkland
+  }
+
+  const PLANS = { radial: planRadial, grid: planGrid, spine: planSpine, village: planVillage,
+                  evostreets: planEvostreets };
   const PIPE = ['back', 'mid', 'front'];                   // the data-flow stack; 'under' isn't a stage
   // The FORM is a claim about structure the data must support: a measurable coupling hub (radial),
   // a balanced full-stack split (spine), or peer modules with no center (grid). Order matters —
@@ -393,9 +472,10 @@ const City = (() => {
                    age: q(block.list.map(b => b.age_days), 1 / 3) };
     for (const b of block.list)                             // each district spotlights its own active third
       b.billboard = b.commits > cuts.commits || b.age_days < cuts.age;
-    block.list.sort((a, b) =>                               // lots run downtown→outskirts: towers center,
-      (RANK[FORM[a.ext]] ?? 0) - (RANK[FORM[b.ext]] ?? 0)   // same-form runs stay contiguous → neighborhoods
-      || b.floors - a.floors);
+    if (!block.ordered)                                    // evostreets pins lots to birth order; don't re-sort
+      block.list.sort((a, b) =>                             // lots run downtown→outskirts: towers center,
+        (RANK[FORM[a.ext]] ?? 0) - (RANK[FORM[b.ext]] ?? 0) // same-form runs stay contiguous → neighborhoods
+        || b.floors - a.floors);
     block.list.forEach((b, i) => place(state, block, b, i));
     block.next = block.list.length;
     for (let i = block.next; i < block.lots.length; i++) {  // leftover lots get dressing
@@ -474,7 +554,44 @@ const City = (() => {
   }
 
   // ---- buildings ----
+  function drawRuin(ctx, cam, b) {                        // a deleted file's husk: a low, gray, roofless stub
+    const f = b.foot * .5;
+    const base = spin(cam, [proj(cam, b.x - f, b.y - f), proj(cam, b.x + f, b.y - f),
+                            proj(cam, b.x + f, b.y + f), proj(cam, b.x - f, b.y + f)]);
+    const h = FLOOR * .5 * cam.s;
+    const top = base.map(p => lift(p, h));
+    quad(ctx, base[3], base[2], top[2], top[3], '#352f3b');
+    quad(ctx, base[2], base[1], top[1], top[2], '#433b49');
+    quad(ctx, top[0], top[1], top[2], top[3], '#241f2a');   // dark caved-in roof
+    b.screen = { sx: (base[1].sx + base[3].sx) / 2, top: top[2].sy - 4,
+                 x0: base[3].sx, x1: base[1].sx, y0: top[2].sy, y1: base[2].sy };
+  }
+
+  function drawCollapse(ctx, cam, b, k) {                  // demolition: the body sinks into the husk, dust rises
+    const f = b.foot * .5;
+    const base = spin(cam, [proj(cam, b.x - f, b.y - f), proj(cam, b.x + f, b.y - f),
+                            proj(cam, b.x + f, b.y + f), proj(cam, b.x - f, b.y + f)]);
+    const full = Math.max(1, b.floors) * FLOOR, husk = FLOOR * .5;
+    const h = (full * (1 - k) + husk * k) * cam.s;
+    const top = base.map(p => lift(p, h));
+    const g = mix(b.color || '#5a4a5e', '#352f3b', k);     // colour fades to ruin-grey as it falls
+    quad(ctx, base[3], base[2], top[2], top[3], shade(g, .55));
+    quad(ctx, base[2], base[1], top[1], top[2], shade(g, .75));
+    quad(ctx, top[0], top[1], top[2], top[3], shade(g, 1.0));
+    const cx = (top[1].sx + top[3].sx) / 2, cy = (top[0].sy + top[2].sy) / 2, s = cam.s;
+    for (let i = 0; i < 4; i++) {                           // dust puffs
+      const a = i * 1.7 + k * 3, r = (3 + 6 * k) * s;
+      ctx.fillStyle = `rgba(150,140,150,${.4 * (1 - k)})`;
+      ctx.fillRect(cx + Math.cos(a) * 8 * s - r / 2, cy + Math.sin(a) * 4 * s - r / 2 - h * .3, r, r);
+    }
+    b.screen = { sx: cx, top: cy - 4, x0: base[3].sx, x1: base[1].sx, y0: top[2].sy, y1: base[2].sy };
+  }
+
   function drawBuilding(ctx, cam, b, t) {
+    if (b.ruined) {                                        // collapse for ~700ms, then settle to a husk
+      const k = b._collapseAt ? (t - b._collapseAt) / 700 : 1;
+      return k < 1 ? drawCollapse(ctx, cam, b, k) : drawRuin(ctx, cam, b);
+    }
     const pop = b.born ? Math.min(1, (t - b.born) / 600) : 1;
     const f = b.foot * pop / 2;
     const base = spin(cam, [proj(cam, b.x - f, b.y - f), proj(cam, b.x + f, b.y - f),

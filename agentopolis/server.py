@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from . import forge as forge_mod
 from .nation import CAPITAL, discover_repos, is_mother, load_nation
 from .seed import git, seed
+from .timeline import build_timeline
 from .zone import load_zone
 
 shutting_down = asyncio.Event()                  # set on lifespan shutdown; SSE streams watch it to end
@@ -48,6 +49,7 @@ if _root := os.environ.get("AGENTOPOLIS_ROOT"):
 if _repo := os.environ.get("AGENTOPOLIS_REPO"):
     city.update(repo=_repo, zone_path=os.environ.get("AGENTOPOLIS_ZONE"))
 seeded: dict[str, dict] = {}        # repo path -> {head, data}, cached per git HEAD
+timelines: dict[str, dict] = {}     # repo path -> {head, data}, cached per git HEAD
 
 
 def configure(repo: str, zone_path: str | None) -> None:
@@ -70,6 +72,14 @@ def seed_cached(repo: str, zone_path: str | None = None, exclude: set | None = N
     if not cur or cur["head"] != head:
         cur = seeded[key] = {"head": head,
                              "data": seed(repo, load_zone(repo, zone_path, exclude), exclude)}
+    return cur["data"]
+
+
+def timeline_cached(repo: str) -> dict:
+    head = git(repo, "rev-parse", "HEAD").strip()
+    cur = timelines.get(repo)
+    if not cur or cur["head"] != head:
+        cur = timelines[repo] = {"head": head, "data": build_timeline(repo)}
     return cur["data"]
 
 MAX_DETAIL = 80
@@ -146,6 +156,20 @@ def city_data(repo: str | None = None):
     return seed_cached(city["repo"], city["zone_path"])
 
 
+@app.get("/timeline.json")
+def timeline_data(repo: str | None = None):
+    if showcase["dir"]:                             # baked fixtures have no live git to walk
+        return Response(status_code=404)
+    root = nation["root"]
+    if repo:                                        # nation drill-down, mirrors /city-data.json
+        if root and repo == CAPITAL and is_mother(root):
+            return timeline_cached(root)
+        if not root or repo not in discover_repos(root):
+            return Response(status_code=404)
+        return timeline_cached(str(Path(root) / repo))
+    return timeline_cached(city["repo"])
+
+
 @app.get("/forge")
 def forge_city(url: str):
     if url in forge_mod.forged:                  # cache hit: skip the clone gate entirely
@@ -154,6 +178,22 @@ def forge_city(url: str):
         return Response(status_code=429)
     try:
         return forge_mod.forge(url)
+    except ValueError:
+        return Response(status_code=400)
+    except Exception:
+        return Response(status_code=502)
+    finally:
+        forge_gate.release()
+
+
+@app.get("/forge-timelapse")
+def forge_timelapse_city(url: str):              # full-history clone → {data, timeline} bundle
+    if url in forge_mod.forged_tl:
+        return forge_mod.forged_tl[url]
+    if not forge_gate.acquire(blocking=False):
+        return Response(status_code=429)
+    try:
+        return forge_mod.forge_timelapse(url)
     except ValueError:
         return Response(status_code=400)
     except Exception:
@@ -205,19 +245,25 @@ def root(request: Request) -> HTMLResponse:
     # Otherwise the showcase opens the nation map; AGENTOPOLIS_DEMO_CITY auto-drills into one city on
     # load (so zoom-out + the tier breadcrumb still reach the nation), and ?nation skips the drill.
     forge = request.query_params.get("forge")
+    timelapse = "timelapse" in request.query_params
     auto_city = bool(showcase["dir"] and showcase["city"]) and "nation" not in request.query_params
+    timeline_src = "timeline.json"
     if forge:
         name = forge.rstrip("/").split("/")[-1].removesuffix(".git")   # heading: "<repo> City"
-        mode, src = "city", "/forge?url=" + quote(forge, safe="")
+        mode = "city"
+        src = ("/forge-timelapse?url=" if timelapse else "/forge?url=") + quote(forge, safe="")
     elif nation["root"]:
         mode, name, src = "nation", Path(nation["root"]).name, "city-data.json"
     else:
         mode, name, src = "city", Path(city["repo"]).resolve().name, "city-data.json"
     engine = "nation.js" if mode == "nation" else "city-live.js"
+    if mode == "city" and timelapse:                 # replay git history over the layout
+        engine = "city-timelapse.js"
     html = (Path(__file__).parent / "static" / "index.html").read_text()
     return HTMLResponse(html.replace("{{MODE}}", mode).replace("{{ENGINE}}", engine)
                         .replace("{{HALL_LEVEL}}", mode).replace("{{HALL_NAME}}", name)
-                        .replace("{{CITY_SRC}}", src).replace("{{DEMO}}", "1" if showcase["dir"] else "")
+                        .replace("{{CITY_SRC}}", src).replace("{{TIMELINE_SRC}}", timeline_src)
+                        .replace("{{DEMO}}", "1" if showcase["dir"] else "")
                         .replace("{{DEMO_CITY}}", showcase["city"] if auto_city else ""))
 
 
