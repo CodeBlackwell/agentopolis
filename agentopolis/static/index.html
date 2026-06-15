@@ -43,8 +43,8 @@
            text-shadow: 0 2px 7px rgba(0,0,0,.75), 1px 1px 0 var(--plum); }
   header h1 { font-family: 'Limelight', cursive; font-size: clamp(18px, 1.9vw, 26px);
               letter-spacing: .06em; color: var(--cream); }
-  header p { font-family: 'Silkscreen', monospace; font-size: 9px; color: var(--pink-deep);
-             letter-spacing: .16em; text-transform: uppercase; margin-top: 1px; }
+  header p { font-family: 'Silkscreen', monospace; font-size: 13px; color: var(--pink-deep);
+             letter-spacing: .16em; text-transform: uppercase; margin-top: 1px; line-height: 1.7; }
 
   /* every zone wears the same gilded exhibit frame */
   .mapwrap, #side, #dock {
@@ -73,12 +73,18 @@
   #mapctl .wide { grid-column: span 2; width: auto; }
 
   /* ---- nation-mode map chrome ---- */
-  #back {
-    position: absolute; top: 58px; left: 14px; display: none; cursor: pointer;
+  #back {                                              /* in-header flow: sits below the hints at any font size */
+    display: none; cursor: pointer; pointer-events: auto; margin-top: 10px;
     background: var(--plum-soft); color: var(--cream); border: 2px solid var(--gold);
     font-family: 'Silkscreen', monospace; font-size: 12px; padding: 7px 12px;
   }
   #back:hover { background: var(--gold); color: var(--plum); }
+  /* city-mode: jump into the git-history time-lapse of this repo (removed by the time-lapse engine itself) */
+  #replay { display: none; cursor: pointer; pointer-events: auto; margin-top: 9px;
+            background: var(--plum-soft); color: var(--cream); border: 2px solid var(--gold);
+            font-family: 'Silkscreen', monospace; font-size: 11px; padding: 6px 11px; }
+  #replay:hover { background: var(--gold); color: var(--plum); }
+  body[data-mode="city"] #replay { display: inline-block; }
   #tiers {
     position: absolute; top: 24px; right: 24px;
     display: flex; align-items: center; gap: 6px; padding: 6px 8px;
@@ -210,7 +216,7 @@
     #tiers button { padding: 8px 11px; font-size: 12px; }
     #mapctl { top: 58px; right: 12px; }
     #mapctl button { width: 42px; height: 42px; font-size: 18px; }
-    #back { top: 54px; left: 12px; padding: 9px 14px; }
+    #back { padding: 9px 14px; }
     #forge { bottom: 64px; }
     #forge input { max-width: 86vw; }
   }
@@ -221,11 +227,13 @@
     <canvas id="map" width="1280" height="720"></canvas>
     <header>
       <h1><span class="m-nation">Agentopolis Nation</span><span class="m-city">{{HALL_NAME}} City</span></h1>
-      <p class="m-nation">drag to pan &middot; scroll to zoom &middot; click a city to enter &middot; zoom out to leave &middot; Q/E rotate</p>
+      <p class="m-nation">drag to pan<br>scroll to zoom<br>click a city to enter<br>zoom out to leave<br>Q/E rotate</p>
+      <button id="back" class="m-nation" title="back to world map">&#8593; WORLD MAP</button>
       <p class="m-city">scroll to zoom in &amp; out &middot; drag to pan &middot; the city builds itself</p>
       <p class="m-city demo-only"><a href="/?nation">&#9656; explore the whole BLACKBOX nation</a></p>
+      <button id="replay" class="m-city" title="replay this repo's git history as a time-lapse"
+              onclick="location.search='?timelapse'">&#9654; replay history</button>
     </header>
-    <button id="back" class="m-nation" title="back to world map">&#8593; WORLD MAP</button>
     <div id="tiers" class="m-nation">
       <button data-tier="world">WORLD</button><span class="sep">&#9656;</span>
       <button data-tier="state">STATE</button><span class="sep">&#9656;</span>
@@ -289,7 +297,7 @@
   <script src="hall.js"></script>
   <script src="hall-tiers.js"></script>
   <script src="touch.js"></script>
-  <script>window.CITY_SRC = "{{CITY_SRC}}"; window.DEMO_CITY = "{{DEMO_CITY}}";</script>
+  <script>window.CITY_SRC = "{{CITY_SRC}}"; window.TIMELINE_SRC = "{{TIMELINE_SRC}}"; window.DEMO_CITY = "{{DEMO_CITY}}";</script>
   <script src="{{ENGINE}}"></script>
   <script src="hotel.js"></script>
   <script>
