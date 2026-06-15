@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- The city hall no longer paints over the buildings standing in front of it. It
+  was always drawn last, on top of every building; it now takes its place in the
+  painter's-order sort (by its front footprint corner), so closer buildings
+  correctly overlap it in every formation.
+
 ## [0.8.0] - 2026-06-15
 
 ### Added

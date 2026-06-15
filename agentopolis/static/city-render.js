@@ -653,6 +653,9 @@ const City = (() => {
                             proj(cam, b.x + f, b.y + f), proj(cam, b.x - f, b.y + f)]);
     const h = b.floors * FLOOR * b.heightScale * pop * cam.s;
     const top = base.map(p => lift(p, h));
+    const shx = 3 * cam.s + h * .16, shy = 1.5 * cam.s + h * .08;   // contact shadow: footprint nudged away
+    const sh = base.map(p => ({ sx: p.sx + shx, sy: p.sy + shy }));  // from the sun, longer as the body rises
+    quad(ctx, sh[0], sh[1], sh[2], sh[3], 'rgba(12,6,16,.22)');      // body draws over it → grounding crescent
     quad(ctx, base[3], base[2], top[2], top[3], shade(b.color, .55));
     quad(ctx, base[2], base[1], top[1], top[2], shade(b.color, .75));
     quad(ctx, top[0], top[1], top[2], top[3], shade(b.color, 1.05));
@@ -1009,7 +1012,12 @@ const City = (() => {
     }
     CityScape.drawGround(ctx, cam, state, t);
     if (!opts.embedded && state.deps.length) CityScape.drawStation(ctx, cam, state, t);   // freight hugs the grid
+    const k = dkey(R), hall = state.cityHall;                // hall sorts by its front footprint corner so
+    const hallKey = hall ? Math.max(...[[-1, -1], [1, -1], [1, 1], [-1, 1]]   // buildings in front draw over it
+                     .map(([dx, dy]) => k({ x: hall.x + 1.35 * dx, y: hall.y + 1.35 * dy }))) : Infinity;
+    let hallDrawn = !hall;
     for (const it of state.items) {
+      if (!hallDrawn && k(it) > hallKey) { drawCityHall(ctx, cam, hall.x, hall.y); hallDrawn = true; }
       if (it.kind) {                                        // _alpha lets a transition cross-fade dressing
         if (it.hidden) continue;
         if (it._alpha !== undefined) ctx.globalAlpha = it._alpha;
@@ -1017,7 +1025,7 @@ const City = (() => {
         ctx.globalAlpha = 1;
       } else drawBuilding(ctx, cam, it, t);
     }
-    if (state.cityHall) drawCityHall(ctx, cam, state.cityHall.x, state.cityHall.y);
+    if (!hallDrawn) drawCityHall(ctx, cam, hall.x, hall.y);
     if (!opts.embedded && state.docker.length) CityScape.drawPort(ctx, cam, state, t);   // ships ride the rotating harbor
     if (opts.embedded) return;
     ctx.fillStyle = 'rgba(243,207,217,.6)';
