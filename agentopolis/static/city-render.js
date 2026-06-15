@@ -347,10 +347,13 @@ const City = (() => {
 
   // The ladder of formations a repo climbs as it grows. First whose enters() holds wins (same
   // precedence + thresholds as the old choosePlan). The time-lapse walks this over history.
+  // FORM_CUT holds every threshold in one place so enters() and the time-lapse's explanation cards
+  // read the same numbers — change a cut here and the on-screen "why this shape" stays truthful.
+  const FORM_CUT = { districts: 2, files: 40, mass: 5, dominance: 2.5, spineFiles: 180 };
   const FORMATIONS = [
-    { id: 'village', plan: planVillage, enters: s => s.n <= 2 || s.nbuild <= 40 },   // hamlet: green + neighborhoods
-    { id: 'radial',  plan: planRadial,  enters: s => s.mass >= 5 && s.dominance >= 2.5 },  // a hub rings orbit
-    { id: 'spine',   plan: planSpine,   enters: s => s.balanced && s.nbuild <= 180 },      // balanced stack → boulevard
+    { id: 'village', plan: planVillage, enters: s => s.n <= FORM_CUT.districts || s.nbuild <= FORM_CUT.files },
+    { id: 'radial',  plan: planRadial,  enters: s => s.mass >= FORM_CUT.mass && s.dominance >= FORM_CUT.dominance },
+    { id: 'spine',   plan: planSpine,   enters: s => s.balanced && s.nbuild <= FORM_CUT.spineFiles },
     { id: 'grid',    plan: planGrid,    enters: () => true },                              // many peers (fallback)
   ];
   function chooseFormation(data) {
@@ -1118,7 +1121,7 @@ const City = (() => {
   }
 
   return { layout, fit, draw, applyEvent, pick, roster,
-           proj, hash, shade, mix, near, chooseFormation, statsOf, FORMATIONS, FATES, clearPocket };
+           proj, hash, shade, mix, near, chooseFormation, statsOf, FORMATIONS, FORM_CUT, FATES, clearPocket };
 })();
 
 // Huge repos are sampled server-side; tell the viewer the city is a representative slice, not the whole repo.
