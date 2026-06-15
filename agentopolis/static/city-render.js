@@ -694,7 +694,7 @@ const City = (() => {
   const ARCH = {
     storage(ctx, cam, b, base, top, h) {                    // domed tank with seams
       const cx = (top[1].sx + top[3].sx) / 2, cy = (top[0].sy + top[2].sy) / 2;
-      const rx = (top[1].sx - top[3].sx) / 2;
+      const rx = Math.abs(top[1].sx - top[3].sx) / 2;       // abs: rotation can flip the sign (ellipse rejects negative)
       ctx.fillStyle = shade(b.color, 1.25);
       ctx.beginPath(); ctx.ellipse(cx, cy, rx * .8, rx * .42, 0, Math.PI, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = shade(b.color, .45);
