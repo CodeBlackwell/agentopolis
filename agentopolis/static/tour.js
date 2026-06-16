@@ -196,7 +196,7 @@
         50%{box-shadow:0 0 28px 6px rgba(212,169,83,.98)}}
       /* the farewell beat always dims (even in the screening room) so the one-time "replay lives here" pointer lands */
       #tour-block.farewell-dim #tour-hole{box-shadow:0 0 0 9999px rgba(26,10,20,.82),0 0 22px 3px rgba(212,169,83,.85)}
-      #tour-card{position:fixed;z-index:42;width:340px;max-width:calc(100vw - 24px);background:var(--plum);
+      #tour-card{position:fixed;z-index:42;pointer-events:auto;width:340px;max-width:calc(100vw - 24px);background:var(--plum);
         border:4px solid var(--gold);box-shadow:0 14px 30px rgba(0,0,0,.5);font-family:'Silkscreen',monospace;
         color:var(--cream);transition:top .35s ease,bottom .35s ease,left .35s ease}
       #tour-card .body{display:flex;gap:10px;padding:12px}
