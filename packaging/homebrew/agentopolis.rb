@@ -3,8 +3,8 @@ class Agentopolis < Formula
 
   desc "Habbo-style visualizer of Claude Code agents building your repo as a city"
   homepage "https://github.com/CodeBlackwell/agentopolis"
-  url "https://files.pythonhosted.org/packages/c4/35/4ae97c611294583ca368640b8e006b8c601e0fca698facd31f26da4a2d04/agentopolis-0.8.0.tar.gz"
-  sha256 "fed2ab430d951a4b3909adea35e7d7d06930a451ac3302ee45525383350e81f7"
+  url "https://files.pythonhosted.org/packages/85/dd/2e1a18ae5705a652af95ae2995839acab8067b123dd3dcd9fce3570d95a2/agentopolis-0.10.0.tar.gz"
+  sha256 "fc954ede554ed785aa53c093f25fa56d1bd43ac0f459094c0b3b0a92c3aebb96"
   license "MIT"
 
   depends_on "rust" => :build # builds pydantic-core
