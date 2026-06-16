@@ -97,13 +97,18 @@ def scan(path: Path) -> tuple[int, int, int, int]:
     return loc, classes, imports, todos
 
 
+def is_manifest(name: str) -> bool:
+    """True for a dependency manifest filename (package.json / pyproject.toml / requirements*.txt)."""
+    return name in ("package.json", "pyproject.toml") or \
+        (name.startswith("requirements") and name.endswith(".txt"))
+
+
 def parse_deps(repo: str, files: list[str]) -> list[str]:
     import tomllib
     found = set()
     for f in files:
         name = f.rsplit("/", 1)[-1].lower()
-        if name not in ("package.json", "pyproject.toml") and \
-           not (name.startswith("requirements") and name.endswith(".txt")):
+        if not is_manifest(name):
             continue
         try:
             text = Path(repo, f).read_text(errors="ignore")
@@ -131,9 +136,7 @@ def detect_clouds(repo: str, comp: dict[str, str | None]) -> list[dict]:
     votes: dict[str, Counter] = {}
     for f, c in comp.items():
         name = f.rsplit("/", 1)[-1].lower()
-        is_manifest = name in ("package.json", "pyproject.toml") or \
-            (name.startswith("requirements") and name.endswith(".txt"))
-        for dep in parse_deps(repo, [f]) if is_manifest else []:
+        for dep in parse_deps(repo, [f]) if is_manifest(name) else []:
             for label, fps in DEP_CLOUDS:
                 if any(fp in dep for fp in fps):
                     votes.setdefault(label, Counter())[c or default] += 1

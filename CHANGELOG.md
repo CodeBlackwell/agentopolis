@@ -6,6 +6,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- `agentopolis .` — a zero-setup one-shot: it attaches the Claude Code hooks on start
+  and removes them again on exit (Ctrl+C), so no separate `attach`/`detach` step is
+  needed for a quick session. It only detaches hooks it added itself, so a prior manual
+  `agentopolis attach` is left untouched.
+
+### Changed
+- Map control panel (`#mapctl`) polish: icon buttons are flex-centered at a larger glyph
+  size; RESET / SHARE are full-width text bars with proper padding; the Share arrow no
+  longer wraps onto its own line.
+
+## [0.15.0] - 2026-06-16
+
 ### Fixed
 - Share button now opens a destination menu (native share sheet where supported, plus
   X / LinkedIn / Reddit / Hacker News web-intents, copy link, download image, and — in a

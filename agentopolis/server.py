@@ -7,7 +7,6 @@ seeds the configured repo's city on demand (cached per git HEAD).
 import asyncio
 import json
 import os
-import re
 import threading
 from collections import Counter, deque
 from contextlib import asynccontextmanager
@@ -347,18 +346,22 @@ def _og_block(title: str, desc: str, img: str, url: str, player: str | None = No
 
 def _canon_path(forge_url: str) -> str | None:
     # github.com/owner/repo -> /c/owner/repo, the clean canonical a shared link unfurls + reads as
-    m = re.match(r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$", forge_url or "")
-    return f"/c/{m.group(1)}/{m.group(2)}" if m else None
+    owner, repo = forge_mod.owner_repo(forge_url)
+    return f"/c/{owner}/{repo}" if owner else None
+
+
+def _forge_url(owner: str, repo: str) -> str:
+    return f"https://github.com/{owner}/{repo.removesuffix('.git')}"
 
 
 @app.get("/c/{owner}/{repo}")                    # clean canonical: /c/owner/repo == ?forge=github.com/owner/repo
 def canonical(owner: str, repo: str, request: Request) -> HTMLResponse:
-    return _page(request, f"https://github.com/{owner}/{repo.removesuffix('.git')}")
+    return _page(request, _forge_url(owner, repo))
 
 
 @app.get("/player/{owner}/{repo}")               # chromeless autoplaying movie — the player-card iframe + embeds
 def player(owner: str, repo: str, request: Request) -> HTMLResponse:
-    return _page(request, f"https://github.com/{owner}/{repo.removesuffix('.git')}", embed=True)
+    return _page(request, _forge_url(owner, repo), embed=True)
 
 
 @app.get("/")

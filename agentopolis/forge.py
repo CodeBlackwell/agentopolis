@@ -88,6 +88,12 @@ def peek_tl(url: str) -> dict | None:
     return _load(url, "tl", forged_tl)
 
 
+def owner_repo(url: str) -> tuple[str | None, str | None]:
+    """Parse a github.com/owner/repo url into (owner, repo); (None, None) if it doesn't match."""
+    m = re.match(r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$", url or "")
+    return (m.group(1), m.group(2)) if m else (None, None)
+
+
 def clone_url(url: str) -> str:
     """Validate a public github.com/owner/repo url; return the https clone url or raise."""
     u = urlparse(url.strip())

@@ -1,6 +1,6 @@
 [project]
 name = "agentopolis"
-version = "0.14.0"
+version = "0.15.0"
 description = "Agentopolis — Habbo-style visualization of Claude Code agents building your repo as a city"
 readme = "README.md"
 license = "MIT"
@@ -8,6 +8,16 @@ license-files = ["LICENSE"]
 authors = [{ name = "LeChristopher Blackwell", email = "codeblackwell@gmail.com" }]
 keywords = ["claude-code", "visualization", "agents", "isometric", "pixel-art"]
 requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
 dependencies = ["fastapi>=0.110", "uvicorn>=0.29"]
 
 # the hosted demo installs `.[card]` so forge links unfurl with a generated social card;
@@ -20,6 +30,7 @@ test = ["pytest>=8", "httpx", "pillow>=10.1", "pytest-playwright>=0.5"]
 Homepage = "https://github.com/CodeBlackwell/agentopolis"
 Source = "https://github.com/CodeBlackwell/agentopolis"
 Issues = "https://github.com/CodeBlackwell/agentopolis/issues"
+Changelog = "https://github.com/CodeBlackwell/agentopolis/blob/master/CHANGELOG.md"
 
 [project.scripts]
 agentopolis = "agentopolis.cli:main"

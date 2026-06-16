@@ -87,7 +87,7 @@ def test_caption_names_the_repo_and_carries_a_stat(page, base_url):
     _open_city(page, base_url)
     text = page.evaluate("window.__share.text()")
     assert "isometric city" in text
-    assert "botapest" in text                              # the repo dir name (data-hall-name)
+    assert Path(REPO).name in text                         # the repo dir name (data-hall-name)
     assert any(ch.isdigit() for ch in text)                # a headline number, not the old static line
 
 

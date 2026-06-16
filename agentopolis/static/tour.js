@@ -26,6 +26,25 @@
   const pres = 'Supreme President';                                      // the everyday short form
   const city = document.body.dataset.hallName || 'your city';
 
+  // Touch devices have no mouse/keyboard: rewrite the desktop control idioms (scroll, Q/E, spacebar,
+  // arrows, click, hover) into the phone gestures the canvases actually listen for (pinch, two-finger
+  // twist, tap, tap & hold). Applied to every step's prose + "try" hint at render time.
+  const TOUCH = matchMedia('(pointer: coarse)').matches;
+  const touchify = s => !TOUCH || !s ? s : s
+    .replaceAll('scroll to zoom upon the rooftops', 'pinch to zoom on the rooftops')
+    .replaceAll('scroll to zoom', 'pinch to zoom').replaceAll(', scroll,', ', pinch,').replaceAll('scroll', 'pinch')
+    .replaceAll('Q or E to spin it for the cameras', 'twist with two fingers for the cameras')
+    .replaceAll('Q or E to spin', 'two-finger twist to spin').replaceAll('Q/E to spin', 'two-finger twist to spin')
+    .replaceAll('Q/E', 'two-finger twist').replaceAll('and spin while it builds', 'and twist while it builds')
+    .replaceAll('Press ▶ or tap spacebar', 'Tap ▶').replaceAll(' (spacebar)', '').replaceAll('(spacebar)', '')
+    .replaceAll('← → to step a commit, or ', '')
+    .replaceAll('Press play', 'Tap play').replaceAll('Press the controls', 'Tap the controls')
+    .replaceAll('Press ■ live', 'Tap ■ live').replaceAll('Press ▶ Replay', 'Tap ▶ Replay')
+    .replaceAll('Click', 'Tap').replaceAll('click', 'tap')
+    .replaceAll('Hover one', 'Tap & hold one').replaceAll('Hover a worker', 'Tap & hold a worker')
+    .replaceAll('Hover an agent', 'Tap & hold an agent').replaceAll('Hover a citizen', 'Tap & hold a citizen')
+    .replaceAll('Hover to inspect', 'Tap & hold to inspect').replaceAll('Hover', 'Tap');
+
   // ---- the script: each step spotlights one #id; center steps have no target; a forced step blocks the
   //      tour until the President presses the real highlighted control (and carries the tour onward). ----
   const NATION = [
@@ -221,21 +240,12 @@
       #tour-card button{cursor:pointer;font-family:inherit;font-size:10px;padding:7px 12px;
         background:var(--plum-soft);color:var(--cream);border:2px solid var(--gold)}
       #tour-card button:hover{background:var(--gold);color:var(--plum)}
-      #tour-card .skip{background:transparent;border:0;color:var(--pink-deep);padding:7px 4px;font-size:9px}
-      #tour-card .skip:hover{background:transparent;color:var(--gold)}
+      #tour-card .skip{background:transparent;border:2px solid var(--gold);color:var(--cream);padding:7px 11px;font-size:10px}
+      #tour-card .skip:hover{background:var(--gold);color:var(--plum)}
       #tour-card .nudge{font-size:9px;color:var(--gold);padding:7px 4px;animation:tour-bob 1.1s ease-in-out infinite}
       #tour-card .try{margin:0 12px 10px;padding:6px 9px;font-size:9px;line-height:1.5;color:var(--plum);
         background:var(--gold);box-shadow:2px 2px 0 var(--plum-soft)}
-      #tour-help{position:fixed;z-index:9;cursor:pointer;padding:0;border:0;background:none;width:48px;height:60px}
-      #tour-help canvas{width:100%;height:100%;image-rendering:pixelated;display:block;
-        filter:drop-shadow(2px 2px 0 rgba(26,10,20,.45))}
-      #tour-help .q{position:absolute;top:-4px;right:-7px;min-width:18px;height:18px;border-radius:9px;padding:0 2px;
-        box-sizing:border-box;background:var(--gold);color:var(--plum);border:2px solid var(--plum);
-        font:700 11px 'Silkscreen',monospace;display:flex;align-items:center;justify-content:center;
-        box-shadow:1px 1px 0 var(--plum-soft)}
-      #tour-help:hover canvas{filter:drop-shadow(0 0 7px var(--gold))}
-      #tour-help:hover .q{background:var(--cream)}
-      @media(max-width:720px){#tour-card #tour-sprite{display:none}#tour-card{width:300px}}`;
+      @media(max-width:720px){#tour-card #tour-sprite{display:none}#tour-card{width:300px}}`;   /* #tour-help rules live in buildHelp() */
     document.head.appendChild(document.createElement('style')).textContent = css;
 
     const block = el('div', { id: 'tour-block' });
@@ -246,7 +256,7 @@
     card.innerHTML = `<div class="body"><canvas id="tour-sprite"></canvas>
       <div class="txt"><h3></h3><p></p><span class="who">— your Chief of Staff</span></div></div>
       <div class="try" hidden></div>
-      <div class="bar"><button class="skip">skip tour</button><div class="dots"></div>
+      <div class="bar"><button class="skip">&#10005; skip tour</button><div class="dots"></div>
       <span class="nudge" hidden>press it ↑</span>
       <button class="back">back</button><button class="next">next ▸</button></div>`;
     block.append(...masks, hole, card);
@@ -275,6 +285,10 @@
     const step = steps[i];
     const fw = !!step.farewell, cel = !!step.celebrate;
     const target = step.center ? null : document.querySelector(step.sel);
+    // on phones the forge input lives in a closed bottom sheet (off-screen) — open it, then re-render once
+    // it has slid up, so the spotlight frames the real input and the typed URL is visible.
+    const sheet = target?.closest('#forge-sheet');
+    if (sheet && !sheet.classList.contains('open')) { window.openForgeSheet?.(); return setTimeout(() => show(i), 340); }
     const forced = !!step.force && !!target;
     if (target) {
       const r = target.getBoundingClientRect();
@@ -291,9 +305,9 @@
       Object.assign(ui.card.style, { left: '50%', top: '50%', bottom: 'auto', transform: 'translate(-50%,-50%)' });
     }
     ui.h3.textContent = step.title;
-    type(step.text);
+    type(touchify(step.text));
     ui.tryEl.hidden = !(step.try && target);                   // encourage hands-on play with the live element
-    if (step.try && target) ui.tryEl.textContent = '👆 ' + step.try;
+    if (step.try && target) ui.tryEl.textContent = '👆 ' + touchify(step.try);
     ui.dots.innerHTML = (fw || cel) ? '' : steps.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('');
     ui.skip.style.display = (fw || cel) ? 'none' : '';
     ui.back.style.visibility = (i && !fw && !cel) ? 'visible' : 'hidden';

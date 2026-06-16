@@ -450,18 +450,6 @@ const City = (() => {
   }
   const choosePlan = data => chooseFormation(data).plan;    // back-compat: layout() still calls choosePlan
 
-  // What each piece of village dressing becomes as the city outgrows the hamlet (time-lapse transitions).
-  const FATES = {
-    windmill:   { fate: 'relic',     place: 'outskirts' },                 // travels with the farm
-    cow:        { fate: 'transform', place: 'outskirts', into: 'cityfarm' },
-    well:       { fate: 'transform', place: 'anchor',    into: 'fountain' },
-    watertower: { fate: 'relic',     place: 'anchor' },
-    tree:       { fate: 'relic',     place: 'anchor' },
-    hay:        { fate: 'demolish' },
-    fence:      { fate: 'demolish' },
-    ufo:        { fate: 'demolish' },
-  };
-
   function addCemetery(state, data) {                       // dead files: graveyard rows below the city
     const allDead = data.dead || [];
     if (!allDead.length) return;
@@ -1499,7 +1487,7 @@ const City = (() => {
   }
 
   return { layout, fit, draw, applyEvent, pick, roster,
-           proj, hash, shade, mix, near, chooseFormation, statsOf, FORMATIONS, FORM_CUT, FATES, clearPocket,
+           proj, hash, shade, near, chooseFormation, statsOf, FORM_CUT, clearPocket,
            SHAPE_MODES, applyShapes: assignMasses,
            get shapeMode() { return shapeMode; },
            setShapeMode(m) { if (SHAPE_MODES.includes(m)) shapeMode = m; } };

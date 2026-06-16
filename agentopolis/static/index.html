@@ -61,16 +61,21 @@
 
   #mapctl {
     position: absolute; top: 74px; right: 24px;
-    display: grid; grid-template-columns: repeat(2, 28px); gap: 5px;
-    background: rgba(42,16,36,.82); border: 2px solid var(--gold); padding: 6px;
+    display: grid; grid-template-columns: repeat(2, 32px); gap: 6px;
+    background: rgba(42,16,36,.82); border: 2px solid var(--gold); padding: 7px;
   }
   #mapctl button {
-    width: 28px; height: 28px; line-height: 1; cursor: pointer;
+    width: 32px; height: 32px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px; line-height: 1;
     background: var(--plum-soft); color: var(--cream); border: 1px solid var(--gold);
-    font-family: 'Silkscreen', monospace; font-size: 14px;
+    font-family: 'Silkscreen', monospace; font-size: 16px;
   }
   #mapctl button:hover { background: var(--gold); color: var(--plum); }
-  #mapctl .wide { grid-column: span 2; width: auto; }
+  #mapctl .wide {                                      /* RESET / SHARE: full-width text bars */
+    grid-column: span 2; width: auto; height: auto; padding: 9px 0;
+    font-size: 11px; letter-spacing: 1.5px; white-space: nowrap;
+  }
+  #mapctl .wide .ico { font-size: 13px; }              /* share arrow, sized apart from the label */
 
   /* ---- nation-mode map chrome ---- */
   #back {                                              /* in-header flow: sits below the hints at any font size */
@@ -253,6 +258,8 @@
     body { grid-template-columns: 1fr; grid-template-rows: 1fr 40vh;
            grid-template-areas: "map" "dock"; padding: 8px; gap: 8px; }
     header p:not(.demo-only) { display: none; }   /* mouse/wheel/Q-E hints don't apply on touch */
+    /* keep the "explore the nation" banner to one tidy line so it clears the city's canvas labels */
+    header p.demo-only { font-size: 10px; letter-spacing: .08em; white-space: nowrap; }
     /* bottom sheet: thumb-reachable, swipe the handle down to dismiss (the native phone idiom) */
     #side { display: block; position: fixed; left: 0; right: 0; bottom: 0; top: auto;
             width: auto; height: auto; max-height: 82vh;
@@ -269,8 +276,10 @@
     #dock { gap: 0; }
     #tiers { top: 12px; right: 12px; }
     #tiers button { padding: 8px 11px; font-size: 12px; }
-    #mapctl { top: 58px; right: 12px; }
-    #mapctl button { width: 42px; height: 42px; font-size: 18px; }
+    #mapctl { top: 58px; right: 12px; grid-template-columns: repeat(2, 42px); }
+    #mapctl button { width: 42px; height: 42px; font-size: 20px; }
+    #mapctl .wide { height: auto; font-size: 13px; padding: 11px 0; }
+    #mapctl .wide .ico { font-size: 15px; }
     #mapctl [data-act="rot-"], #mapctl [data-act="rot+"] { display: none; }  /* two-finger twist rotates instead */
     #back { padding: 9px 14px; }
     #forge input { max-width: 86vw; }
@@ -282,6 +291,9 @@
                  background: var(--gold); color: var(--plum); border: 2px solid var(--gold);
                  box-shadow: 3px 3px 0 var(--plum); font-family: 'Silkscreen', monospace;
                  font-size: 13px; font-weight: 700; letter-spacing: .04em; padding: 13px 10px; text-align: center; }
+    /* movie mode: the transport bar owns the very bottom strip — lift the build CTA above it (full width,
+       since the stats drawer button is hidden here) so neither control buries the other */
+    .mapwrap.tl-mode #build-btn { left: 12px; right: 12px; bottom: 66px; }
     #forge-sheet { position: fixed; left: 0; right: 0; bottom: 0; top: auto; transform: translateY(100%);
                    transition: transform .3s ease; z-index: 20; background: var(--plum);
                    border: 4px solid var(--gold); border-bottom: none; border-radius: 16px 16px 0 0;
@@ -421,6 +433,7 @@
       const openSheet = s => { closeAll(); s.classList.add('open'); scrim.classList.add('open'); };
       statsBtn.addEventListener('click', () => side.classList.contains('open') ? closeAll() : openSheet(side));
       buildBtn.addEventListener('click', () => { openSheet(forgeSheet); detectClipboard(); });
+      window.openForgeSheet = () => { if (mq.matches) { openSheet(forgeSheet); detectClipboard(); } };  // the tour opens it to spotlight the forge input on phones
       scrim.addEventListener('click', closeAll);
 
       // example + clipboard chips forge on tap

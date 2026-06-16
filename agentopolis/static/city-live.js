@@ -3,10 +3,11 @@ const cityCanvas = document.getElementById('map');
 const cityCtx = cityCanvas.getContext('2d');
 const cityCam = { ox: 0, oy: 0, s: 1 };
 let cityState = null;
+const FIT = [115, 30, 1.18];                               // City.fit (pad, margin, zoom) for the live view
 
 // match the backing store to the box × DPR now and on every resize/orientation change, re-fitting
 // the city to the new shape (skipped until the layout has loaded; the fetch below does the first fit)
-autosizeCanvas(cityCanvas, () => { if (cityState) City.fit(cityCam, cityCanvas, cityState, 115, 30, 1.18); })();
+autosizeCanvas(cityCanvas, () => { if (cityState) City.fit(cityCam, cityCanvas, cityState, ...FIT); })();
 
 // carry the camera across the live↔movie reload so flipping modes doesn't jump the view. Keyed by city
 // (the forge url, else the data source) so a different city never inherits the wrong frame. The movie
@@ -51,7 +52,7 @@ fetch(window.CITY_SRC || 'city-data.json').then(r => r.json()).then(data => {
     City.applyShapes(cityState);
   };
   citySampleNote(data);
-  City.fit(cityCam, cityCanvas, cityState, 115, 30, 1.18);
+  City.fit(cityCam, cityCanvas, cityState, ...FIT);
   try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');   // keep the frame carried from the movie
     if (c && c.k === camKey) { cityCam.ox = c.ox; cityCam.oy = c.oy; cityCam.s = c.s; cityCam.rot = c.rot; } } catch (e) {}
   requestAnimationFrame(function frame(t) {
@@ -76,7 +77,7 @@ function cityRotate(dir) { cityCam.rot = ((cityCam.rot || 0) + (dir > 0 ? 1 : 7)
 
 const CTL = { 'rot-': () => cityRotate(-1), 'rot+': () => cityRotate(1),
               'zoom+': () => cityZoom(1.18), 'zoom-': () => cityZoom(1 / 1.18),
-              'reset': () => { cityCam.rot = 0; City.fit(cityCam, cityCanvas, cityState, 115, 30, 1.18); } };
+              'reset': () => { cityCam.rot = 0; City.fit(cityCam, cityCanvas, cityState, ...FIT); } };
 document.getElementById('mapctl').addEventListener('click', e => {
   const act = e.target.dataset.act;
   if (act && cityState) CTL[act]();

@@ -6,9 +6,8 @@ stats once the city bundle is cached. PNG via Pillow when available; returns Non
 otherwise so the caller falls back to the static card — keeping the CLI install at
 its two declared deps while the hosted demo (which adds Pillow) gets rich cards.
 """
-import re
-
 from . import forge as forge_mod
+from .forge import owner_repo
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -18,11 +17,6 @@ except ImportError:                              # CLI installs ship fastapi+uvi
 PLUM, PLUM2, CREAM, GOLD, PINK = (36, 16, 32), (61, 24, 50), (249, 239, 227), (212, 169, 83), (199, 122, 170)
 # size label by district count — a taxonomy, not a tuned threshold; explicit cuts read clearly
 SIZE_LADDER = [(400, "a metropolis"), (120, "a city"), (30, "a town"), (0, "a village")]
-
-
-def owner_repo(url: str) -> tuple[str | None, str | None]:
-    m = re.match(r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$", url or "")
-    return (m.group(1), m.group(2)) if m else (None, None)
 
 
 def stats(url: str) -> dict | None:

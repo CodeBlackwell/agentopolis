@@ -5,9 +5,10 @@
 const tlCanvas = document.getElementById('map');
 const tlCtx = tlCanvas.getContext('2d');
 const cam = { ox: 0, oy: 0, s: 1 };
+const FIT = [150, 30, 1.18];                               // City.fit (pad, margin, zoom) for the movie view
 let state = null, commits = [], births = [], mods = [], deaths = [], bornAt = new Map(), props = [];
 // match backing store to box × DPR; on resize re-fit the current epoch's village to the new shape
-autosizeCanvas(tlCanvas, () => { if (state) City.fit(cam, tlCanvas, state, 150, 30, 1.18); })();
+autosizeCanvas(tlCanvas, () => { if (state) City.fit(cam, tlCanvas, state, ...FIT); })();
 let groundFinal = null, groundBirth = null, decaySpan = 0;
 let layouts = [], epochIndex = -1;                        // one fixed layout per formation epoch
 let reformShown = -1;                                      // last epoch the Re-Form card auto-scrolled to (snap on new only)
@@ -407,12 +408,12 @@ function setEpoch(ei) {
     b.heightScale = p.heightScale; b.lit = p.lit; b.billboard = p.billboard; b.hub = p.hub; b.debt = p.debt;
     if (b.death !== undefined) b._sapling = { kind: 'tree', x: b.x, y: b.y, seed: City.hash(b.path), sapling: true };
   }
-  City.fit(cam, tlCanvas, state, 150, 30, 1.18);
+  City.fit(cam, tlCanvas, state, ...FIT);
 }
 
 // ---- formation transition: an animated demolish-and-rebuild between two epoch layouts ----
 const ease = u => u * u * (3 - 2 * u);
-const fitScale = st => { const c = {}; City.fit(c, tlCanvas, st, 150, 30, 1.18); return c.s; };
+const fitScale = st => { const c = {}; City.fit(c, tlCanvas, st, ...FIT); return c.s; };
 const applyVis = (b, p) => { b.foot = p.foot; b.color = p.color; b.form = p.form; b.arch = p.arch;
   b.heightScale = p.heightScale; b.lit = p.lit; b.billboard = p.billboard; b.hub = p.hub; b.debt = p.debt; };
 function centerOn(c, gx, gy, bias = 30) {                 // keep grid point (gx,gy) screen-centred at any scale
@@ -646,7 +647,7 @@ let intro = null, introLast = 0;
 function startIntro() {
   if (!savedCam) return;
   cam.rot = savedCam.rot;
-  City.fit(cam, tlCanvas, state, 150, 30, 1.18);          // recentre the village for the adopted orientation = target
+  City.fit(cam, tlCanvas, state, ...FIT);          // recentre the village for the adopted orientation = target
   intro = { fx: savedCam.ox, fy: savedCam.oy, fs: savedCam.s, tx: cam.ox, ty: cam.oy, ts: cam.s, t: 0 };
   cam.ox = savedCam.ox; cam.oy = savedCam.oy; cam.s = savedCam.s;   // ...but start where the live view left off
   introLast = 0;
@@ -809,15 +810,15 @@ function buildTransport() {
     #transport select{flex:0 0 auto;background:var(--plum-soft);color:var(--cream);border:1px solid var(--gold);font:inherit}
     #tl-label{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}
     #tl-exit{width:auto;padding:0 9px}
-    /* date stamp rides the top of the canvas, center-right, lightly faded — synced to the playhead */
-    #tl-date{position:absolute;top:14px;left:38%;right:18px;z-index:4;pointer-events:none;text-align:center;
+    /* date stamp rides the top-right of the canvas, hugging the edge so it clears the title — synced to the playhead */
+    #tl-date{position:absolute;top:14px;right:18px;z-index:4;pointer-events:none;text-align:right;
       font-family:'Silkscreen',monospace;font-size:13px;letter-spacing:.07em;color:var(--cream);
       opacity:.5;text-shadow:0 2px 7px rgba(0,0,0,.75)}
     /* phones: trim to the video-player essentials (play / scrub / speed / exit), bigger touch targets */
-    @media (max-width:720px){#transport{gap:7px;padding:8px 10px;font-size:11px}
-      #transport button{width:40px;height:36px}#tl-trans,#tl-shape,#tl-label{display:none}
-      #tl-seek{min-width:90px}#tl-exit{padding:0 12px}
-      #tl-date{font-size:10px;top:10px;left:26%}}`;
+    @media (max-width:720px){#transport{gap:6px;padding:8px 8px;font-size:11px}
+      #transport button{width:36px;height:36px}#tl-trans,#tl-shape,#tl-label{display:none}
+      #tl-track{min-width:50px}#tl-seek{min-width:0}#tl-exit{padding:0 9px}
+      #tl-date{font-size:10px;top:10px}}`;
   document.head.appendChild(document.createElement('style')).textContent = css;
   const bar = document.createElement('div');
   bar.id = 'transport';
@@ -1156,7 +1157,7 @@ function zoom(k, mx = tlCanvas.width / 2, my = tlCanvas.height / 2) {
 function rotate(d) { cam.rot = ((cam.rot || 0) + (d > 0 ? 1 : 7)) % 8; }
 const CTL = { 'rot-': () => rotate(-1), 'rot+': () => rotate(1),
   'zoom+': () => zoom(1.18), 'zoom-': () => zoom(1 / 1.18),
-  'reset': () => { cam.rot = 0; City.fit(cam, tlCanvas, state, 150, 30, 1.18); } };
+  'reset': () => { cam.rot = 0; City.fit(cam, tlCanvas, state, ...FIT); } };
 document.getElementById('mapctl').addEventListener('click', e => {
   const act = e.target.dataset.act; if (act && state) CTL[act]();
 });

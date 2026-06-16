@@ -1,6 +1,7 @@
 // Environment for Agentopolis City: ground fabric, waterfront, horizon, street props.
 const CityScape = (() => {
   const { proj, hash, near } = City;
+  const NIGHT = '#1a0a16', SHADOW = '#2b2230';   // street-prop ink + shadow, reused across every sprite
 
   function tile(ctx, cam, x, y, fill) {
     const a = proj(cam, x, y), b = proj(cam, x + 1, y), c = proj(cam, x + 1, y + 1), d = proj(cam, x, y + 1);
@@ -132,7 +133,7 @@ const CityScape = (() => {
       ctx.fillRect(sx - 4 * s, base - 10 * s, 8 * s, 3 * s);
       ctx.fillStyle = '#9fd8e8';
       ctx.fillRect(sx - 3 * s, base - 9.5 * s, 3 * s, 2.5 * s);
-      ctx.fillStyle = '#1a0a16';
+      ctx.fillStyle = NIGHT;
       ctx.fillRect(sx - 6 * s, base - 2.5 * s, 3 * s, 2.5 * s);
       ctx.fillRect(sx + 3 * s, base - 2.5 * s, 3 * s, 2.5 * s);
     } else if (p.kind === 'lamp') {
@@ -154,11 +155,11 @@ const CityScape = (() => {
                           tip: state.graveTip, scroll: true }, s);
     } else if (p.kind === 'cow') {                          // grazing cow, black-and-white
       const f = p.seed % 2 ? 1 : -1;
-      ctx.fillStyle = '#2b2230';
+      ctx.fillStyle = SHADOW;
       for (const dx of [-4, -1.5, 1.5, 4]) ctx.fillRect(sx + dx * s, base - 2.5 * s, 1.2 * s, 2.5 * s);
       ctx.fillStyle = '#efe9e2';
       ctx.fillRect(sx - 5 * s, base - 6 * s, 10 * s, 4 * s);
-      ctx.fillStyle = '#2b2230';
+      ctx.fillStyle = SHADOW;
       ctx.fillRect(sx - 3 * s, base - 5.5 * s, 2.5 * s, 2 * s);
       ctx.fillRect(sx + 1.5 * s, base - 6 * s, 2 * s, 2.5 * s);
       ctx.fillStyle = '#efe9e2';
@@ -215,7 +216,7 @@ const CityScape = (() => {
       ctx.beginPath();
       ctx.moveTo(sx - 5 * s, base); ctx.lineTo(sx + 5 * s, base);
       ctx.lineTo(sx + 3 * s, capY); ctx.lineTo(sx - 3 * s, capY); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#1a0a16';
+      ctx.fillStyle = NIGHT;
       ctx.fillRect(sx - 1.5 * s, base - 7 * s, 3 * s, 7 * s);   // doorway
       ctx.fillStyle = '#8a3a2e';
       ctx.beginPath(); ctx.moveTo(sx - 4 * s, capY); ctx.lineTo(sx + 4 * s, capY); ctx.lineTo(sx, capY - 6 * s); ctx.closePath(); ctx.fill();
@@ -231,7 +232,7 @@ const CityScape = (() => {
         ctx.lineTo(ex, ey); ctx.lineTo(ex - Math.sin(a) * 3 * s, ey + Math.cos(a) * 3 * s);
         ctx.closePath(); ctx.fill();
       }
-      ctx.fillStyle = '#2b2230';
+      ctx.fillStyle = SHADOW;
       ctx.beginPath(); ctx.arc(hx, hy, 1.8 * s, 0, Math.PI * 2); ctx.fill();
     } else if (p.kind === 'watertower') {                   // small-town landmark: tank on splayed legs
       const ty = base - 22 * s;
@@ -299,7 +300,7 @@ const CityScape = (() => {
       const wx = w.sx, wb = w.sy + 6 * s, bob = Math.abs(Math.sin(t / (150 + p.seed % 110) + p.seed)) * 1.2 * s;
       ctx.fillStyle = SHIRTS[p.seed % SHIRTS.length];        // torso
       ctx.fillRect(wx - 1.4 * s, wb - 5 * s - bob, 2.8 * s, 3.2 * s);
-      ctx.fillStyle = '#1a0a16';                            // legs
+      ctx.fillStyle = NIGHT;                            // legs
       ctx.fillRect(wx - 1.4 * s, wb - 2 * s - bob, 1.1 * s, 2 * s);
       ctx.fillRect(wx + .3 * s, wb - 2 * s - bob, 1.1 * s, 2 * s);
       ctx.fillStyle = '#e8b88a';                            // head
@@ -315,7 +316,7 @@ const CityScape = (() => {
       ctx.fillRect(csx - 4 * s, cb - 10 * s, 8 * s, 3 * s);
       ctx.fillStyle = '#9fd8e8';
       ctx.fillRect(csx - 3 * s, cb - 9.5 * s, 3 * s, 2.5 * s);
-      ctx.fillStyle = '#1a0a16';
+      ctx.fillStyle = NIGHT;
       ctx.fillRect(csx - 6 * s, cb - 2.5 * s, 3 * s, 2.5 * s);
       ctx.fillRect(csx + 3 * s, cb - 2.5 * s, 3 * s, 2.5 * s);
       ctx.globalAlpha = ga;
@@ -357,7 +358,7 @@ const CityScape = (() => {
         ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
       }
     } else if (p.kind === 'steam') {                        // a street vent venting puffs
-      ctx.fillStyle = '#2b2230';
+      ctx.fillStyle = SHADOW;
       ctx.fillRect(sx - 3 * s, base - 1.5 * s, 6 * s, 2 * s);
       for (let i = 0; i < 3; i++) {
         const k = (t / (1300 + p.seed % 800) + i / 3 + p.seed) % 1, r = (2 + 4 * k) * s;
@@ -367,7 +368,7 @@ const CityScape = (() => {
     } else if (p.kind === 'crow') {                         // a bird wheeling over the graveyard, wings flapping
       const a = t / (820 + p.seed % 620) + p.seed, o = proj(cam, p.x + Math.cos(a) * 2.2, p.y + Math.sin(a) * 1.4);
       const cx = o.sx, cy = o.sy - (16 + Math.sin(t / (500 + p.seed % 280) + p.seed) * 4) * s, flap = Math.sin(t / (70 + p.seed % 50) + p.seed) * 3 * s;
-      ctx.strokeStyle = '#1a0a16';
+      ctx.strokeStyle = NIGHT;
       ctx.lineWidth = Math.max(1, 1.2 * s);
       ctx.beginPath();
       ctx.moveTo(cx - 4 * s, cy + flap); ctx.lineTo(cx, cy); ctx.lineTo(cx + 4 * s, cy + flap); ctx.stroke();
@@ -410,7 +411,7 @@ const CityScape = (() => {
       const p = proj(cam, x + .15, y), seed = hash(dep);
       ctx.fillStyle = CARS[seed % CARS.length];
       ctx.fillRect(p.sx - 8 * s, p.sy - 9 * s, 16 * s, 7 * s);
-      ctx.fillStyle = '#1a0a16';
+      ctx.fillStyle = NIGHT;
       ctx.fillRect(p.sx - 6 * s, p.sy - 2.5 * s, 3 * s, 2.5 * s);
       ctx.fillRect(p.sx + 3 * s, p.sy - 2.5 * s, 3 * s, 2.5 * s);
       hit(ctx, state, { x0: p.sx - 8 * s, x1: p.sx + 8 * s, y0: p.sy - 9 * s, y1: p.sy,
@@ -419,13 +420,13 @@ const CityScape = (() => {
     const ey = at(0);
     if (ey >= .5 && ey <= state.H - 1) {                    // locomotive
       const p = proj(cam, x + .15, ey);
-      ctx.fillStyle = '#2b2230';
+      ctx.fillStyle = SHADOW;
       ctx.fillRect(p.sx - 9 * s, p.sy - 10 * s, 18 * s, 8 * s);
       ctx.fillStyle = '#5a2c4d';
       ctx.fillRect(p.sx - 8 * s, p.sy - 14 * s, 7 * s, 4 * s);
       ctx.fillStyle = `rgba(255,214,120,${.6 + .3 * Math.sin(t / 300)})`;
       ctx.fillRect(p.sx + 7 * s, p.sy - 8 * s, 2.5 * s, 2.5 * s);
-      ctx.fillStyle = '#1a0a16';
+      ctx.fillStyle = NIGHT;
       ctx.fillRect(p.sx - 6 * s, p.sy - 2.5 * s, 3 * s, 2.5 * s);
       ctx.fillRect(p.sx + 3 * s, p.sy - 2.5 * s, 3 * s, 2.5 * s);
       for (let i = 0; i < 3; i++) {                         // smoke puffs
@@ -482,7 +483,7 @@ const CityScape = (() => {
       const p = proj(cam, tx, state.H + 2.4);
       tx += 5 + cols;                                       // bigger stacks get a wider berth
       const sy = p.sy + Math.sin(t / 1200 + i * 2.1) * 1.5 * s;
-      ctx.fillStyle = '#2b2230';                            // hull
+      ctx.fillStyle = SHADOW;                            // hull
       ctx.fillRect(p.sx - hullW * s, sy, hullW * 2 * s, 9 * s);
       ctx.fillStyle = '#d8c5a0';                            // bridge
       ctx.fillRect(p.sx + (hullW - 8) * s, sy - 8 * s, 7 * s, 8 * s);

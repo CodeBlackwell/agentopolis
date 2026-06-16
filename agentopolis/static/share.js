@@ -142,7 +142,7 @@ function mount() {
   if (!ctl || document.getElementById('share')) return;
   const btn = document.createElement('button');
   btn.id = 'share'; btn.className = 'wide'; btn.title = 'share this city';
-  btn.innerHTML = '&#8682; share';
+  btn.innerHTML = '<span class="ico">&#8682;</span>share';
   btn.onclick = () => openMenu(btn);
   ctl.appendChild(btn);
 }

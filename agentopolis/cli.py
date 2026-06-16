@@ -71,6 +71,17 @@ def free_port(port: int) -> None:
             time.sleep(.1)
 
 
+def serve(port: int) -> None:
+    # SSE streams end on client disconnect / lifespan shutdown; the graceful-shutdown
+    # timeout is the backstop that force-closes any still-open stream on Ctrl+C
+    runner = uvicorn.Server(uvicorn.Config(server.app, port=port,
+                                           log_level="warning", timeout_graceful_shutdown=2))
+    try:
+        runner.run()
+    except KeyboardInterrupt:               # uvicorn re-raises the Ctrl+C after shutdown
+        pass
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="agentopolis",
@@ -78,9 +89,10 @@ def main() -> None:
                     "replay its git history as a time-lapse movie, or crawl a folder of repos for the "
                     "best movies.")
     parser.add_argument("command", nargs="?", default="serve",
-                        choices=["serve", "movie", "marathon", "crawl", "attach", "detach"],
-                        help="serve the live city (default), play one repo's movie, run a marathon of every "
-                             "repo's movie, crawl a folder for the best movies, or attach/detach hooks")
+                        choices=["serve", "movie", "marathon", "crawl", "attach", "detach", "."],
+                        help="serve the live city (default), `.` to serve with hooks auto-attached + removed "
+                             "on exit, play one repo's movie, run a marathon of every repo's movie, crawl a "
+                             "folder for the best movies, or attach/detach hooks")
     parser.add_argument("target", nargs="?",
                         help="for `movie`: a local repo dir or a github url; for `marathon`/`crawl`: a "
                              "folder of repos to scan (default: current dir)")
@@ -93,6 +105,9 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=4242)
     parser.add_argument("--no-open", action="store_true", help="don't open the city in a browser")
     args = parser.parse_args()
+    auto_hooks = args.command == "."     # `agentopolis .` — attach on start, serve, detach on exit (zero setup)
+    if auto_hooks:
+        args.command = "serve"
 
     if args.command == "attach":
         hooks.attach(args.port)
@@ -126,23 +141,24 @@ def main() -> None:
             server.configure_nation(root, None)
         where, label = (f"nation: {root}", "Nation") if root else (f"repo: {args.repo}", "City")
 
+    auto_attached = auto_hooks and not hooks.is_attached()   # only detach hooks WE added, not a manual attach
+    if auto_attached:
+        hooks.attach(args.port)
+
     free_port(args.port)
     url = f"http://localhost:{args.port}"
     print(f"Agentopolis {label} on {url} ({where})")
     if args.command != "movie" and not hooks.is_attached():
-        print("tip: run `agentopolis attach` so Claude Code sessions report to the city")
+        print("tip: run `agentopolis attach` (or `agentopolis .`) so Claude Code sessions report to the city")
     if not args.no_open:
         opener = threading.Timer(1, lambda: webbrowser.open(url + open_path))
         opener.daemon = True
         opener.start()
-    # SSE streams end on client disconnect / lifespan shutdown; the graceful-shutdown
-    # timeout is the backstop that force-closes any still-open stream on Ctrl+C
-    runner = uvicorn.Server(uvicorn.Config(server.app, port=args.port,
-                                           log_level="warning", timeout_graceful_shutdown=2))
     try:
-        runner.run()
-    except KeyboardInterrupt:               # uvicorn re-raises the Ctrl+C after shutdown
-        pass
+        serve(args.port)
+    finally:
+        if auto_attached:
+            hooks.detach()
 
 
 def run_crawl(root: str, as_json: bool) -> None:
@@ -204,12 +220,7 @@ def run_marathon(root: str, port: int, no_open: bool, top: int | None) -> None:
         opener = threading.Timer(1, lambda: webbrowser.open(url + "/?marathon"))
         opener.daemon = True
         opener.start()
-    runner = uvicorn.Server(uvicorn.Config(server.app, port=port,
-                                           log_level="warning", timeout_graceful_shutdown=2))
-    try:
-        runner.run()
-    except KeyboardInterrupt:
-        pass
+    serve(port)
 
 
 def configure_movie(args) -> bool:

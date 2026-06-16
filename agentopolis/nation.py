@@ -17,25 +17,6 @@ from .seed import git, tracked
 PALETTE = ["#16a085", "#5b8dd9", "#c0395b", "#d4a953", "#8e5d9f",
            "#b5651d", "#2980b9", "#4a6b5c", "#c9b78a", "#5c6b73"]
 
-FAMILY_NAMES = {
-    "backend":   "Logic Highlands",
-    "frontend":  "Interface Coast",
-    "fullstack": "The Crossroads",
-    "infra":     "Iron Province",
-    "data":      "The Mines",
-    "docs":      "The Scriptorium",
-    "neutral":   "The Hinterlands",
-}
-FAMILY_COLOR = {
-    "backend":   "#2980b9",
-    "frontend":  "#27ae60",
-    "fullstack": "#16a085",
-    "infra":     "#7f8c8d",
-    "data":      "#d4a953",
-    "docs":      "#c9b78a",
-    "neutral":   "#7d6b8a",
-}
-
 # province biome by the shape a city grows into (chooseFormation) — the nation groups by architecture,
 # which is what Agentopolis teaches. Names/colors are defaults; a manifest can rename per state id.
 FORMATION_NAMES = {

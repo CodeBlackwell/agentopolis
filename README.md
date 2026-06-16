@@ -21,10 +21,9 @@ pan/zoom. The city re-seeds itself from git whenever HEAD moves.
 ```bash
 uv tool install agentopolis         # or: pipx install agentopolis
                                     # or: brew install codeblackwell/tap/agentopolis
-agentopolis attach                  # one-time: fire-and-forget hooks into ~/.claude/settings.json
 
 cd ~/code/any-repo
-agentopolis                         # its city on http://localhost:4242
+agentopolis .                       # zero-setup: hooks attached, city on :4242, hooks removed on exit
 
 agentopolis movie                   # replay this repo's git history as a growing city
 agentopolis movie ../other-repo     # …or any local repo
@@ -34,10 +33,16 @@ agentopolis crawl ~/code            # rank a folder of repos by movie potential
 agentopolis marathon ~/code         # play every repo's movie back-to-back, with a selection bar
 ```
 
-Open http://localhost:4242, then start any Claude Code session — new sessions
-report in automatically. No live session handy? http://localhost:4242/?demo
-runs a scripted day in the city. `agentopolis detach` removes the hooks (a backup
-of settings.json is written on attach). Flags: `--repo`, `--port`, `--zone`.
+`agentopolis .` is the one-command path: it attaches the Claude Code hooks on
+start and removes them again when you quit (Ctrl+C) — no separate setup or
+teardown. Open http://localhost:4242, then start any Claude Code session and it
+reports in automatically. No live session handy? http://localhost:4242/?demo
+runs a scripted day in the city.
+
+Prefer persistent hooks? `agentopolis attach` wires them once (a backup of
+settings.json is written), `agentopolis` then just serves, and `agentopolis
+detach` removes them. `agentopolis .` leaves a manual attach untouched. Flags:
+`--repo`, `--port`, `--zone`.
 
 **First visit?** A guided onboarding tour spotlights each part of the interface,
 narrated by a pixel "Chief of Staff" — replay it anytime from the ⭐ badge. See
