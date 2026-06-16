@@ -8,6 +8,14 @@ dev:
     @sleep 1 && open http://localhost:4242 &
     exec env AGENTOPOLIS_ROOT=.. .venv/bin/uvicorn agentopolis.server:app --reload --reload-dir agentopolis --port 4242 --log-level warning --timeout-graceful-shutdown 1
 
+# Run the hosted landing interface locally on http://localhost:4245 — baked showcase fixtures, no live git.
+# Mirrors the Dockerfile. Run `just bake` first if agentopolis/showcase/ is missing.
+landing demo="methodproof":
+    -lsof -ti :4245 | xargs kill -9 2>/dev/null
+    @echo "Agentopolis Landing on http://localhost:4245 (showcase: {{demo}})"
+    @sleep 1 && open http://localhost:4245 &
+    exec env AGENTOPOLIS_SHOWCASE=agentopolis/showcase AGENTOPOLIS_DEMO_CITY={{demo}} .venv/bin/uvicorn agentopolis.server:app --reload --reload-dir agentopolis --port 4245 --log-level warning --timeout-graceful-shutdown 1
+
 # Serve one repo as a city on http://localhost:4243 (small/simple repos render as a village). e.g. `just town ../AURA`
 town repo=".":
     -lsof -ti :4243 | xargs kill -9 2>/dev/null
