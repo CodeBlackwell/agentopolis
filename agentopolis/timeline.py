@@ -31,6 +31,9 @@ def decimate(commits: list[dict]) -> list[dict]:
 
 
 def build_timeline(repo: str) -> dict:
+    # -M folds a file's whole history onto one building across renames/moves. It needs blob content:
+    # cheap on a full local clone, but ~100x slower on a blob:none partial clone (it refetches blobs
+    # over the network — measured 0.4s vs 56s on fastapi). The forge path full-clones for this; see forge.py.
     log = git(repo, "log", "--reverse", "--first-parent", "-M",
               "--name-status", "--pretty=format:%x00%ct%x1f%an%x1f%s")
     commits: list[dict] = []

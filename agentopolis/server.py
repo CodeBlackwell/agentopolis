@@ -195,19 +195,17 @@ def forge_city(url: str):
 
 
 @app.get("/forge-timelapse")
-def forge_timelapse_city(url: str):              # full-history clone → {data, timeline} bundle
-    if (hit := forge_mod.peek_tl(url)) is not None:
-        return hit
-    if not forge_gate.acquire(blocking=False):
-        return Response(status_code=429)
+def forge_timelapse_city(url: str):              # NDJSON: clone-progress lines, then the {data, timeline} bundle
+    if (hit := forge_mod.peek_tl(url)) is not None:                     # cached: one bundle line, instant
+        return StreamingResponse(iter([json.dumps(hit) + "\n"]), media_type="application/x-ndjson")
     try:
-        return forge_mod.forge_timelapse(url)
+        forge_mod.clone_url(url)                                        # validate before taking the gate
     except ValueError:
         return Response(status_code=400)
-    except Exception:
-        return Response(status_code=502)
-    finally:
-        forge_gate.release()
+    if not forge_gate.acquire(blocking=False):
+        return Response(status_code=429)
+    return StreamingResponse(forge_mod.forge_timelapse_stream(url, forge_gate.release),
+                             media_type="application/x-ndjson")
 
 
 @app.get("/marathon/movie/{mid}")

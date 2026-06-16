@@ -2,9 +2,11 @@
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -113,21 +115,55 @@ def forge(url: str) -> dict:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def forge_timelapse(url: str) -> dict:
-    """Like forge() but keeps full history (no --depth 1) so the time-lapse can replay it.
-    blob:none still skips file-content history; the HEAD checkout fetches the blobs seed() reads."""
-    hit = _load(url, "tl", forged_tl)
-    if hit is not None:
-        return hit
-    src = clone_url(url)
-    tmp = tempfile.mkdtemp(prefix="agentopolis-tl-")
+_PROGRESS = re.compile(r"(Receiving objects|Resolving deltas):\s+(\d+)%")
+
+
+def _clone_progress(src: str, tmp: str, timeout: int = 120):
+    """Full clone (all blobs, no --depth/--filter) so build_timeline's -M rename detection stays local.
+    A full clone is git's own parallel packfile download — measured ~6x faster end-to-end than a
+    blob:none clone whose history walk then refetches blobs one batch at a time (11s vs 64s on fastapi).
+    Yields clone percent parsed from git --progress (\\r-separated on stderr): Receiving is the network
+    download (the real wait, 0–0.85), Resolving is the CPU tail (0.85–1.0). Raises on failure/timeout."""
+    proc = subprocess.Popen(["git", "clone", "--progress", "--single-branch", src, tmp],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    start, buf, last = time.time(), "", -1.0
+    while chunk := proc.stderr.read(256):
+        if time.time() - start > timeout:
+            proc.kill()
+            raise RuntimeError("clone timed out")
+        buf += chunk
+        parts = re.split(r"[\r\n]", buf)
+        buf = parts.pop()
+        for part in parts:
+            if m := _PROGRESS.search(part):
+                pct = int(m.group(2)) / 100
+                frac = round(pct * 0.85 if m.group(1).startswith("Receiving") else 0.85 + pct * 0.15, 3)
+                if frac != last:
+                    last = frac
+                    yield json.dumps({"progress": frac, "phase": "clone"}) + "\n"
+    proc.wait()
+    if proc.returncode:
+        raise RuntimeError("clone failed")
+
+
+def forge_timelapse_stream(url: str, release):
+    """Streaming forge: NDJSON clone-progress lines, then the final {data, timeline} bundle line.
+    `release` frees the concurrency gate the endpoint acquired, once the whole stream is done."""
     try:
-        subprocess.run(["git", "clone", "--single-branch", "--filter=blob:none", src, tmp],
-                       capture_output=True, timeout=120, check=True)
-        # walk_history=False: the movie derives commits/centrality/dead from the timeline below,
-        # so the one git-history walk is build_timeline's — not four.
-        bundle = {"data": seed(tmp, load_zone(tmp, None), walk_history=False),
-                  "timeline": build_timeline(tmp)}
-        return _save(url, "tl", forged_tl, bundle)
+        src = clone_url(url)
+        tmp = tempfile.mkdtemp(prefix="agentopolis-tl-")
+        try:
+            yield from _clone_progress(src, tmp)
+            yield json.dumps({"progress": 0.92, "phase": "seed"}) + "\n"
+            # walk_history=False: the movie derives commits/centrality/dead from the timeline below,
+            # so the one git-history walk is build_timeline's — not four.
+            bundle = {"data": seed(tmp, load_zone(tmp, None), walk_history=False),
+                      "timeline": build_timeline(tmp)}
+            _save(url, "tl", forged_tl, bundle)
+            yield json.dumps(bundle) + "\n"
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    except Exception:
+        yield json.dumps({"error": "forge failed"}) + "\n"
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        release()

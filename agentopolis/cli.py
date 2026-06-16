@@ -213,8 +213,8 @@ def run_marathon(root: str, port: int, no_open: bool, top: int | None) -> None:
 
 
 def configure_movie(args) -> bool:
-    """Set up movie mode for a local repo dir or a github url. github urls download the minimum git data
-    (blob:none clone → temp, removed after seeding) and the city is held in memory only."""
+    """Set up movie mode for a local repo dir or a github url. github urls are cloned to a temp dir
+    (removed after seeding) and the city is held in memory only."""
     target = args.target or args.repo
     if is_url(target):
         try:

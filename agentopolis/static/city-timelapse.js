@@ -37,7 +37,10 @@ try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');
   }
   const loading = showLoading();
   let resp;
-  try { const r = await fetch(citySrc); if (!r.ok) throw r.status; resp = await r.json(); }
+  try {
+    const r = await fetch(citySrc); if (!r.ok) throw r.status;
+    resp = isForge ? await readForgeStream(r, loading) : await r.json();  // forge streams clone progress
+  }
   catch (e) {                                             // forge clone failed / too large / gate busy → quick city
     const m = citySrc.match(/url=(.+)$/);
     if (isForge && m) { location.href = '/?forge=' + m[1] + '&static'; return; }
@@ -71,16 +74,83 @@ try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');
 
 const autoSpeed = () => Math.max(3, Math.min(120, commits.length / 20));   // commits per second
 
+// A hard-hat pixel worker — the forge's own sprite (NOT the tour aide). Drawn 1x into a 28x34 grid,
+// canvas backed x3 + image-rendering:pixelated for crisp blocks; same technique as tour.js drawAide.
+function drawForgeWorker(canvas) {
+  const S = 3, c = canvas.getContext('2d');
+  canvas.width = 28 * S; canvas.height = 34 * S;
+  c.scale(S, S);
+  const p = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+  const GOLD = '#d4a953', SKIN = '#f0c8a0', PLUM = '#4f2a48', PLUM_D = '#3a1d36',
+        CREAM = '#f9efe3', DARK = '#241018', STEEL = '#b8b8c2';
+  p(7, 31, 14, 3, 'rgba(0,0,0,.28)');                      // floor shadow
+  p(9, 29, 4, 3, DARK); p(15, 29, 4, 3, DARK);             // boots
+  p(9, 21, 4, 9, PLUM_D); p(15, 21, 4, 9, PLUM_D);         // overall legs
+  p(8, 13, 12, 9, PLUM);                                   // overall torso
+  p(10, 13, 2, 9, GOLD); p(16, 13, 2, 9, GOLD);            // hi-vis straps
+  p(8, 12, 12, 2, CREAM);                                  // shirt collar
+  p(6, 14, 3, 7, SKIN); p(19, 14, 3, 6, SKIN);             // arms
+  p(19, 19, 3, 2, CREAM);                                  // glove gripping the haft
+  p(20, 15, 2, 7, DARK); p(18, 12, 6, 3, STEEL);           // sledgehammer shouldered (haft + head)
+  p(10, 5, 8, 8, SKIN);                                    // face
+  p(12, 8, 1, 1, DARK); p(15, 8, 1, 1, DARK);              // eyes
+  p(8, 2, 12, 4, GOLD); p(6, 5, 16, 2, GOLD);              // hard-hat dome + brim
+  p(13, 1, 2, 2, GOLD);                                    // hat ridge
+}
+
 function showLoading() {                                  // shown while a forge repo clones + seeds
   const el = document.createElement('div');
   el.id = 'tl-loading';
   const h = document.querySelector('header h1 .m-city');
-  el.textContent = '⏳ building ' + ((h && h.textContent) || 'the city') + ' …';
-  Object.assign(el.style, { position: 'absolute', inset: '0', display: 'flex', alignItems: 'center',
-    justifyContent: 'center', zIndex: 8, color: '#f9efe3', font: "14px 'Silkscreen', monospace",
-    letterSpacing: '.1em', textShadow: '0 2px 6px rgba(0,0,0,.85)', pointerEvents: 'none' });
+  el._name = (h && h.textContent) || 'the city';
+  const sprite = document.createElement('canvas');
+  drawForgeWorker(sprite);
+  const label = el._label = document.createElement('div');
+  label.textContent = 'cloning ' + el._name + ' …';
+  const track = document.createElement('div');
+  const fill = el._fill = document.createElement('div');
+  track.appendChild(fill); el.append(sprite, label, track);
+  Object.assign(el.style, { position: 'absolute', inset: '0', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center', gap: '12px', zIndex: 8, color: '#f9efe3',
+    font: "14px 'Silkscreen', monospace", letterSpacing: '.1em', textShadow: '0 2px 6px rgba(0,0,0,.85)',
+    pointerEvents: 'none' });
+  Object.assign(sprite.style, { width: '56px', height: '68px', imageRendering: 'pixelated' });
+  Object.assign(track.style, { width: '180px', height: '4px', borderRadius: '2px',
+    background: 'rgba(249,239,227,.18)', overflow: 'hidden' });
+  Object.assign(fill.style, { width: '0%', height: '100%', background: '#f9efe3',
+    transition: 'width .3s linear' });
+  sprite.animate([{ transform: 'translateY(0) rotate(-5deg)' }, { transform: 'translateY(-3px) rotate(5deg)' }],
+    { duration: 560, direction: 'alternate', iterations: Infinity, easing: 'ease-in-out' });  // hammering bob
   (document.querySelector('.mapwrap') || document.body).appendChild(el);
   return el;
+}
+
+// Read the forge NDJSON stream: {progress} lines drive the bar; the final {data, timeline} line is the bundle.
+async function readForgeStream(resp, loading) {
+  const reader = resp.body.getReader(), dec = new TextDecoder();
+  let buf = '';
+  const handle = line => {
+    const msg = JSON.parse(line);
+    if (msg.error) throw msg.error;                        // clone failed / too large → caller falls back to static
+    if (msg.timeline) return msg;                          // the bundle — done
+    if (msg.progress != null) {
+      loading._fill.style.width = Math.round(msg.progress * 100) + '%';
+      if (msg.phase === 'seed') loading._label.textContent = 'raising ' + loading._name + ' …';
+    }
+    return null;
+  };
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+      if (line) { const bundle = handle(line); if (bundle) return bundle; }
+    }
+  }
+  if (buf.trim()) { const bundle = handle(buf.trim()); if (bundle) return bundle; }
+  throw 'no bundle';
 }
 
 const globMatch = (path, g) =>

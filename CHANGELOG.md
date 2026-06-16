@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-06-16
+
+### Added
+- Forging a github url into a movie now streams live clone progress: a pixel
+  hard-hat worker raises the city over a real progress bar fed by `git`'s own
+  receiving/resolving percentages, instead of a frozen "building…" message. The
+  endpoint became a tiny NDJSON stream — progress lines, then the finished
+  `{data, timeline}` bundle (cache hits send the bundle alone, instantly).
+
+### Fixed
+- Forging a movie from a github url was ~6x slower than it needed to be (≈64s →
+  ≈11s on a 7k-commit repo). The time-lapse's history walk uses `-M` rename
+  detection so a file's lineage folds onto one building across moves — but `-M`
+  needs file *contents*, and on a `blob:none` partial clone git refetched those
+  blobs over the network one batch at a time (≈56s of the total, ~82%). The forge
+  now does a full clone — git's own parallel packfile download — so the rename
+  walk reads everything locally (≈0.4s). Exact renames are unchanged. (A
+  hand-rolled parallel chunked walk was prototyped and measured too; git's native
+  clone beat it outright, so it wasn't shipped.)
+
 ## [0.12.0] - 2026-06-16
 
 ### Added
