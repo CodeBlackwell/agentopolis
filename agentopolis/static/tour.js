@@ -194,13 +194,13 @@
       #tour-hole.force{animation:tour-pulse 1.1s ease-in-out infinite}
       @keyframes tour-pulse{0%,100%{box-shadow:0 0 0 9999px rgba(26,10,20,.8),0 0 10px rgba(212,169,83,.5)}
         50%{box-shadow:0 0 0 9999px rgba(26,10,20,.8),0 0 28px 6px rgba(212,169,83,.95)}}
-      /* screening room: the movie IS the content — never wash it dark. The spotlit element reads from its
-         gold outline + glow alone, and the four-panel cutout still gates interaction. */
-      #tour-block.nodim #tour-hole{box-shadow:0 0 22px 3px rgba(212,169,83,.75)}
-      #tour-block.nodim #tour-hole.scrim{box-shadow:none}
+      /* screening room: the movie is the content, so dim it only SOFTLY (the city still reads through) while
+         the gold-outlined spotlight pulls focus; the four-panel cutout still gates interaction. */
+      #tour-block.nodim #tour-hole{box-shadow:0 0 0 9999px rgba(26,10,20,.5),0 0 22px 3px rgba(212,169,83,.75)}
+      #tour-block.nodim #tour-hole.scrim{box-shadow:0 0 0 9999px rgba(26,10,20,.5)}
       #tour-block.nodim #tour-hole.force{animation:tour-pulse-light 1.1s ease-in-out infinite}
-      @keyframes tour-pulse-light{0%,100%{box-shadow:0 0 10px rgba(212,169,83,.6)}
-        50%{box-shadow:0 0 28px 6px rgba(212,169,83,.98)}}
+      @keyframes tour-pulse-light{0%,100%{box-shadow:0 0 0 9999px rgba(26,10,20,.5),0 0 10px rgba(212,169,83,.6)}
+        50%{box-shadow:0 0 0 9999px rgba(26,10,20,.5),0 0 28px 6px rgba(212,169,83,.98)}}
       /* the farewell beat always dims (even in the screening room) so the one-time "replay lives here" pointer lands */
       #tour-block.farewell-dim #tour-hole{box-shadow:0 0 0 9999px rgba(26,10,20,.82),0 0 22px 3px rgba(212,169,83,.85)}
       #tour-card{position:fixed;z-index:42;pointer-events:auto;width:340px;max-width:calc(100vw - 24px);background:var(--plum);
@@ -239,7 +239,7 @@
     document.head.appendChild(document.createElement('style')).textContent = css;
 
     const block = el('div', { id: 'tour-block' });
-    if (screeningRoom) block.classList.add('nodim');          // movie/demo open undimmed so the visualization shows
+    if (screeningRoom) block.classList.add('nodim');          // movie/demo dim only softly so the visualization still reads
     const masks = [0, 1, 2, 3].map(() => el('div', { className: 'tour-mask' }));   // frame the spotlit element
     const hole = el('div', { id: 'tour-hole' });
     const card = el('div', { id: 'tour-card' });
