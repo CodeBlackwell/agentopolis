@@ -48,3 +48,20 @@ function attachTouch(canvas, { pan, pinch, tap, hold }) {
   });
   canvas.addEventListener('touchcancel', () => { clearHold(); last = null; pinchDist = 0; });
 }
+
+// Size a canvas's backing store to its CSS box × devicePixelRatio so the view fills the frame
+// (no letterbox) and renders crisp on retina/phone screens. Every engine works in backing-store
+// pixels and already maps input by the box ratio, so resizing these dims is all that's needed for
+// fit()/draw/picking to adapt — onResize just re-fits the camera to the new shape. DPR is capped
+// at 2 so dense phone screens don't multiply fill-rate and drop frames. Returns a manual apply().
+function autosizeCanvas(canvas, onResize) {
+  const apply = () => {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
+    if (!w || !h || (canvas.width === w && canvas.height === h)) return;
+    canvas.width = w; canvas.height = h;
+    if (onResize) onResize();
+  };
+  new ResizeObserver(apply).observe(canvas);
+  return apply;
+}

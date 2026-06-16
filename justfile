@@ -23,9 +23,10 @@ movie repo=".":
     @sleep 1 && case "{{repo}}" in http*) open "http://localhost:4244/?forge={{repo}}&timelapse";; *) open "http://localhost:4244/?timelapse";; esac &
     @case "{{repo}}" in http*) R="." ;; *) R="{{repo}}" ;; esac; exec env AGENTOPOLIS_REPO="$R" .venv/bin/uvicorn agentopolis.server:app --reload --reload-dir agentopolis --port 4244 --log-level warning --timeout-graceful-shutdown 1
 
-# Re-bake the BLACKBOX showcase fixtures (run before deploy when repos change)
-bake:
-    .venv/bin/python -m agentopolis.bake
+# Re-bake the BLACKBOX showcase fixtures (run before deploy when repos change).
+# DEMO_CITY matches the Dockerfile so the landing city also gets its grow-from-start movie timeline.
+bake demo="SPICE":
+    AGENTOPOLIS_DEMO_CITY={{demo}} .venv/bin/python -m agentopolis.bake
 
 # Deploy the hosted demo to Hetzner. Fixtures (private project data) never touch
 # public git — they rsync straight to the host between the pull and the rebuild.

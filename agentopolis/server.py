@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import forge as forge_mod
@@ -165,8 +165,9 @@ def city_data(repo: str | None = None):
 
 @app.get("/timeline.json")
 def timeline_data(repo: str | None = None):
-    if showcase["dir"]:                             # baked fixtures have no live git to walk
-        return Response(status_code=404)
+    if d := showcase["dir"]:                         # baked fixtures: only the demo city has a baked timeline
+        f = Path(d) / "timelines" / ((repo or "_capital").replace("/", "%2F") + ".json")
+        return json.loads(f.read_text()) if f.exists() else Response(status_code=404)
     root = nation["root"]
     if repo:                                        # nation drill-down, mirrors /city-data.json
         if root and repo == CAPITAL and is_mother(root):
@@ -215,6 +216,26 @@ def marathon_movie(mid: str):                    # in-memory {data, timeline} bu
     return bundle if bundle is not None else Response(status_code=404)
 
 
+@app.post("/og")                                 # the browser uploads a captured skyline PNG for a shared link
+async def og_upload(key: str, request: Request):
+    if not request.headers.get("content-type", "").startswith("image/png"):
+        return Response(status_code=400)
+    body = await request.body()
+    try:
+        return {"ok": True, "hash": forge_mod.save_og(key, body)}
+    except ValueError:
+        return Response(status_code=400)
+
+
+@app.get("/og/{name}")                           # serve a cached skyline PNG (name = <16-hex>.png)
+def og_image(name: str):
+    h = name[:-4] if name.endswith(".png") else name
+    if len(h) != 16 or any(c not in "0123456789abcdef" for c in h):   # hash only — no path traversal
+        return Response(status_code=404)
+    p = forge_mod.OG_DIR / f"{h}.png"
+    return FileResponse(p, media_type="image/png") if p.exists() else Response(status_code=404)
+
+
 @app.get("/events")
 async def events(request: Request) -> StreamingResponse:
     queue: asyncio.Queue = asyncio.Queue()
@@ -252,6 +273,24 @@ async def no_stale_assets(request: Request, call_next):
     return response
 
 
+def _og_block(title: str, desc: str, img: str, url: str) -> str:
+    e = lambda s: s.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
+    t, d, i, u = e(title), e(desc), e(img), e(url)
+    return (f'<link rel="canonical" href="{u}">\n'
+            f'<meta property="og:type" content="website">\n'
+            f'<meta property="og:url" content="{u}">\n'
+            f'<meta property="og:title" content="{t}">\n'
+            f'<meta property="og:description" content="{d}">\n'
+            f'<meta property="og:image" content="{i}">\n'
+            f'<meta property="og:image:width" content="1200">\n'
+            f'<meta property="og:image:height" content="630">\n'
+            f'<meta property="og:image:alt" content="{t}">\n'
+            f'<meta name="twitter:card" content="summary_large_image">\n'
+            f'<meta name="twitter:title" content="{t}">\n'
+            f'<meta name="twitter:description" content="{d}">\n'
+            f'<meta name="twitter:image" content="{i}">')
+
+
 @app.get("/")
 def root(request: Request) -> HTMLResponse:
     # one shell, two map engines. ?forge=<github url> opens the city engine on the forge endpoint.
@@ -263,6 +302,7 @@ def root(request: Request) -> HTMLResponse:
     timeline_src = "timeline.json"
     marathon_json = "null"
     movie = False
+    demo_movie = False                       # the curated showcase landing: a meme-mode movie of one city
     if "marathon" in qp and marathon["rows"]:    # playlist of pre-built movies, switched without re-seeding
         rows = marathon["rows"]
         cur = qp.get("m") if qp.get("m") in marathon["bundles"] else rows[0]["id"]
@@ -275,18 +315,45 @@ def root(request: Request) -> HTMLResponse:
         mode = "city"
         movie = "static" not in qp           # a forged repo plays its history by default; ?static = the quick city
         src = ("/forge-timelapse?url=" if movie else "/forge?url=") + quote(forge, safe="")
+    elif auto_city:                          # showcase demo: land on a grow-from-start movie of the pinned city
+        mode, name, movie, demo_movie = "city", showcase["city"], True, True
+        src = "/city-data.json?repo=" + quote(showcase["city"], safe="")
+        timeline_src = "/timeline.json?repo=" + quote(showcase["city"], safe="")
     elif nation["root"]:
         mode, name, src = "nation", Path(nation["root"]).name, "city-data.json"
     else:
         mode, name, src = "city", Path(city["repo"]).resolve().name, "city-data.json"
         movie = "timelapse" in qp            # a local city replays its history only on request
     engine = "nation.js" if mode == "nation" else ("city-timelapse.js" if movie else "city-live.js")
+
+    # per-repo social card: a shared link unfurls with that repo's name + its captured skyline (warmed by share.js)
+    base = os.environ.get("AGENTOPOLIS_PUBLIC_URL") or str(request.base_url).rstrip("/")
+    if forge:
+        og_key, og_url = forge, f"{base}/?forge={quote(forge, safe='')}"
+    elif auto_city:
+        og_key, og_url = showcase["city"], f"{base}/"
+    else:
+        og_key, og_url = None, f"{base}/"
+    if og_key:
+        og_title = f"{name} — a codebase as a living isometric city"
+        og_desc = (f"Watch {name}'s git history build itself as an isometric city — "
+                   "Claude Code agents are pixel workers on the dispatch floor.")
+    else:
+        og_title = "Agentopolis — Claude Code as a living isometric city"
+        og_desc = ("Watch Claude Code build your codebase as a living isometric city — agents are pixel "
+                   "workers on a dispatch floor and the skyline grows from your git history.")
+    og_img = (f"{base}/og/{forge_mod.og_hash(og_key)}.png" if og_key and forge_mod.og_exists(og_key)
+              else f"{base}/og-image.png")
+    og_tags = _og_block(og_title, og_desc, og_img, og_url)
+
     html = (Path(__file__).parent / "static" / "index.html").read_text()
     return HTMLResponse(html.replace("{{MODE}}", mode).replace("{{ENGINE}}", engine)
                         .replace("{{HALL_LEVEL}}", mode).replace("{{HALL_NAME}}", name)
                         .replace("{{CITY_SRC}}", src).replace("{{TIMELINE_SRC}}", timeline_src)
                         .replace("{{DEMO}}", "1" if showcase["dir"] else "")
                         .replace("{{DEMO_CITY}}", showcase["city"] if auto_city else "")
+                        .replace("{{DEMO_MOVIE}}", "1" if demo_movie else "")
+                        .replace("{{OG_TAGS}}", og_tags)
                         .replace("{{MARATHON}}", marathon_json))
 
 

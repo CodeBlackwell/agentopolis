@@ -1,7 +1,7 @@
 // Hotel state machine: SSE events in, avatars move, ticker logs.
 // IIFE-scoped so its ctx/canvas/tooltip globals don't collide with nation.js when both load.
 (() => {
-if (window.MOVIE) return;                  // movie mode replaces the dispatch floor with the explanation box
+if (window.MOVIE && !window.DEMO_MOVIE) return;   // movie hides the floor — except the demo movie, which keeps it as the agent-speed meme
 const STATIONS = {
   reception: [5, 2], terminal: [9, 2], archive: [2, 4], workshop: [2, 9],
   telephone: [10, 8], lobby: [5, 6], door: [0, 7],
@@ -12,7 +12,7 @@ const TOOL_STATION = {
   WebSearch: 'telephone', WebFetch: 'telephone', Task: 'reception', TodoWrite: 'reception',
 };
 const HAIR = ['#2d1b12', '#6b3e1e', '#c9a227', '#3a3a3a'];
-const SPEED = 3.2;
+const SPEED = window.DEMO_MOVIE ? 7 : 3.2;        // the demo movie cranks agent speed for the meme
 const SEATS = [[0, 0], [.55, 0], [0, .55], [.55, .55], [-.5, .3], [.3, -.5], [-.5, -.5], [.7, .35]];
 
 const ctx = document.getElementById('hotel').getContext('2d');
@@ -147,7 +147,7 @@ setInterval(() => {                         // idle agents wander to stations
   for (const av of avatars.values())
     if (av.isAgent && !av.leaving && av.state === 'idle' && Math.random() < .35)
       send(av, randomStation());
-}, 5000);
+}, window.DEMO_MOVIE ? 1600 : 5000);
 
 let last = performance.now();
 function frame(t) {
@@ -247,13 +247,13 @@ function buildScript(buildings) {
 
 let demoTimer = null;
 window.startDemoLoop = startDemoLoop;            // city-live.js / nation.js (separate scopes) trigger it
-function startDemoLoop(buildings) {
+function startDemoLoop(buildings, opts = {}) {
   const forced = new URLSearchParams(location.search).has('demo');
   if (location.hostname === 'localhost' && !forced) return;   // local real-hook use: stay quiet
   if (demoTimer) clearInterval(demoTimer);       // restart on the newly-focused city's buildings
   const script = buildScript(buildings || []);
   let i = 0;
-  demoTimer = setInterval(() => handle(script[i++ % script.length]), 2600);
+  demoTimer = setInterval(() => handle(script[i++ % script.length]), opts.interval || 2600);
 }
 
 // nation mode drives the loop per drilled-in city (nation.js); only kick a generic loop when not auto-drilling

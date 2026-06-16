@@ -23,7 +23,40 @@ disk_cache = True
 
 
 def _disk(url: str, kind: str) -> Path:
-    return CACHE_DIR / f"{kind}-{hashlib.sha256(url.encode()).hexdigest()[:16]}.json"
+    return CACHE_DIR / f"{kind}-{og_hash(url)}.json"
+
+
+# ---- shared-link OG images: the browser captures the rendered city and uploads it; we cache the PNG
+# keyed by repo identity (forge url, or "SPICE" for the demo) so the shared link unfurls with that skyline.
+OG_DIR = Path(os.environ.get("AGENTOPOLIS_OG_CACHE", Path(tempfile.gettempdir()) / "agentopolis-og"))
+OG_MAX_BYTES = 2 * 1024 * 1024
+OG_MAX_FILES = 200
+_PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+
+
+def og_hash(key: str) -> str:
+    return hashlib.sha256(key.encode()).hexdigest()[:16]
+
+
+def og_path(key: str) -> Path:
+    return OG_DIR / f"{og_hash(key)}.png"
+
+
+def og_exists(key: str) -> bool:
+    return og_path(key).exists()
+
+
+def save_og(key: str, data: bytes) -> str:
+    """Validate + cache a captured PNG; prune oldest over the cap. Returns the hash; raises ValueError on bad input."""
+    if len(data) > OG_MAX_BYTES or not data.startswith(_PNG_MAGIC):
+        raise ValueError("not a small png")
+    OG_DIR.mkdir(parents=True, exist_ok=True)
+    pngs = sorted(OG_DIR.glob("*.png"), key=lambda p: p.stat().st_mtime)
+    for old in pngs[: max(0, len(pngs) - OG_MAX_FILES + 1)]:   # keep room for the one we're about to write
+        old.unlink(missing_ok=True)
+    p = og_path(key)
+    p.write_bytes(data)
+    return p.stem
 
 
 def _load(url: str, kind: str, mem: dict) -> dict | None:

@@ -12,5 +12,7 @@ RUN pip install --no-cache-dir .
 # the demo lands on one impressive city; ?nation still opens the full map.
 ENV AGENTOPOLIS_SHOWCASE=/app/agentopolis/showcase
 ENV AGENTOPOLIS_DEMO_CITY=SPICE
+# absolute base for og:image so shared links unfurl with the captured skyline
+ENV AGENTOPOLIS_PUBLIC_URL=https://agentopolis.codeblackwell.ai
 EXPOSE 8000
 CMD ["uvicorn", "agentopolis.server:app", "--host", "0.0.0.0", "--port", "8000"]

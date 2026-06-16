@@ -4,6 +4,10 @@ const cityCtx = cityCanvas.getContext('2d');
 const cityCam = { ox: 0, oy: 0, s: 1 };
 let cityState = null;
 
+// match the backing store to the box × DPR now and on every resize/orientation change, re-fitting
+// the city to the new shape (skipped until the layout has loaded; the fetch below does the first fit)
+autosizeCanvas(cityCanvas, () => { if (cityState) City.fit(cityCam, cityCanvas, cityState, 115, 30, 1.18); })();
+
 // carry the camera across the live↔movie reload so flipping modes doesn't jump the view. Keyed by city
 // (the forge url, else the data source) so a different city never inherits the wrong frame. The movie
 // reframes itself each formation, so only the live view — which fits once then holds — restores.

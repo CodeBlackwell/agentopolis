@@ -9,6 +9,7 @@ specter-1-private, specter-1-wave2 ...) collapse to one city.
     python -m agentopolis.bake [WORKSPACE_ROOT] [OUT_DIR]
 """
 import json
+import os
 import re
 import sys
 import tempfile
@@ -16,6 +17,7 @@ from pathlib import Path
 
 from .nation import load_nation
 from .seed import seed
+from .timeline import build_timeline
 from .zone import load_zone
 
 VARIANT = re.compile(r"-(private|integration|wave\d+|mvp)$")
@@ -80,6 +82,8 @@ def main() -> None:
     root = sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).resolve().parents[2])
     out = Path(sys.argv[2]) if len(sys.argv) > 2 else Path(__file__).parent / "showcase"
     (out / "cities").mkdir(parents=True, exist_ok=True)
+    (out / "timelines").mkdir(parents=True, exist_ok=True)
+    demo = os.environ.get("AGENTOPOLIS_DEMO_CITY")     # only the landing city plays a movie → only it needs a timeline
 
     nat = build_nation(root)
     (out / "nation.json").write_text(json.dumps(nat))
@@ -89,7 +93,12 @@ def main() -> None:
         data = seed(str(Path(root) / repo), load_zone(str(Path(root) / repo), None))
         protect_docker(data)
         (out / "cities" / f"{repo}.json").write_text(json.dumps(data))
-        print(f"  {repo} ({len(data['buildings'])} buildings)")
+        note = f"  {repo} ({len(data['buildings'])} buildings)"
+        if repo == demo:
+            tl = build_timeline(str(Path(root) / repo))
+            (out / "timelines" / f"{repo}.json").write_text(json.dumps(tl))
+            note += f" + timeline ({len(tl['commits'])} commits)"
+        print(note)
 
     print(f"baked {len(nat['cities'])} cities → {out}")
 

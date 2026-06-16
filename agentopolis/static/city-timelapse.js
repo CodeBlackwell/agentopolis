@@ -6,6 +6,8 @@ const tlCanvas = document.getElementById('map');
 const tlCtx = tlCanvas.getContext('2d');
 const cam = { ox: 0, oy: 0, s: 1 };
 let state = null, commits = [], births = [], mods = [], deaths = [], bornAt = new Map(), props = [];
+// match backing store to box × DPR; on resize re-fit the current epoch's village to the new shape
+autosizeCanvas(tlCanvas, () => { if (state) City.fit(cam, tlCanvas, state, 150, 30, 1.18); })();
 let groundFinal = null, groundBirth = null, decaySpan = 0;
 let layouts = [], epochIndex = -1;                        // one fixed layout per formation epoch
 let transition = null;                                    // active demolish-and-rebuild between two epochs
@@ -570,6 +572,20 @@ function setPlay(p) {
   playing = p; last = 0;
   if (p && ptr >= commits.length - 1) seek(-1);          // replay from the start
   document.getElementById('tl-play').textContent = playing ? '⏸' : '▶';
+  if (!p && window.DEMO_MOVIE && ptr >= commits.length - 1) showFinishCTA();   // the demo holds on the finished city
+}
+
+// the demo movie ends → hold on the finished city and point the viewer at the forge box to build their own
+function showFinishCTA() {
+  if (document.getElementById('tl-cta')) return;
+  const cta = document.createElement('div');
+  cta.id = 'tl-cta';
+  cta.innerHTML = `<div class="cta-h">${esc(document.body.dataset.hallName || 'this city')} — built from ${commits.length} commits.</div>`
+                + `<div class="cta-s">now build your own &#8595;</div>`;
+  const wrap = document.querySelector('.mapwrap') || document.body;
+  wrap.classList.add('cta-on');                          // drops the forge box below the headline
+  wrap.appendChild(cta);
+  document.querySelector('#forge input')?.focus();
 }
 
 // ---- transport bar (built in JS so the shared shell stays untouched) ----
@@ -649,6 +665,10 @@ const card = (title, html, chip, focus) => `<div class="xcard"${focus ? ` data-f
 function buildExplain() {
   const dock = document.getElementById('dock');
   if (!dock) return;
+  if (window.DEMO_MOVIE) {                          // the agent-speed meme: keep the live dispatch hall, no explain cards
+    startDemoLoop?.(state.buildings, { interval: 900 });
+    return;
+  }
   document.querySelector('#dock .dispatch')?.style.setProperty('display', 'none');   // retire the agent floor
   document.getElementById('ticker')?.style.setProperty('display', 'none');
   const css = `#explain{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start;

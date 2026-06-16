@@ -762,4 +762,11 @@ attachTouch(canvas, {
 
 function stateName(id) { return (nation.blocks.find(b => b.st.id === id) || { st: {} }).st.name || id; }
 
+// keep the backing store matched to the box × DPR; on resize re-fit whichever view is drilled in
+autosizeCanvas(canvas, () => {
+  if (!nation) return;
+  if (mode === 'city' && currentCity) City.fit(cityCam, canvas, currentCity.cityState, 90, 0, 1);
+  else fitMap();
+})();
+
 init();
