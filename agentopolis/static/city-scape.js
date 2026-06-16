@@ -109,6 +109,14 @@ const CityScape = (() => {
     ctx.strokeRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
   }
 
+  function carPos(p, t) {                                 // live position along a traffic route + loop phase
+    const path = p.path || [{ x: p.x, y: p.y }];
+    const u = (t / (2400 + p.seed % 2800) + p.seed / 7) % 1;
+    const f = u * (path.length - 1), i = Math.min(path.length - 2, Math.floor(f)), frac = f - i;
+    const a = path[i], b = path[i + 1] || a;
+    return { x: a.x + (b.x - a.x) * frac, y: a.y + (b.y - a.y) * frac, u };
+  }
+
   function drawProp(ctx, cam, p, t, state) {
     const { sx, sy } = proj(cam, p.x, p.y), s = cam.s, base = sy + 6 * s;
     if (p.kind === 'tree') {
@@ -297,11 +305,7 @@ const CityScape = (() => {
       ctx.fillStyle = '#e8b88a';                            // head
       ctx.fillRect(wx - s, wb - 7.2 * s - bob, 2 * s, 2.2 * s);
     } else if (p.kind === 'traffic') {                      // a car driving its route (1-3 turns), then fading out
-      const path = p.path || [{ x: p.x, y: p.y }];
-      const u = (t / (2400 + p.seed % 2800) + p.seed / 7) % 1;
-      const f = u * (path.length - 1), i = Math.min(path.length - 2, Math.floor(f)), frac = f - i;
-      const a = path[i], b = path[i + 1] || a;
-      const gx = a.x + (b.x - a.x) * frac, gy = a.y + (b.y - a.y) * frac;
+      const { x: gx, y: gy, u } = carPos(p, t);
       const tg = state && state.ground[Math.floor(gy)] && state.ground[Math.floor(gy)][Math.floor(gx)];
       if (tg > 1 || tg === undefined) return;               // road not paved here yet (movie opening) → no car on grass
       const c = proj(cam, gx, gy), csx = c.sx, cb = c.sy + 6 * s, ga = ctx.globalAlpha;
@@ -518,5 +522,5 @@ const CityScape = (() => {
     }
   }
 
-  return { drawGround, drawWater, drawHorizon, drawProp, drawStation, drawPort };
+  return { drawGround, drawWater, drawHorizon, drawProp, drawStation, drawPort, carPos };
 })();

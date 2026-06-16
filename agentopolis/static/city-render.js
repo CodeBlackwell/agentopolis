@@ -1277,9 +1277,10 @@ const City = (() => {
   }
 
   function draw(ctx, cam, state, t, opts = {}) {
-    const R = cam.rot || 0;
-    if (state.sortedRot !== R) {                            // painter's order follows the camera
-      const k = dkey(R);
+    const R = cam.rot || 0, k = dkey(R);
+    let moved = false;                                      // cars carry a live position; keep their depth honest
+    for (const it of state.items) if (it.path) { const c = CityScape.carPos(it, t); it.x = c.x; it.y = c.y; moved = true; }
+    if (moved || state.sortedRot !== R) {                   // painter's order follows the camera and the traffic
       state.items.sort((a, b) => k(a) - k(b));
       state.sortedRot = R;
     }
@@ -1293,7 +1294,7 @@ const City = (() => {
     }
     CityScape.drawGround(ctx, cam, state, t);
     if (!opts.embedded && state.deps.length) CityScape.drawStation(ctx, cam, state, t);   // freight hugs the grid
-    const k = dkey(R), hall = state.cityHall;                // hall sorts by its centre, like any building, so
+    const hall = state.cityHall;                             // hall sorts by its centre, like any building, so
     const hallKey = hall ? k(hall) : Infinity;               // neighbours in front draw over it and those behind don't
     let hallDrawn = !hall;
     for (const it of state.items) {
