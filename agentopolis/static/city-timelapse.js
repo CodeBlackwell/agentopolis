@@ -10,6 +10,7 @@ let state = null, commits = [], births = [], mods = [], deaths = [], bornAt = ne
 autosizeCanvas(tlCanvas, () => { if (state) City.fit(cam, tlCanvas, state, 150, 30, 1.18); })();
 let groundFinal = null, groundBirth = null, decaySpan = 0;
 let layouts = [], epochIndex = -1;                        // one fixed layout per formation epoch
+let reformShown = -1;                                      // last epoch the Re-Form card auto-scrolled to (snap on new only)
 let transition = null;                                    // active demolish-and-rebuild between two epochs
 let ptr = -1, playing = false, speed = 12, acc = 0, last = 0, slider = null, label = null, dateEl = null;
 let megaCommit = 15;                                      // commit-size gate for coupling; set relatively in index()
@@ -950,6 +951,8 @@ function buildExplain() {
     letter-spacing:.1em;text-transform:uppercase;padding:5px 8px;display:flex;align-items:center;gap:6px}
     .xcard h5 .chip{width:10px;height:10px;flex:0 0 10px;border:1px solid var(--plum)}
     .xcard p{font:9px 'Silkscreen',monospace;color:var(--cream);line-height:1.55;padding:7px 9px;margin:0}
+    .reform-scroll{max-height:220px;overflow-y:auto}
+    .reform-scroll p+p{border-top:1px solid rgba(243,207,217,.15)}
     .xcard .em{color:var(--gold)}
     #explain .stat-grid{margin:0}
     #explain .stat-value{color:var(--cream)}
@@ -1021,7 +1024,7 @@ function reformedCard() {
   const now = layouts[epochIndex].ep.formation.id;
   return `<div class="xcard live" data-tip="reform" style="border-color:var(--pink-deep)">`
     + `<h5>⟳ Re-Formed · ${rows.length === 1 ? (FORM_TITLE[now] || now) : pl(rows.length, 'transition')}</h5>`
-    + rows.join('') + `</div>`;
+    + `<div class="reform-scroll">` + rows.join('') + `</div></div>`;
 }
 
 function renderExplain(shown, i) {
@@ -1063,7 +1066,12 @@ function renderExplain(shown, i) {
   if (onFoot || cars) cards.push(card('Street Life', `<span class="em">${pl(onFoot, 'resident')}</span> out on foot and <span class="em">${pl(cars, 'car')}</span> on the roads — both thicken in the districts touched most recently.`, null, 'street'));
   if (stalls) cards.push(card('Market', `${pl(stalls, 'stall')} ring the plaza — one per district still seeing active commits.`, null, 'stall'));
   if (boats) cards.push(card('Canal Traffic', `${pl(boats, 'boat')} work the canals that divide the data-flow layers.`, null, 'boat'));
+  const keepScroll = box.querySelector('.reform-scroll')?.scrollTop || 0;   // survive the innerHTML rebuild
   box.innerHTML = cards.join('');
+  const scroller = box.querySelector('.reform-scroll');
+  if (scroller)                                            // new transition → jump to it; otherwise hold the reader's place
+    scroller.scrollTop = epochIndex > reformShown ? scroller.scrollHeight : keepScroll;
+  reformShown = epochIndex;
 }
 
 // ---- card → map: hovering a card (or a building / fixture on the map) traces a thick gold outline
