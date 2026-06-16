@@ -241,6 +241,78 @@ const City = (() => {
     state.village = true;
   }
 
+  // ---- form F: acropolis — a lone dense core in concentric square rings, terrace streets, no spokes
+  //      or canals (the monolith: one or two districts grown too big for a hamlet) ----
+  function planAcropolis(state, data, byComp) {
+    const comps = groupsOf(data).flat();                    // civic first, then the 1-2 real districts
+    const lists = comps.map(c => byComp[c.id] || []);
+    const needs = lists.map((l, k) => need(comps[k], l));
+    const total = needs.reduce((a, b) => a + b, 0);
+    let r = 2, cap = 0;                                      // rings 0-1 are the civic core plaza
+    while (cap < total) { if ((r - 2) % 4 !== 3) cap += 8 * r; r++; }   // every 4th ring is a terrace street
+    const Rmax = r, margin = 3, cx = margin + Rmax, cy = cx;
+    state.W = state.H = 2 * Rmax + 2 * margin + 1;
+    state.cityHall = state.origin = { x: cx + .5, y: cy + .5 };
+    const g = Array.from({ length: state.H }, () => new Array(state.W).fill(2));
+    const tiles = [];
+    for (let y = 0; y < state.H; y++)
+      for (let x = 0; x < state.W; x++) {
+        const rr = Math.max(Math.abs(x - cx), Math.abs(y - cy));
+        if (rr <= 1) g[y][x] = 3;                            // civic core plaza
+        else if (rr > Rmax) continue;                        // parkland past the wall
+        else if ((rr - 2) % 4 === 3) g[y][x] = 0;            // terrace street rings the core
+        else tiles.push({ x, y, r: rr, a: Math.atan2(y - cy, x - cx) });
+      }
+    tiles.sort((t1, t2) => t1.r - t2.r || t1.a - t2.a);      // fill inside-out: densest at the core
+    let i0 = 0, acc = 0;
+    comps.forEach((comp, k) => {
+      acc += needs[k];
+      const i1 = Math.round(tiles.length * acc / total);
+      const block = newBlock(state, comp, lists[k]);
+      for (const tl of tiles.slice(i0, i1)) {
+        if (state.reserved && state.reserved.has(tl.x + ',' + tl.y)) continue;   // relic plot stays green
+        g[tl.y][tl.x] = comp.kind === 'civic' ? 3 : 10 + block.id;
+        block.lots.push({ x: tl.x + .5, y: tl.y + .5 });
+      }
+      i0 = i1; centroid(block);
+    });
+    state.ground = g;
+  }
+
+  // ---- form G: constellation — each district an island, open water between, bridges across the
+  //      channels (the archipelago: many districts that barely couple) ----
+  function planConstellation(state, data, byComp) {
+    const cells = groupsOf(data).flat().map(c => {
+      const list = byComp[c.id] || [], n = need(c, list), bw = Math.max(2, Math.round(Math.sqrt(n * 1.2)));
+      return { comp: c, list, w: widen(bw) + 2, h: Math.max(2, Math.ceil(n / bw)) + 2 };   // +2: a grass shore
+    });
+    const targetW = Math.max(Math.ceil(Math.sqrt(cells.reduce((a, c) => a + (c.w + 2) * (c.h + 2), 0))),
+                             ...cells.map(c => c.w));
+    const margin = 3, gap = 2;                               // 2-wide water channels between islands
+    let x = margin, y = margin, rowH = 0, maxX = margin;
+    for (const cell of cells) {                              // shelf-pack islands into roughly-square rows
+      if (x > margin && x + cell.w - margin > targetW) { x = margin; y += rowH + gap; rowH = 0; }
+      cell.x0 = x; cell.y0 = y;
+      x += cell.w + gap; rowH = Math.max(rowH, cell.h); maxX = Math.max(maxX, cell.x0 + cell.w);
+    }
+    state.W = maxX + margin; state.H = y + rowH + margin;
+    const g = Array.from({ length: state.H }, () => new Array(state.W).fill(4));   // open water everywhere
+    for (const cell of cells) {                              // each island: a grass shore around a paved core
+      for (let yy = cell.y0; yy < cell.y0 + cell.h; yy++)
+        for (let xx = cell.x0; xx < cell.x0 + cell.w; xx++) if (g[yy] && g[yy][xx] !== undefined) g[yy][xx] = 2;
+      paveRect(state, g, newBlock(state, cell.comp, cell.list), cell.x0 + 1, cell.y0 + 1, cell.w - 2, cell.h - 2);
+    }
+    for (let i = 1; i < cells.length; i++) {                 // bridge each island to its left-neighbour on the shelf
+      const a = cells[i - 1], b = cells[i];
+      const yb = Math.round((Math.max(a.y0, b.y0) + Math.min(a.y0 + a.h, b.y0 + b.h)) / 2);
+      for (let xx = a.x0 + a.w; xx < b.x0 && g[yb]; xx++) if (g[yb][xx] === 4) g[yb][xx] = 5;
+    }
+    state.ground = g;
+    const civic = state.blocks.find(b => b.comp.kind === 'civic') || state.blocks[0];
+    state.cityHall = { x: civic.lx, y: civic.ly };
+    state.origin = { x: state.W / 2, y: state.H / 2 };       // shared frame anchor (map center)
+  }
+
   // ---- form E: EvoStreets — the directory tree as a street network. Files line their dir's street
   //      in birth order; sub-dirs branch perpendicular (axis alternates by depth). Append-stable:
   //      a building's spot is a pure function of its path + birth rank, so it never moves as the
@@ -321,11 +393,12 @@ const City = (() => {
   }
 
   const PLANS = { radial: planRadial, grid: planGrid, spine: planSpine, village: planVillage,
-                  evostreets: planEvostreets };
+                  acropolis: planAcropolis, constellation: planConstellation, evostreets: planEvostreets };
   const PIPE = ['back', 'mid', 'front'];                   // the data-flow stack; 'under' isn't a stage
-  // The FORM is a claim about structure the data must support: a measurable coupling hub (radial),
-  // a balanced full-stack split (spine), or peer modules with no center (grid). Order matters —
-  // size is only a legibility floor, never the shape decision. Thresholds sit in the data's gaps.
+  // The FORM is a claim about structure the data must support: a lone dense core (acropolis), a
+  // measurable coupling hub (radial), a balanced full-stack split (spine), a fragmented archipelago
+  // (constellation), or peer modules with no center (grid). Order matters — size is only a legibility
+  // floor (village), never the shape decision. Thresholds sit in the data's gaps.
   function statsOf(data) {                                  // the metrics the formation thresholds read
     const real = data.zone.components.filter(c => c.kind !== 'civic' && c.kind !== 'auto');
     const wsum = {}, wt = {};                               // commit-weighted mean centrality per district
@@ -337,10 +410,14 @@ const City = (() => {
     const mass = coup.reduce((a, b) => a + b, 0);
     const dominance = mass ? Math.max(...coup) / mass * real.length : 0;   // 1 even → n one district carries all
     const hub = real.length ? real[coup.indexOf(Math.max(...coup))] : null;   // the district the rings would orbit
+    const islands = coup.filter(c => c < 1).length;         // districts coupling to <1 other on average (an island)
+    const fragmentation = real.length ? islands / real.length : 0;   // 0 one tight web → 1 all isolated
     const tier = {};                                        // district counts per data-flow layer
     for (const c of real) if (PIPE.includes(c.layer)) tier[c.layer] = (tier[c.layer] || 0) + 1;
     const t = Object.values(tier);
-    return { n: real.length, nbuild: data.buildings.length, mass, dominance, tiers: tier,
+    // scale: 0 at the village ceiling, 1 at metropolis — a dressing knob, decoupled from the shape choice
+    const scale = Math.max(0, Math.min(1, (data.buildings.length - FORM_CUT.files) / (FORM_CUT.spineFiles - FORM_CUT.files)));
+    return { n: real.length, nbuild: data.buildings.length, mass, dominance, fragmentation, scale, tiers: tier,
              hub: hub && hub.id, hubName: hub && hub.name,
              balanced: t.length >= 2 && Math.min(...t) / Math.max(...t) >= 0.4 };
   }
@@ -349,12 +426,15 @@ const City = (() => {
   // precedence + thresholds as the old choosePlan). The time-lapse walks this over history.
   // FORM_CUT holds every threshold in one place so enters() and the time-lapse's explanation cards
   // read the same numbers — change a cut here and the on-screen "why this shape" stays truthful.
-  const FORM_CUT = { districts: 2, files: 40, mass: 5, dominance: 2.5, spineFiles: 180 };
+  // spineFiles is no longer a gate — it's the scale ceiling (files at which a city reads as a metropolis).
+  const FORM_CUT = { districts: 2, files: 40, mass: 5, dominance: 2.5, spineFiles: 180, peers: 5, fragment: .4 };
   const FORMATIONS = [
-    { id: 'village', plan: planVillage, enters: s => s.n <= FORM_CUT.districts || s.nbuild <= FORM_CUT.files },
-    { id: 'radial',  plan: planRadial,  enters: s => s.mass >= FORM_CUT.mass && s.dominance >= FORM_CUT.dominance },
-    { id: 'spine',   plan: planSpine,   enters: s => s.balanced && s.nbuild <= FORM_CUT.spineFiles },
-    { id: 'grid',    plan: planGrid,    enters: () => true },                              // many peers (fallback)
+    { id: 'village',       plan: planVillage,       enters: s => s.nbuild <= FORM_CUT.files },   // size floor only
+    { id: 'acropolis',     plan: planAcropolis,     enters: s => s.n <= FORM_CUT.districts },     // 1-2 districts, too big for a hamlet → one dense core
+    { id: 'radial',        plan: planRadial,        enters: s => s.mass >= FORM_CUT.mass && s.dominance >= FORM_CUT.dominance },
+    { id: 'spine',         plan: planSpine,         enters: s => s.balanced },                    // balance is the claim; size is dressing
+    { id: 'constellation', plan: planConstellation, enters: s => s.n >= FORM_CUT.peers && s.fragmentation >= FORM_CUT.fragment },
+    { id: 'grid',          plan: planGrid,          enters: () => true },                         // connected peers (fallback)
   ];
   function chooseFormation(data) {
     const s = statsOf(data);
@@ -591,8 +671,7 @@ const City = (() => {
     state.formation = data._formationId || data.zone.plan || chooseFormation(data).id;   // the stage, for ambient dressing
     if (state.cityHall) {                                   // the hall's grandeur tracks the repo's scale, repo-relative
       const st = statsOf(data);
-      const span = FORM_CUT.spineFiles - FORM_CUT.files;    // village ceiling → spine-city: the growth runway
-      state.cityHall.grandeur = Math.max(0, Math.min(1, (st.nbuild - FORM_CUT.files) / span));
+      state.cityHall.grandeur = st.scale;                   // scale is now a first-class signal, decoupled from the shape gate
       state.cityHall.columns = Math.max(2, Math.min(8, st.n + 1));   // one portico column per district
       state.cityHall.dome = st.dominance >= FORM_CUT.dominance;      // a dominant hub earns a capitol dome
     }

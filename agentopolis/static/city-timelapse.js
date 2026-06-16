@@ -692,19 +692,25 @@ function buildExplain() {
   dock.appendChild(box);
 }
 
-const FORM_TITLE = { village: 'Small Town', radial: 'Radial', spine: 'Spine', grid: 'Grid' };
+const FORM_TITLE = { village: 'Small Town', acropolis: 'Acropolis', radial: 'Radial', spine: 'Spine',
+                     constellation: 'Constellation', grid: 'Grid' };
 const RELIC_KIND = { cityfarm: 'city farm', windmill: 'windmill', fountain: 'fountain', watertower: 'water tower' };
 
 function formationCard(id, s) {                            // the secret sauce, in this repo's own thresholds
   const k = City.FORM_CUT, d = s.dominance.toFixed(1), m = s.mass.toFixed(1);
   const layers = Object.entries(s.tiers).map(([l, v]) => `${l} ${v}`).join(' · ') || '—';
+  const frag = (s.fragmentation * 100).toFixed(0);
   const why = {
-    village: `Only <span class="em">${pl(s.n, 'core district')}</span> and ${s.nbuild} files — below the downtown
-      threshold (≤${k.districts} districts or ≤${k.files} files). A green hamlet of neighborhoods, no center yet.`,
+    village: `Just ${s.nbuild} files — below the downtown threshold (≤${k.files} files).
+      A green hamlet of neighborhoods, no center yet.`,
+    acropolis: `Only <span class="em">${pl(s.n, 'core district')}</span> (≤${k.districts}) but ${s.nbuild} files —
+      one dense core grown too big for a hamlet, paved in concentric terraces.`,
     radial: `<span class="em">${esc(s.hubName || 'one district')}</span> carries <span class="em">${d}×</span> its even
       share of the repo's coupling (mass ${m} ≥ ${k.mass}, dominance ${d} ≥ ${k.dominance}) — the city orbits it in rings.`,
-    spine: `The data-flow layers are <span class="em">balanced</span> (${layers}) at ${s.nbuild} files (≤${k.spineFiles}) —
+    spine: `The data-flow layers are <span class="em">balanced</span> (${layers}) —
       a full-stack boulevard stacks them back-to-front.`,
+    constellation: `<span class="em">${pl(s.n, 'district')}</span> (≥${k.peers}) but <span class="em">${frag}%</span> are
+      islands (≥${(k.fragment * 100).toFixed(0)}%) — a fragmented archipelago, bridged across the water.`,
     grid: `<span class="em">${pl(s.n, 'peer district')}</span> with no dominant coupling hub
       (dominance ${d} < ${k.dominance}) and no balanced layer stack — a downtown grid of equals.`,
   };
@@ -714,8 +720,10 @@ function formationCard(id, s) {                            // the secret sauce, 
 function reformReason(to, s) {                             // the one threshold the repo crossed to trigger the re-form
   const k = City.FORM_CUT, d = s.dominance.toFixed(1), m = s.mass.toFixed(1);
   return {
+    acropolis: `it outgrew the hamlet but stayed <span class="em">${pl(s.n, 'core district')}</span> — a single dense core.`,
     radial: `<span class="em">${esc(s.hubName || 'one district')}</span>'s coupling took over (mass ${m} ≥ ${k.mass}, dominance ${d} ≥ ${k.dominance}).`,
-    spine: `the data-flow layers came into balance at ${s.nbuild} files.`,
+    spine: `the data-flow layers came into balance.`,
+    constellation: `it fragmented into <span class="em">${pl(s.n, 'island district')}</span> across the water.`,
     grid: `it outgrew a single hub into <span class="em">${pl(s.n, 'peer district')}</span> with no clear center.`,
     village: `it settled back below the downtown threshold.`,
   }[to] || '';

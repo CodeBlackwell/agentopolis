@@ -14,7 +14,8 @@ from .timeline import build_timeline
 from .zone import load_zone
 
 PIPE = {"back", "mid", "front"}
-FORM_CUT = {"districts": 2, "files": 40, "mass": 5, "dominance": 2.5, "spineFiles": 180}
+FORM_CUT = {"districts": 2, "files": 40, "mass": 5, "dominance": 2.5, "spineFiles": 180,
+            "peers": 5, "fragment": 0.4}
 
 
 def _resolver(commits):
@@ -73,7 +74,9 @@ def _formation(zone, alive):                             # statsOf + chooseForma
         wt[b["component"]] = wt.get(b["component"], 0) + b["commits"]
     coup = [(wsum.get(c["id"], 0) / wt[c["id"]]) if wt.get(c["id"]) else 0 for c in real]
     mass = sum(coup)
-    dominance = (max(coup) / mass * len(real)) if mass and coup else 0
+    n = len(real)
+    dominance = (max(coup) / mass * n) if mass and coup else 0
+    fragmentation = (sum(1 for c in coup if c < 1) / n) if n else 0   # share of islands (couple to <1 other)
     tier = {}
     for c in real:
         if c["layer"] in PIPE:
@@ -81,12 +84,16 @@ def _formation(zone, alive):                             # statsOf + chooseForma
     t = list(tier.values())
     balanced = len(t) >= 2 and min(t) / max(t) >= 0.4
     nbuild = len(alive)
-    if len(real) <= FORM_CUT["districts"] or nbuild <= FORM_CUT["files"]:
+    if nbuild <= FORM_CUT["files"]:                         # size floor only
         return "village"
+    if n <= FORM_CUT["districts"]:                          # one dense core, too big for a hamlet
+        return "acropolis"
     if mass >= FORM_CUT["mass"] and dominance >= FORM_CUT["dominance"]:
         return "radial"
-    if balanced and nbuild <= FORM_CUT["spineFiles"]:
+    if balanced:                                            # balance is the claim; size is dressing
         return "spine"
+    if n >= FORM_CUT["peers"] and fragmentation >= FORM_CUT["fragment"]:
+        return "constellation"
     return "grid"
 
 
