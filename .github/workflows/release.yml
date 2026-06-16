@@ -1,0 +1,55 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  pypi:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write          # Trusted Publishing (OIDC) — no token stored
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  brew:
+    needs: pypi
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync the Homebrew tap formula (url + sha256 only; deps are stable)
+        env:
+          TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # PyPI can lag a few seconds behind publish; poll for the sdist.
+          for i in $(seq 1 30); do
+            meta=$(curl -s "https://pypi.org/pypi/agentopolis/$version/json") && \
+              echo "$meta" | python3 -c "import sys,json;json.load(sys.stdin)['urls']" 2>/dev/null && break
+            sleep 5
+          done
+          url=$(echo "$meta" | python3 -c "import sys,json;print(next(u['url'] for u in json.load(sys.stdin)['urls'] if u['packagetype']=='sdist'))")
+          sha=$(echo "$meta" | python3 -c "import sys,json;print(next(u['digests']['sha256'] for u in json.load(sys.stdin)['urls'] if u['packagetype']=='sdist'))")
+          mkdir -p ~/.ssh && echo "$TAP_DEPLOY_KEY" > ~/.ssh/tap && chmod 600 ~/.ssh/tap
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap -o StrictHostKeyChecking=no"
+          git clone git@github.com:codeblackwell/homebrew-tap.git tap
+          sed -i -E "s|^  url .*|  url \"$url\"|; s|^  sha256 .*|  sha256 \"$sha\"|" tap/Formula/agentopolis.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "agentopolis $version" && git push
+
+  deploy:
+    needs: pypi
+    runs-on: ubuntu-latest
+    steps:
+      - name: Redeploy the hosted demo (fixtures persist on the host)
+        env:
+          SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh && echo "$SSH_KEY" > ~/.ssh/id && chmod 600 ~/.ssh/id
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id root@5.78.198.79 \
+            'cd /opt/agentopolis && git pull && docker compose up -d --build'

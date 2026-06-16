@@ -7,8 +7,9 @@ seeds the configured repo's city on demand (cached per git HEAD).
 import asyncio
 import json
 import os
+import re
 import threading
-from collections import deque
+from collections import Counter, deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote
@@ -19,6 +20,7 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import forge as forge_mod
+from . import og as og_mod
 from .nation import CAPITAL, discover_repos, is_mother, load_nation
 from .seed import git, seed
 from .timeline import build_timeline
@@ -43,6 +45,23 @@ showcase = {"dir": os.environ.get("AGENTOPOLIS_SHOWCASE"),    # serve baked fixt
             "city": os.environ.get("AGENTOPOLIS_DEMO_CITY")}  # demo-only: land on this city, not the nation
 forge_gate = threading.BoundedSemaphore(2)                    # cap concurrent clones on a public box
 marathon = {"rows": [], "bundles": {}}                        # `agentopolis marathon`: ranked movies + in-memory bundles
+
+# viral-loop funnel counters (no PII): land -> forge -> share_tapped -> share_completed -> install.
+# Edges let us read the loop's conversion; client beacons (/e/<edge>) cover the share + install half.
+# AGENTOPOLIS_STATS_FILE persists counts across restarts (set on the hosted demo; unset = in-memory only).
+LOOP_EDGES = {"land", "forge", "share_tapped", "share_completed", "build_your_own", "install"}
+STATS_FILE = Path(p) if (p := os.environ.get("AGENTOPOLIS_STATS_FILE")) else None
+STATS_TOKEN = os.environ.get("AGENTOPOLIS_STATS_TOKEN")
+PLAYER_CARD = os.environ.get("AGENTOPOLIS_PLAYER_CARD")   # X player cards need per-account approval; off by default
+loop = Counter(json.loads(STATS_FILE.read_text())) if STATS_FILE and STATS_FILE.exists() else Counter()
+
+
+def bump(edge: str) -> None:
+    loop[edge] += 1
+    if STATS_FILE:                                   # write-through; human-action volume is low
+        tmp = STATS_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(dict(loop)))
+        tmp.replace(STATS_FILE)
 
 # dev mode: env vars survive uvicorn --reload cycles; cli.py still wins when used directly
 if showcase["dir"]:                              # showcase is nation mode fed by fixtures
@@ -178,8 +197,28 @@ def timeline_data(repo: str | None = None):
     return timeline_cached(city["repo"])
 
 
+@app.get("/e/{edge}")                            # client beacon for the share half of the loop; 204, no body
+def loop_beacon(edge: str):
+    if edge in LOOP_EDGES:
+        bump(edge)
+    return Response(status_code=204)
+
+
+@app.get("/stats")                               # private read of the viral-loop funnel counters
+def loop_stats(token: str | None = None):
+    if STATS_TOKEN and token != STATS_TOKEN:     # public on the hosted demo unless a token is set
+        return Response(status_code=404)
+    return dict(loop)
+
+
+@app.get("/health")                              # liveness probe for the Docker healthcheck + uptime cron
+def health():
+    return {"status": "ok"}
+
+
 @app.get("/forge")
 def forge_city(url: str):
+    bump("forge")
     if (hit := forge_mod.peek(url)) is not None:  # memory or disk cache: skip the clone gate entirely
         return hit
     if not forge_gate.acquire(blocking=False):
@@ -196,6 +235,7 @@ def forge_city(url: str):
 
 @app.get("/forge-timelapse")
 def forge_timelapse_city(url: str):              # NDJSON: clone-progress lines, then the {data, timeline} bundle
+    bump("forge")
     if (hit := forge_mod.peek_tl(url)) is not None:                     # cached: one bundle line, instant
         return StreamingResponse(iter([json.dumps(hit) + "\n"]), media_type="application/x-ndjson")
     try:
@@ -223,6 +263,14 @@ async def og_upload(key: str, request: Request):
         return {"ok": True, "hash": forge_mod.save_og(key, body)}
     except ValueError:
         return Response(status_code=400)
+
+
+@app.get("/og-card")                             # generated card for a forge link before its skyline is captured
+def og_card(url: str):
+    png = og_mod.card_png(url)                    # None when Pillow is absent (CLI installs) → generic card
+    if png is None:
+        return FileResponse(Path(__file__).parent / "static" / "og-image.png", media_type="image/png")
+    return Response(png, media_type="image/png", headers={"Cache-Control": "public, max-age=600"})
 
 
 @app.get("/og/{name}")                           # serve a cached skyline PNG (name = <16-hex>.png)
@@ -271,9 +319,17 @@ async def no_stale_assets(request: Request, call_next):
     return response
 
 
-def _og_block(title: str, desc: str, img: str, url: str) -> str:
+def _og_block(title: str, desc: str, img: str, url: str, player: str | None = None) -> str:
     e = lambda s: s.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
     t, d, i, u = e(title), e(desc), e(img), e(url)
+    # player card plays the build inline in-feed; falls back to the still image where it isn't honored.
+    if player:
+        card = (f'<meta name="twitter:card" content="player">\n'
+                f'<meta name="twitter:player" content="{e(player)}">\n'
+                f'<meta name="twitter:player:width" content="1200">\n'
+                f'<meta name="twitter:player:height" content="630">\n')
+    else:
+        card = '<meta name="twitter:card" content="summary_large_image">\n'
     return (f'<link rel="canonical" href="{u}">\n'
             f'<meta property="og:type" content="website">\n'
             f'<meta property="og:url" content="{u}">\n'
@@ -283,19 +339,40 @@ def _og_block(title: str, desc: str, img: str, url: str) -> str:
             f'<meta property="og:image:width" content="1200">\n'
             f'<meta property="og:image:height" content="630">\n'
             f'<meta property="og:image:alt" content="{t}">\n'
-            f'<meta name="twitter:card" content="summary_large_image">\n'
+            + card +
             f'<meta name="twitter:title" content="{t}">\n'
             f'<meta name="twitter:description" content="{d}">\n'
             f'<meta name="twitter:image" content="{i}">')
 
 
+def _canon_path(forge_url: str) -> str | None:
+    # github.com/owner/repo -> /c/owner/repo, the clean canonical a shared link unfurls + reads as
+    m = re.match(r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$", forge_url or "")
+    return f"/c/{m.group(1)}/{m.group(2)}" if m else None
+
+
+@app.get("/c/{owner}/{repo}")                    # clean canonical: /c/owner/repo == ?forge=github.com/owner/repo
+def canonical(owner: str, repo: str, request: Request) -> HTMLResponse:
+    return _page(request, f"https://github.com/{owner}/{repo.removesuffix('.git')}")
+
+
+@app.get("/player/{owner}/{repo}")               # chromeless autoplaying movie — the player-card iframe + embeds
+def player(owner: str, repo: str, request: Request) -> HTMLResponse:
+    return _page(request, f"https://github.com/{owner}/{repo.removesuffix('.git')}", embed=True)
+
+
 @app.get("/")
 def root(request: Request) -> HTMLResponse:
+    return _page(request, request.query_params.get("forge"), embed="embed" in request.query_params)
+
+
+def _page(request: Request, forge: str | None, embed: bool = False) -> HTMLResponse:
     # one shell, two map engines. ?forge=<github url> opens the city engine on the forge endpoint.
     # Otherwise the showcase opens the nation map; AGENTOPOLIS_DEMO_CITY auto-drills into one city on
     # load (so zoom-out + the tier breadcrumb still reach the nation), and ?nation skips the drill.
     qp = request.query_params
-    forge = qp.get("forge")
+    if forge:
+        bump("land")                             # someone opened a shared/forge link — top of the loop
     auto_city = bool(showcase["dir"] and showcase["city"]) and "nation" not in qp
     timeline_src = "timeline.json"
     marathon_json = "null"
@@ -327,7 +404,8 @@ def root(request: Request) -> HTMLResponse:
     # per-repo social card: a shared link unfurls with that repo's name + its captured skyline (warmed by share.js)
     base = os.environ.get("AGENTOPOLIS_PUBLIC_URL") or str(request.base_url).rstrip("/")
     if forge:
-        og_key, og_url = forge, f"{base}/?forge={quote(forge, safe='')}"
+        og_key = forge
+        og_url = base + (_canon_path(forge) or f"/?forge={quote(forge, safe='')}")
     elif auto_city:
         og_key, og_url = showcase["city"], f"{base}/"
     else:
@@ -340,9 +418,17 @@ def root(request: Request) -> HTMLResponse:
         og_title = "Agentopolis — Claude Code as a living isometric city"
         og_desc = ("Watch Claude Code build your codebase as a living isometric city — agents are pixel "
                    "workers on a dispatch floor and the skyline grows from your git history.")
-    og_img = (f"{base}/og/{forge_mod.og_hash(og_key)}.png" if og_key and forge_mod.og_exists(og_key)
-              else f"{base}/og-image.png")
-    og_tags = _og_block(og_title, og_desc, og_img, og_url)
+    if og_key and forge_mod.og_exists(og_key):           # warmed real skyline capture wins
+        og_img = f"{base}/og/{forge_mod.og_hash(og_key)}.png"
+    elif forge:                                          # cold forge link: generated card still names the repo
+        og_img = f"{base}/og-card?url={quote(forge, safe='')}"
+    else:
+        og_img = f"{base}/og-image.png"
+    # player card (inline-playing build in-feed) only when this deploy has X player-card approval; the
+    # reliable still-image card stays the default. embed pages never advertise themselves as a card.
+    cp = _canon_path(forge) if forge else None
+    player_url = base + cp.replace("/c/", "/player/") if (PLAYER_CARD and cp and not embed) else None
+    og_tags = _og_block(og_title, og_desc, og_img, og_url, player_url)
 
     repo_url = forge or ""           # forge cities link their title back to the source repo; private/local cities don't
     html = (Path(__file__).parent / "static" / "index.html").read_text()
@@ -353,6 +439,7 @@ def root(request: Request) -> HTMLResponse:
                         .replace("{{DEMO}}", "1" if showcase["dir"] else "")
                         .replace("{{DEMO_CITY}}", showcase["city"] if auto_city else "")
                         .replace("{{DEMO_MOVIE}}", "1" if demo_movie else "")
+                        .replace("{{EMBED}}", "1" if embed else "")
                         .replace("{{OG_TAGS}}", og_tags)
                         .replace("{{MARATHON}}", marathon_json))
 

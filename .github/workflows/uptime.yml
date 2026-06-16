@@ -1,0 +1,13 @@
+name: uptime
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'      # every 15 min; a failed run emails the repo owner
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the live demo is healthy
+        run: curl -fsS https://agentopolis.codeblackwell.ai/health

@@ -23,6 +23,10 @@ movie repo=".":
     @sleep 1 && case "{{repo}}" in http*) open "http://localhost:4244/?forge={{repo}}&timelapse";; *) open "http://localhost:4244/?timelapse";; esac &
     @case "{{repo}}" in http*) R="." ;; *) R="{{repo}}" ;; esac; exec env AGENTOPOLIS_REPO="$R" .venv/bin/uvicorn agentopolis.server:app --reload --reload-dir agentopolis --port 4244 --log-level warning --timeout-graceful-shutdown 1
 
+# Run the test suite (backend functional + Playwright UI). First time: `uv run --extra test playwright install chromium`.
+test *args:
+    uv run --extra test pytest tests/ {{args}}
+
 # Re-bake the BLACKBOX showcase fixtures (run before deploy when repos change).
 # DEMO_CITY matches the Dockerfile so the landing city also gets its grow-from-start movie timeline.
 bake demo="SPICE":
@@ -43,6 +47,18 @@ attach:
 # Remove the city's hooks
 detach:
     uv run agentopolis detach
+
+# Cut a release: bump version, commit, tag, push -> the release workflow does PyPI + brew + deploy.
+release version:
+    @grep -q "## \[{{version}}\]" CHANGELOG.md || { echo "add a CHANGELOG.md entry for {{version}} first"; exit 1; }
+    sed -i '' -E 's/^version = ".*"/version = "{{version}}"/' pyproject.toml
+    git commit -am "chore(release): {{version}}"
+    git tag v{{version}}
+    git push origin master --tags
+
+# Recent PyPI download counts (acquisition metric; pairs with the /stats web funnel)
+pypi-stats:
+    @curl -s https://pypistats.org/api/packages/agentopolis/recent | python3 -c "import sys,json; d=json.load(sys.stdin)['data']; print('agentopolis downloads — day:', d['last_day'], 'week:', d['last_week'], 'month:', d['last_month'])"
 
 # Regenerate the Homebrew formula from the published PyPI release (run after `uv publish`)
 brew-formula version=`grep '^version' pyproject.toml | cut -d'"' -f2`:

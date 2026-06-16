@@ -18,6 +18,9 @@ addEventListener('pagehide', () => { try {
 
 fetch(window.CITY_SRC || 'city-data.json').then(r => r.json()).then(data => {
   cityState = City.layout(data);
+  const dr = data.sample || {};                            // headline stats for the share caption (#6/#7)
+  window.CITY_STATS = { files: data.buildings.reduce((n, b) => n + (b.files || 0), 0) + (dr.files?.dropped || 0),
+                        districts: data.buildings.length + (dr.buildings?.dropped || 0) };
   if (typeof startDemoLoop === 'function') startDemoLoop(data.buildings);
   const legend = document.getElementById('legend');
   const controls = legend.lastElementChild;

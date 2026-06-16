@@ -10,6 +10,12 @@ keywords = ["claude-code", "visualization", "agents", "isometric", "pixel-art"]
 requires-python = ">=3.11"
 dependencies = ["fastapi>=0.110", "uvicorn>=0.29"]
 
+# the hosted demo installs `.[card]` so forge links unfurl with a generated social card;
+# CLI installs stay at the two deps above (the card path no-ops without Pillow)
+[project.optional-dependencies]
+card = ["pillow>=10.1"]
+test = ["pytest>=8", "httpx", "pillow>=10.1", "pytest-playwright>=0.5"]
+
 [project.urls]
 Homepage = "https://github.com/CodeBlackwell/agentopolis"
 Source = "https://github.com/CodeBlackwell/agentopolis"

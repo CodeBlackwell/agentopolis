@@ -6,7 +6,19 @@ const params = new URLSearchParams(location.search);
 const forge = params.get('forge');
 // must match server root()'s og_key: the forge url, else the demo city (SPICE)
 const shareKey = () => forge || window.DEMO_CITY || document.body.dataset.hallName || 'city';
-const shareUrl = () => forge ? location.origin + '/?forge=' + encodeURIComponent(forge) : location.origin + '/';
+// /c/owner/repo canonical when this is a github forge, else the plain origin
+const shareUrl = () => {
+  const m = forge && /github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(forge);
+  return m ? location.origin + '/c/' + m[1] + '/' + m[2] : (forge ? location.origin + '/?forge=' + encodeURIComponent(forge) : location.origin + '/');
+};
+
+// a curiosity-gap caption naming the repo + its headline stat — the text the human AND the ranker read
+function shareText() {
+  const name = document.body.dataset.hallName || 'a codebase', s = window.CITY_STATS || {};
+  if (s.commits) return `${name} — ${s.commits.toLocaleString()} commits as a living isometric city 🏙️`;
+  if (s.districts) return `${name} — ${s.districts.toLocaleString()} districts as a living isometric city 🏙️`;
+  return `${name} as a living isometric city 🏙️`;
+}
 
 function captureOG() {                                    // #map → branded 1200x630 PNG
   const map = document.getElementById('map');
@@ -37,23 +49,66 @@ function toast(msg) {
   setTimeout(() => t.remove(), 2600);
 }
 
+const beacon = (edge) => { try { navigator.sendBeacon('/e/' + edge); } catch {} };
+
+function downloadBlob(file) {                            // hand the asset to a desktop poster to attach
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file); a.download = file.name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+// show the captured frame before posting: approve it, or back out to reframe (pan/zoom) and tap share again
+function previewFrame(blob) {
+  return new Promise(res => {
+    const url = URL.createObjectURL(blob), wrap = document.createElement('div');
+    Object.assign(wrap.style, { position: 'fixed', inset: 0, zIndex: 30, display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center', gap: '14px', background: 'rgba(36,16,32,.93)', padding: '20px' });
+    const cap = document.createElement('div');
+    cap.textContent = "this is what you'll post";
+    cap.style.cssText = "color:#f9efe3;font:12px 'Silkscreen',monospace;letter-spacing:.12em";
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.cssText = 'max-width:min(90vw,640px);width:100%;border:3px solid #d4a953;box-shadow:4px 4px 0 #5a2c4d';
+    const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:10px';
+    const mk = (label, primary) => {
+      const b = document.createElement('button'); b.textContent = label;
+      b.style.cssText = `cursor:pointer;padding:10px 16px;font:12px 'Silkscreen',monospace;border:2px solid #d4a953;`
+        + (primary ? 'background:#d4a953;color:#2a1024' : 'background:#5a2c4d;color:#f9efe3');
+      return b;
+    };
+    const ok = mk('post this', true), no = mk('reframe', false);
+    const done = v => { URL.revokeObjectURL(url); wrap.remove(); res(v); };
+    ok.onclick = () => done(true); no.onclick = () => done(false);
+    row.append(no, ok); wrap.append(cap, img, row); document.body.appendChild(wrap);
+  });
+}
+
 async function onShare(btn) {
   btn.disabled = true;
+  beacon('share_tapped');
   try {
     const blob = await captureOG();
+    if (!window.MOVIE && blob && !(await previewFrame(blob))) return;   // live city: approve the frame, or back out to reframe
     if (blob) await fetch('/og?key=' + encodeURIComponent(shareKey()),
       { method: 'POST', headers: { 'Content-Type': 'image/png' }, body: blob });
-    const url = shareUrl(), data = { title: 'Agentopolis', text: 'my codebase as a living isometric city', url };
+    const url = shareUrl(), data = { title: 'Agentopolis', text: shareText(), url };
     let file = blob && new File([blob], 'city.png', { type: 'image/png' });
     if (window.MOVIE && window.recordTimelapseClip) {        // in a movie, share the build itself — a short clip
-      const label = btn.innerHTML; btn.innerHTML = '&#9679; rec';
+      const label = btn.innerHTML; btn.innerHTML = '&#9679; rendering&hellip;';
+      toast('rendering your clip… (~12s)');
       const clip = await window.recordTimelapseClip();        // ~12s pass; the still above still warms the unfurl card
       btn.innerHTML = label;
       if (clip) file = new File([clip], 'city.' + (clip.type.includes('mp4') ? 'mp4' : 'webm'), { type: clip.type });
     }
     if (navigator.share && file && navigator.canShare?.({ files: [file] })) await navigator.share({ ...data, files: [file] });
     else if (navigator.share) await navigator.share(data);
-    else { await navigator.clipboard.writeText(url); toast('link copied — paste anywhere to share your city'); }
+    else {                                                // desktop: download the asset + open a prefilled X compose
+      if (file) downloadBlob(file);
+      const intent = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(data.text) + '&url=' + encodeURIComponent(url);
+      if (window.open(intent, '_blank', 'noopener')) toast('city saved — attach it to your post');
+      else { await navigator.clipboard.writeText(data.text + ' ' + url); toast('city saved + caption copied — paste into a post'); }
+    }
+    beacon('share_completed');
   } catch (e) { if (e?.name !== 'AbortError') console.warn('share failed', e); }   // AbortError = user closed the sheet
   finally { btn.disabled = false; }
 }
@@ -70,4 +125,5 @@ function mount() {
   ctl.appendChild(btn);
 }
 if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mount); else mount();
+window.__share = { text: shareText, url: shareUrl, preview: previewFrame };   // exposed for share self-tests (cf. window.__tl)
 })();

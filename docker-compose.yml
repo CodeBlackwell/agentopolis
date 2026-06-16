@@ -5,6 +5,11 @@ services:
     restart: unless-stopped
     networks:
       - web
+    volumes:
+      - agentopolis-data:/data       # funnel counters survive `up --build`
+
+volumes:
+  agentopolis-data:
 
 networks:
   web:
