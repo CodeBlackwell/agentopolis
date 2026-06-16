@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-06-16
+
+### Added
+- An onboarding tour — a first-visit guided walkthrough led by a pixel "Chief of
+  Staff" who spotlights one part of the interface at a time and addresses you as
+  the Permanent Democratically Elected Supreme President. It branches across all
+  five views (the nation map, a live city, the time-lapse movie, and the hosted
+  demo's landing + forge result), lets you interact with each highlighted element
+  while it's explained, and replays anytime from a ⭐ badge. The overlay appears
+  instantly to focus attention, and never dims the movie views (where the
+  visualization is the content). Self-contained in `static/tour.js`; see
+  [docs/tour.md](docs/tour.md) for the full reference.
+- Hosted-demo install funnel: `brew` and `pip` install badges plus a "run it
+  locally — 1 · 2 · 3" accordion, all click-to-copy.
+
+### Changed
+- The hosted demo's dispatch floor now runs a busier interleaved multi-agent
+  stream (4–5 subagents cycling through the door) so the floor scurries while the
+  city builds, and the demo's "paste a github url" forge box moved into the
+  header column.
+
 ## [0.11.1] - 2026-06-16
 
 ### Fixed

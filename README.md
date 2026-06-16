@@ -39,6 +39,10 @@ report in automatically. No live session handy? http://localhost:4242/?demo
 runs a scripted day in the city. `agentopolis detach` removes the hooks (a backup
 of settings.json is written on attach). Flags: `--repo`, `--port`, `--zone`.
 
+**First visit?** A guided onboarding tour spotlights each part of the interface,
+narrated by a pixel "Chief of Staff" — replay it anytime from the ⭐ badge. See
+[docs/tour.md](docs/tour.md).
+
 **Movie mode** (`agentopolis movie [target]`) replays a repo's whole git history
 as a city that grows and re-forms commit by commit. `target` is a local repo dir
 or a public github url; github repos download only the minimum git data (a
