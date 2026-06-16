@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Onboarding tour on the hosted demo: the screening-room (auto-playing movie) context
+  now applies a soft dim + spotlight instead of running fully undimmed, restoring the
+  dim-and-focus effect; the farewell beat keeps its full dim.
+
+### Changed
+- Public-repo hardening: removed a private project's manifest/architecture (replaced
+  with a generic `city/example.json`) and other non-generalizable references; the
+  deploy host is now read from `$AGENTOPOLIS_DEPLOY_HOST` / a CI secret instead of
+  being hardcoded in the workflow and justfile.
+
 ## [0.14.0] - 2026-06-16
 
 ### Added
