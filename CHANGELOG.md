@@ -6,6 +6,34 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- `agentopolis movie [target]` — replay any repo's git history as a growing city
+  straight from the CLI. `target` is a local repo dir or a public github url; with
+  no target it plays the current repo. GitHub urls download only the minimum git
+  data (a `blob:none` clone into a temp dir, removed right after seeding) and the
+  city is held in memory only — nothing is persisted to disk.
+- A friendly note instead of a blank city when agentopolis is run outside a git
+  repo, on a repo with no commits, or with `--root` over a folder containing no
+  git repos — each with the relevant next step.
+- `agentopolis crawl [folder]` — scan a folder of git repos and rank them by
+  time-lapse "movie" potential (size-tier journey, history length, deletions,
+  HEAD formation) from cheap git metadata. `--json` for machine output.
+- Stage-keyed passive ambient life, each tied to a repo-relative signal and shown
+  only when that signal is present: pedestrians (∝ district recency), traffic that
+  drives multi-turn routes on paved roads (∝ commit volume), a plaza fountain whose
+  spray scales with hub dominance, market stalls, canal boats, downtown crosswalks
+  and steam vents, and graveyard crows.
+- Movie explanation box: "badge" cards explaining the ambient life (Street Life,
+  Market, Canal Traffic), and a persistent **Re-Formed** card that records each
+  formation transition with the exact commit and the threshold it crossed.
+
+### Changed
+- The freight rail line now joins the city with a grass verge instead of floating
+  over a gap.
+
+### Fixed
+- Movie stat-card values were near-invisible (plum on plum) — now cream.
+
 ## [0.9.0] - 2026-06-16
 
 ### Added

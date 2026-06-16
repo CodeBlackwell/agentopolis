@@ -97,6 +97,8 @@ const CityScape = (() => {
   }
 
   const CARS = ['#c0395b', '#2980b9', '#27ae60', '#d4a953', '#8e44ad', '#e67e22'];
+  const SHIRTS = ['#c0395b', '#2980b9', '#27ae60', '#d4a953', '#8e44ad', '#16a085', '#e8a8bd'];
+  const AWNINGS = ['#9c3b32', '#2e8b4f', '#2980b9', '#d4a953'];
 
   function hit(ctx, state, r, s) {                          // register hover target; outline when under the mouse
     state.hits.push(r);
@@ -254,7 +256,7 @@ const CityScape = (() => {
       ctx.fillRect(sx - 7 * s, base - 1 * s, 14 * s, 2 * s);
       ctx.fillStyle = '#9aa6b3';                           // central pedestal
       ctx.fillRect(sx - 1.5 * s, base - 9 * s, 3 * s, 6 * s);
-      const jet = (4 + Math.sin(t / 300 + p.seed) * 1.5) * s;
+      const jet = (4 + Math.sin(t / 300 + p.seed) * 1.5) * (p.spray || 1) * s;   // taller spray = more dominant hub
       ctx.fillStyle = 'rgba(126,200,255,.8)';              // jets, gently pulsing
       ctx.fillRect(sx - s, base - 9 * s - jet, 2 * s, jet);
       for (const dx of [-3, 3]) ctx.fillRect(sx + dx * s, base - 6 * s - jet * .6, 1.5 * s, jet * .6);
@@ -284,12 +286,98 @@ const CityScape = (() => {
       ctx.fillStyle = '#b5651d';
       ctx.fillRect(sx + 1 * s, base - 5 * s, 5 * s, 5 * s);
       ctx.fillRect(sx - 4 * s, base - 11 * s, 5 * s, 5 * s);
+    } else if (p.kind === 'walker') {                       // a pedestrian wandering a small patch, at its own pace
+      const a = t / (1400 + p.seed % 1300) + p.seed, w = proj(cam, p.x + Math.cos(a) * .3, p.y + Math.sin(a * 1.3) * .3);
+      const wx = w.sx, wb = w.sy + 6 * s, bob = Math.abs(Math.sin(t / (150 + p.seed % 110) + p.seed)) * 1.2 * s;
+      ctx.fillStyle = SHIRTS[p.seed % SHIRTS.length];        // torso
+      ctx.fillRect(wx - 1.4 * s, wb - 5 * s - bob, 2.8 * s, 3.2 * s);
+      ctx.fillStyle = '#1a0a16';                            // legs
+      ctx.fillRect(wx - 1.4 * s, wb - 2 * s - bob, 1.1 * s, 2 * s);
+      ctx.fillRect(wx + .3 * s, wb - 2 * s - bob, 1.1 * s, 2 * s);
+      ctx.fillStyle = '#e8b88a';                            // head
+      ctx.fillRect(wx - s, wb - 7.2 * s - bob, 2 * s, 2.2 * s);
+    } else if (p.kind === 'traffic') {                      // a car driving its route (1-3 turns), then fading out
+      const path = p.path || [{ x: p.x, y: p.y }];
+      const u = (t / (2400 + p.seed % 2800) + p.seed / 7) % 1;
+      const f = u * (path.length - 1), i = Math.min(path.length - 2, Math.floor(f)), frac = f - i;
+      const a = path[i], b = path[i + 1] || a;
+      const gx = a.x + (b.x - a.x) * frac, gy = a.y + (b.y - a.y) * frac;
+      const tg = state && state.ground[Math.floor(gy)] && state.ground[Math.floor(gy)][Math.floor(gx)];
+      if (tg > 1 || tg === undefined) return;               // road not paved here yet (movie opening) → no car on grass
+      const c = proj(cam, gx, gy), csx = c.sx, cb = c.sy + 6 * s, ga = ctx.globalAlpha;
+      ctx.globalAlpha = ga * Math.min(1, Math.min(u, 1 - u) * 6);   // fade in at the route start, out at the end
+      ctx.fillStyle = CARS[p.seed % CARS.length];
+      ctx.fillRect(csx - 8 * s, cb - 7 * s, 16 * s, 5 * s);
+      ctx.fillRect(csx - 4 * s, cb - 10 * s, 8 * s, 3 * s);
+      ctx.fillStyle = '#9fd8e8';
+      ctx.fillRect(csx - 3 * s, cb - 9.5 * s, 3 * s, 2.5 * s);
+      ctx.fillStyle = '#1a0a16';
+      ctx.fillRect(csx - 6 * s, cb - 2.5 * s, 3 * s, 2.5 * s);
+      ctx.fillRect(csx + 3 * s, cb - 2.5 * s, 3 * s, 2.5 * s);
+      ctx.globalAlpha = ga;
+    } else if (p.kind === 'stall') {                        // market stall: posts, striped awning, goods
+      const sway = Math.sin(t / (480 + p.seed % 360) + p.seed) * .6 * s;
+      ctx.fillStyle = '#7a4a26';
+      ctx.fillRect(sx - 6 * s, base - 8 * s, 1.2 * s, 8 * s);
+      ctx.fillRect(sx + 5 * s, base - 8 * s, 1.2 * s, 8 * s);
+      ctx.fillStyle = AWNINGS[p.seed % AWNINGS.length];
+      ctx.beginPath();
+      ctx.moveTo(sx - 7 * s, base - 8 * s); ctx.lineTo(sx + 7 * s, base - 8 * s);
+      ctx.lineTo(sx + 6 * s, base - 10 * s + sway); ctx.lineTo(sx - 6 * s, base - 10 * s - sway);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#c9a23f';                            // goods on the counter
+      ctx.fillRect(sx - 5 * s, base - 4 * s, 10 * s, 2 * s);
+      ctx.fillStyle = '#3d1832';
+      ctx.fillRect(sx - 5 * s, base - 2 * s, 10 * s, 2 * s);
+    } else if (p.kind === 'boat') {                         // a canal boat drifting one way, gently bobbing
+      const way = p.seed % 2 ? 1 : -1, u = (t / (4500 + p.seed % 4000) + p.seed / 5) % 1, tt = (u - .5) * way;
+      const o = proj(cam, p.x + (p.dx || 0) * tt * (p.len || 4), p.y + (p.dy || 0) * tt * (p.len || 4));
+      const osx = o.sx, ob = o.sy + 3 * s + Math.sin(t / (600 + p.seed % 400) + p.seed) * 1.2 * s, ga = ctx.globalAlpha;
+      ctx.globalAlpha = ga * Math.min(1, Math.min(u, 1 - u) * 6);   // fade in/out at the ends
+      ctx.fillStyle = 'rgba(126,200,255,.5)';               // wake
+      ctx.fillRect(osx - 8 * s, ob + 1 * s, 16 * s, 1.2 * s);
+      ctx.fillStyle = '#5a3a26';                            // hull
+      ctx.beginPath();
+      ctx.moveTo(osx - 7 * s, ob - 2 * s); ctx.lineTo(osx + 7 * s, ob - 2 * s);
+      ctx.lineTo(osx + 4 * s, ob + 1.5 * s); ctx.lineTo(osx - 4 * s, ob + 1.5 * s); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#c9b893';                            // cabin
+      ctx.fillRect(osx - 3 * s, ob - 5 * s, 6 * s, 3 * s);
+      ctx.globalAlpha = ga;
+    } else if (p.kind === 'crosswalk') {                    // flat zebra decal across an intersection tile
+      ctx.strokeStyle = 'rgba(233,228,214,.45)';
+      ctx.lineWidth = Math.max(1.5, 2.4 * s);
+      for (let i = 0; i < 4; i++) {
+        const f = -.32 + i * .21;
+        const a = p.dir ? proj(cam, p.x - .34, p.y + f) : proj(cam, p.x + f, p.y - .34);
+        const b = p.dir ? proj(cam, p.x + .34, p.y + f) : proj(cam, p.x + f, p.y + .34);
+        ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
+      }
+    } else if (p.kind === 'steam') {                        // a street vent venting puffs
+      ctx.fillStyle = '#2b2230';
+      ctx.fillRect(sx - 3 * s, base - 1.5 * s, 6 * s, 2 * s);
+      for (let i = 0; i < 3; i++) {
+        const k = (t / (1300 + p.seed % 800) + i / 3 + p.seed) % 1, r = (2 + 4 * k) * s;
+        ctx.fillStyle = `rgba(220,224,232,${.26 * (1 - k)})`;
+        ctx.beginPath(); ctx.arc(sx + Math.sin(k * 6 + p.seed) * 2 * s, base - 2 * s - 13 * k * s, r, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (p.kind === 'crow') {                         // a bird wheeling over the graveyard, wings flapping
+      const a = t / (820 + p.seed % 620) + p.seed, o = proj(cam, p.x + Math.cos(a) * 2.2, p.y + Math.sin(a) * 1.4);
+      const cx = o.sx, cy = o.sy - (16 + Math.sin(t / (500 + p.seed % 280) + p.seed) * 4) * s, flap = Math.sin(t / (70 + p.seed % 50) + p.seed) * 3 * s;
+      ctx.strokeStyle = '#1a0a16';
+      ctx.lineWidth = Math.max(1, 1.2 * s);
+      ctx.beginPath();
+      ctx.moveTo(cx - 4 * s, cy + flap); ctx.lineTo(cx, cy); ctx.lineTo(cx + 4 * s, cy + flap); ctx.stroke();
     }
   }
 
   function drawStation(ctx, cam, state, t) {                // package deps arrive by freight train
     const s = cam.s, x = -1.8;                              // open left edge: nothing occludes it
     const bx0 = x - .35, bx1 = x + .65, by0 = .2, by1 = state.H - .2;   // gravel ballast: rails sit on ground, not sky
+    const apron = [proj(cam, bx0, by0), proj(cam, .05, by0), proj(cam, .05, by1), proj(cam, bx0, by1)];
+    ctx.fillStyle = '#294630';                             // grass verge: bridge the gap between the rail line and the city
+    ctx.beginPath(); ctx.moveTo(apron[0].sx, apron[0].sy);
+    for (let k = 1; k < 4; k++) ctx.lineTo(apron[k].sx, apron[k].sy);
+    ctx.closePath(); ctx.fill();
     const bed = [proj(cam, bx0, by0), proj(cam, bx1, by0), proj(cam, bx1, by1), proj(cam, bx0, by1)];
     ctx.fillStyle = '#473a2c';                             // brown dirt
     ctx.beginPath(); ctx.moveTo(bed[0].sx, bed[0].sy);

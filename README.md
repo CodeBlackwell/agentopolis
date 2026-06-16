@@ -23,12 +23,23 @@ agentopolis attach                  # one-time: fire-and-forget hooks into ~/.cl
 
 cd ~/code/any-repo
 agentopolis                         # its city on http://localhost:4242
+
+agentopolis movie                   # replay this repo's git history as a growing city
+agentopolis movie ../other-repo     # …or any local repo
+agentopolis movie https://github.com/owner/repo   # …or any public github repo
 ```
 
 Open http://localhost:4242, then start any Claude Code session — new sessions
 report in automatically. No live session handy? http://localhost:4242/?demo
 runs a scripted day in the city. `agentopolis detach` removes the hooks (a backup
 of settings.json is written on attach). Flags: `--repo`, `--port`, `--zone`.
+
+**Movie mode** (`agentopolis movie [target]`) replays a repo's whole git history
+as a city that grows and re-forms commit by commit. `target` is a local repo dir
+or a public github url; github repos download only the minimum git data (a
+`blob:none` clone removed right after seeding) and the city is held in memory
+only. Run outside a git repo and agentopolis tells you how to point it at one
+instead of opening a blank map.
 
 **Zoning:** if the repo has a `.agentopolis.json` manifest it defines the city's
 components, layers, and clouds (see `city/maisight.json` for a full example);

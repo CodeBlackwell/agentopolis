@@ -486,6 +486,101 @@ const City = (() => {
       || clear.every(([f, r]) => Math.hypot(p.x - f.x - .5, p.y - f.y - .5) > r));
   }
 
+  // Ambient life keyed to the formation stage. Every count derives from a repo-relative quantity
+  // (district recency / commit volume, hub dominance, layer count, deletions) — never a constant — and
+  // is capped relative to map area so a big repo doesn't clutter. Presence is earned: no fountain unless
+  // radial, no boats unless canals exist, no crows unless files died. Pure placement into state.props.
+  function ambientDressing(state, data) {
+    const W = state.W, H = state.H, g = state.ground, code = (x, y) => g[y] && g[y][x];
+    const cap = n => Math.min(n, Math.max(1, Math.round(W * H / 60)));    // clutter ceiling ∝ map area
+    const stats = state.blocks.map(bl => {                               // per-district aggregates
+      let commits = 0, lit = 0;
+      for (const b of bl.list) { commits += b.commits || 0; lit += b.lit || 0; }
+      return { bl, commits, lit, n: bl.list.length };
+    });
+    const maxCommits = Math.max(1, ...stats.map(s => s.commits));
+    const commitMed = q(stats.map(s => s.commits), .5);
+
+    for (const s of stats) {                                            // pedestrians: ∝ district liveliness (mean recency)
+      if (!s.n || !s.bl.lots.length) continue;
+      for (let i = 0, count = cap(Math.round(s.lit / s.n * Math.sqrt(s.n))); i < count; i++) {
+        const lot = s.bl.lots[hash(s.bl.comp.id + 'w' + i) % s.bl.lots.length];
+        state.props.push({ kind: 'walker', x: lot.x, y: lot.y, seed: hash(s.bl.comp.id + 'walk' + i) });
+      }
+    }
+
+    const streets = [], sset = new Set();                               // traffic: cars cruise the road grid ∝ commit activity
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++)
+      if (code(x, y) <= 1) { streets.push({ x, y }); sset.add(x + ',' + y); }
+    if (streets.length) {
+      const activity = stats.reduce((a, s) => a + s.commits, 0) / maxCommits;
+      const DIRS = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+      const road = (x, y) => sset.has(x + ',' + y);
+      for (let i = 0, cars = cap(Math.round(activity * Math.sqrt(streets.length))); i < cars; i++) {
+        let cur = streets[hash('car' + i) % streets.length], dir = DIRS[hash('cd' + i) % 4];
+        const path = [{ x: cur.x + .5, y: cur.y + .5 }];               // a route that takes 1-3 turns, then ends
+        const maxTurns = 1 + hash('ct' + i) % 3;
+        for (let k = 0, turns = 0; k < 5 + hash('cs' + i) % 7; k++) {
+          const fwd = road(cur.x + dir.x, cur.y + dir.y);
+          const perp = [{ x: -dir.y, y: dir.x }, { x: dir.y, y: -dir.x }].filter(d => road(cur.x + d.x, cur.y + d.y));
+          if (turns < maxTurns && perp.length && (!fwd || hash('cturn' + i + k) % 4 === 0)) {
+            dir = perp[hash('cp' + i + k) % perp.length]; turns++;     // turn at an intersection
+          } else if (!fwd) break;
+          cur = { x: cur.x + dir.x, y: cur.y + dir.y };
+          path.push({ x: cur.x + .5, y: cur.y + .5 });
+        }
+        if (path.length >= 2) state.props.push({ kind: 'traffic', x: path[0].x, y: path[0].y, seed: hash('car' + i), path });
+      }
+    }
+
+    if (state.formation === 'radial' && state.cityHall) {               // plaza fountain (spray ∝ dominance) + stalls
+      state.props.push({ kind: 'fountain', x: state.cityHall.x + .5, y: state.cityHall.y + 2, seed: 11,
+        spray: Math.min(2.4, 1 + statsOf(data).dominance / FORM_CUT.dominance) });
+      const avoid = [];
+      for (let i = 0, active = cap(stats.filter(s => s.commits > commitMed).length); i < active; i++) {
+        const p = clearPocket(state, { near: state.cityHall, minRoom: 1, avoid });
+        if (!p) break;
+        avoid.push({ x: p.x + .5, y: p.y + .5, r: 2 });
+        state.props.push({ kind: 'stall', x: p.x + .5, y: p.y + .5, seed: hash('stall' + i) });
+      }
+    }
+
+    const canals = [];                                                  // boats: ∝ data-flow layers on the water
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (code(x, y) === 4) canals.push({ x, y });
+    if (canals.length) {
+      const layers = new Set(state.blocks.map(b => b.comp.layer)).size;
+      for (let i = 0, boats = cap(Math.min(layers, Math.ceil(canals.length / 8))); i < boats; i++) {
+        const c = canals[hash('boat' + i) % canals.length];
+        const horiz = code(c.x + 1, c.y) === 4 || code(c.x - 1, c.y) === 4;
+        state.props.push({ kind: 'boat', x: c.x + .5, y: c.y + .5, seed: hash('boat' + i),
+          dx: horiz ? 1 : 0, dy: horiz ? 0 : 1, len: 3 });
+      }
+    }
+
+    if (state.formation === 'grid') {                                   // downtown: crosswalk decals + steam vents
+      const inter = [], vents = [];
+      for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+        if (code(x, y) > 1) continue;
+        const ns = code(x, y - 1) <= 1 || code(x, y + 1) <= 1, ew = code(x + 1, y) <= 1 || code(x - 1, y) <= 1;
+        (ns && ew ? inter : vents).push({ x, y });
+      }
+      for (let i = 0; i < cap(Math.ceil(inter.length / 3)) && inter.length; i++) {
+        const it = inter[hash('xw' + i) % inter.length];
+        state.props.push({ kind: 'crosswalk', x: it.x + .5, y: it.y + .5, seed: hash('xw' + i), dir: hash('xw' + i) % 2 });
+      }
+      for (let i = 0; i < cap(Math.ceil(vents.length / 12)) && vents.length; i++) {
+        const v = vents[hash('steam' + i) % vents.length];
+        state.props.push({ kind: 'steam', x: v.x + .5, y: v.y + .5, seed: hash('steam' + i) });
+      }
+    }
+
+    if (state.cemetery && (state.graves || []).length) {                // crows over the graveyard ∝ deletions
+      const cx = (1 + state.cemetery.x1) / 2, cy = state.cemetery.y0 + state.cemetery.rows / 2 + .5;
+      for (let i = 0; i < cap(Math.ceil(Math.log2((data.dead || []).length + 1))); i++)
+        state.props.push({ kind: 'crow', x: cx, y: cy, seed: hash('crow' + i) + i });
+    }
+  }
+
   function layout(data) {
     const state = { zone: data.zone, blocks: [], buildings: [], props: [],
                     byPath: new Map(), items: [], clouds: [], cityHall: null };
@@ -493,6 +588,7 @@ const City = (() => {
     const byComp = {};
     for (const b of data.buildings) (byComp[b.component] ??= []).push(b);
     (data._planFn || PLANS[data.zone.plan] || choosePlan(data))(state, data, byComp);   // _planFn pins a formation per epoch
+    state.formation = data._formationId || data.zone.plan || chooseFormation(data).id;   // the stage, for ambient dressing
     addCemetery(state, data);
     sprinkle(state);
     if (state.village && state.cityHall) {                  // a well anchors the green commons
@@ -506,6 +602,7 @@ const City = (() => {
       imports: q(data.buildings.map(b => b.imports || 0), .9),
       todos: q(data.buildings.map(b => b.todos || 0), .9) };
     for (const block of state.blocks) fillBlock(state, block);
+    ambientDressing(state, data);                           // stage-keyed, data-tied passive life
     state.sortedRot = 0;
     const k0 = dkey(0);
     state.items = [...state.buildings, ...state.props].sort((a, b) => k0(a) - k0(b));

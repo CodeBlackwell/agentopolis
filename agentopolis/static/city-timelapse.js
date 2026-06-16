@@ -213,7 +213,8 @@ function buildEpochLayouts(data, epochs) {
   let hadVillage = false;
   epochs.forEach((ep, ei) => {
     const st = City.layout({ zone: data.zone, buildings: ep.buildingsAlive,
-      deps: data.deps, docker: data.docker, dead: data.dead, _planFn: ep.formation.plan });
+      deps: data.deps, docker: data.docker, dead: data.dead,
+      _planFn: ep.formation.plan, _formationId: ep.formation.id });   // tag the stage for ambient dressing
     for (const b of st.buildings)
       (b._epochPos ||= {})[ei] = { x: b.x, y: b.y, floors: b.floors, foot: b.foot, color: b.color,
         form: b.form, arch: b.arch, heightScale: b.heightScale, lit: b.lit, billboard: b.billboard,
@@ -339,9 +340,7 @@ function beginTransition(fromE, toE, at) {
     startT: performance.now(), span: Math.min(3500, Math.max(700, waves * 650)),
     fromS: fitScale(fs), toS: fitScale(ts) };
   cam.cx = ts.W / 2; cam.cy = ts.H / 2;
-  renderExplain([...toAlive].filter(live), at,            // narrate the re-form while it animates (cards hold otherwise)
-    { id: layouts[toE].ep.formation.id, reform: { from: layouts[fromE].ep.formation.id, to: layouts[toE].ep.formation.id } });
-}
+}                                                          // the Re-Formed card appears on settle (recompute → renderExplain)
 
 const COLLAPSE_W = 0.5;                                   // a demolition spans half a wave (rebuild mode)
 const TRANSITION_MODES = ['hybrid', 'slide', 'rebuild'];  // selectable in the transport bar
@@ -623,7 +622,8 @@ function buildExplain() {
     .xcard h5 .chip{width:10px;height:10px;flex:0 0 10px;border:1px solid var(--plum)}
     .xcard p{font:9px 'Silkscreen',monospace;color:var(--cream);line-height:1.55;padding:7px 9px;margin:0}
     .xcard .em{color:var(--gold)}
-    #explain .stat-grid{margin:0}`;
+    #explain .stat-grid{margin:0}
+    #explain .stat-value{color:var(--cream)}`;
   document.head.appendChild(document.createElement('style')).textContent = css;
   const box = document.createElement('div'); box.id = 'explain';
   dock.appendChild(box);
@@ -648,18 +648,32 @@ function formationCard(id, s) {                            // the secret sauce, 
   return card('Shape · ' + (FORM_TITLE[id] || id), why[id] || '', null, 'shape:' + (s.hub || ''));
 }
 
-function reformCard(from, to) {                            // the headline beat: the city crossed a threshold
-  return `<div class="xcard live" style="border-color:var(--pink-deep)"><h5>⟳ Re-forming</h5>`
-    + `<p><span class="em">${FORM_TITLE[from] || from}</span> → <span class="em">${FORM_TITLE[to] || to}</span>`
-    + ` — the repo outgrew its shape, so the city demolishes and rebuilds. Why the new shape:</p></div>`;
+function reformReason(to, s) {                             // the one threshold the repo crossed to trigger the re-form
+  const k = City.FORM_CUT, d = s.dominance.toFixed(1), m = s.mass.toFixed(1);
+  return {
+    radial: `<span class="em">${esc(s.hubName || 'one district')}</span>'s coupling took over (mass ${m} ≥ ${k.mass}, dominance ${d} ≥ ${k.dominance}).`,
+    spine: `the data-flow layers came into balance at ${s.nbuild} files.`,
+    grid: `it outgrew a single hub into <span class="em">${pl(s.n, 'peer district')}</span> with no clear center.`,
+    village: `it settled back below the downtown threshold.`,
+  }[to] || '';
 }
 
-// opts.id overrides the drawn formation (used mid-transition, before the epoch swaps); opts.reform
-// prepends the re-forming banner. Default reads the live epoch + the buildings standing this commit.
-function renderExplain(shown, i, opts = {}) {
+// Persists until the next transition: which two shapes, the exact commit it happened on, and why.
+function reformedCard() {
+  if (epochIndex <= 0) return '';                          // epoch 0 was never re-formed into
+  const from = layouts[epochIndex - 1].ep.formation.id, to = layouts[epochIndex].ep.formation.id;
+  const at = layouts[epochIndex].ep.start, c = commits[at];
+  const s = City.statsOf({ zone: state.zone, buildings: layouts[epochIndex].ep.buildingsAlive });
+  const when = c ? `commit ${at + 1} · ${new Date(c.ts * 1000).toLocaleDateString()}` : `commit ${at + 1}`;
+  return `<div class="xcard live" style="border-color:var(--pink-deep)"><h5>⟳ Re-Formed · ${FORM_TITLE[to] || to}</h5>`
+    + `<p><span class="em">${FORM_TITLE[from] || from}</span> → <span class="em">${FORM_TITLE[to] || to}</span> at <span class="em">${when}</span>`
+    + ` — ${reformReason(to, s)}${c ? `<br>"${esc(c.subject)}"` : ''}</p></div>`;
+}
+
+function renderExplain(shown, i) {
   const box = document.getElementById('explain');
   if (!box || !state) return;
-  const c = commits[i], id = opts.id || layouts[epochIndex].ep.formation.id;
+  const c = commits[i], id = layouts[epochIndex].ep.formation.id;
   const s = City.statsOf({ zone: state.zone, buildings: shown });
   const perDist = {};                                     // standing buildings per district at this commit
   for (const b of shown) perDist[b.component] = (perDist[b.component] || 0) + 1;
@@ -669,14 +683,16 @@ function renderExplain(shown, i, opts = {}) {
   const hubs = shown.filter(b => b.hub).length, debts = shown.filter(b => b.debt).length;
   const graves = state.buildings.filter(b => b.death !== undefined && i >= b.death).length;
   const loc = shown.reduce((a, b) => a + (b.loc || 0), 0);
+  const amb = k => (state._props || []).filter(p => p.kind === k).length;   // ambient life present this epoch
   const relics = (state._props || []).filter(p => RELIC_KIND[p.kind]).length;
+  const onFoot = amb('walker'), cars = amb('traffic'), boats = amb('boat'), stalls = amb('stall'), crows = amb('crow');
   const stat = (l, v) => `<div class="stat-cell"><span class="stat-label">${l}</span><span class="stat-value">${v}</span></div>`;
   const cards = [];
-  if (opts.reform) cards.push(reformCard(opts.reform.from, opts.reform.to));
   cards.push(`<div class="xcard live"><h5>${esc(state.zone.repo || 'city')} · live</h5><div class="stat-grid">`
     + stat('commit', `${i + 1}/${commits.length}`) + stat('date', c ? new Date(c.ts * 1000).toLocaleDateString() : '—')
     + stat('buildings', shown.length) + stat('lines', loc.toLocaleString())
     + stat('districts', districts.length) + stat('shape', id) + `</div></div>`);
+  const reformed = reformedCard(); if (reformed) cards.push(reformed);   // persists until the next re-form
   cards.push(formationCard(id, s));
   for (const d of districts)
     cards.push(card(d.name, `<span class="em">${pl(perDist[d.id], 'file')}</span> · ${KIND_ROLE[d.kind] || d.kind}`
@@ -685,8 +701,11 @@ function renderExplain(shown, i, opts = {}) {
   if (debts) cards.push(card('TODO Debt', `Cranes hang over ${pl(debts, 'file')} in the top 10% by TODO / FIXME count.`, null, 'debt'));
   if (state.deps.length) cards.push(card('Freight Rail', `${state.deps.length} package deps ride the freight line — read from the manifest.`, null, 'deps'));
   if (state.docker.length) cards.push(card('Docker Harbor', `${pl(state.docker.length, 'container service')} moored at the harbor — from compose / Dockerfiles.`, null, 'docker'));
-  if (graves) cards.push(card('Graveyard', `${pl(graves, 'file')} deleted across history so far — headstones below the city.`, null, 'graves'));
+  if (graves) cards.push(card('Graveyard', `${pl(graves, 'file')} deleted across history so far — headstones below the city${crows ? ', crows wheeling overhead' : ''}.`, null, 'graves'));
   if (relics) cards.push(card('Village Relics', `The old well became a fountain and the herd + windmill migrated to a city farm on the outskirts — ${pl(relics, 'relic')} the hamlet left behind.`, null, 'relics'));
+  if (onFoot || cars) cards.push(card('Street Life', `<span class="em">${pl(onFoot, 'resident')}</span> out on foot and <span class="em">${pl(cars, 'car')}</span> on the roads — both thicken in the districts touched most recently.`, null, 'street'));
+  if (stalls) cards.push(card('Market', `${pl(stalls, 'stall')} ring the plaza — one per district still seeing active commits.`, null, 'stall'));
+  if (boats) cards.push(card('Canal Traffic', `${pl(boats, 'boat')} work the canals that divide the data-flow layers.`, null, 'boat'));
   if (c) cards.push(card('Now Playing', `<span class="em">${esc(new Date(c.ts * 1000).toLocaleDateString())}</span> · ${esc(c.author)}`
     + ` · ${pl(c.files.length, 'file')} changed<br>"${esc(c.subject)}"`));
   box.innerHTML = cards.join('');
@@ -727,7 +746,9 @@ function focusPoints(focus) {                              // screen points (wit
     .map(h => ({ ...hitCenter(h), color: '#2b2230' }));
   if (type === 'docker') return (state.hits || []).filter(h => /service|image/i.test(h.tip || ''))
     .map(h => ({ ...hitCenter(h), color: '#2b2230' }));
-  return [];
+  const kinds = type === 'street' ? ['walker', 'traffic'] : [type];   // ambient props ping at their anchor
+  return (state.items || []).filter(p => kinds.includes(p.kind))
+    .map(p => ({ ...City.proj(cam, p.x, p.y), color: '#8fb9a8' }));
 }
 
 function drawFocus(t, focus) {

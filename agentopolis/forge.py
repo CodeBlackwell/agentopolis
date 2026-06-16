@@ -15,9 +15,11 @@ from .zone import load_zone
 forged: dict[str, dict] = {}        # normalized url -> city data, cached for process lifetime
 forged_tl: dict[str, dict] = {}     # normalized url -> {data, timeline}, for the history time-lapse
 
-# disk cache so a shared demo link survives restarts: first visitor pays, the rest are instant
+# disk cache so a shared demo link survives restarts: first visitor pays, the rest are instant.
+# disk_cache=False keeps forged bundles in memory only (the `agentopolis movie` CLI flips it off).
 CACHE_DIR = Path(os.environ.get("AGENTOPOLIS_FORGE_CACHE",
                                 Path(tempfile.gettempdir()) / "agentopolis-forge"))
+disk_cache = True
 
 
 def _disk(url: str, kind: str) -> Path:
@@ -29,7 +31,7 @@ def _load(url: str, kind: str, mem: dict) -> dict | None:
     if url in mem:
         return mem[url]
     path = _disk(url, kind)
-    if path.exists():
+    if disk_cache and path.exists():
         mem[url] = json.loads(path.read_text())
         return mem[url]
     return None
@@ -37,8 +39,9 @@ def _load(url: str, kind: str, mem: dict) -> dict | None:
 
 def _save(url: str, kind: str, mem: dict, bundle: dict) -> dict:
     mem[url] = bundle
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    _disk(url, kind).write_text(json.dumps(bundle))
+    if disk_cache:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        _disk(url, kind).write_text(json.dumps(bundle))
     return bundle
 
 
