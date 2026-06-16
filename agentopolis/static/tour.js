@@ -15,6 +15,7 @@
   const ctx = demo && isMovie ? (window.DEMO_MOVIE ? 'demo-land' : 'demo-cards')
             : isMovie ? 'movie' : mode;                  // 'nation' | 'city' | 'movie' | 'demo-land' | 'demo-cards'
   if (!['nation', 'city', 'movie', 'demo-land', 'demo-cards'].includes(ctx)) return;
+  const screeningRoom = ctx === 'movie' || ctx === 'demo-land' || ctx === 'demo-cards';   // the movie IS the content
   const DONE = 'agentopolis-tour-done', RESUME = 'agentopolis-tour-resume';
   const leader = 'Permanent Democratically Elected Supreme President';   // the full, mandatory title
   const pres = 'Supreme President';                                      // the everyday short form
@@ -26,13 +27,16 @@
     { center: 1, title: '⭐ THE NATION OF AGENTOPOLIS ⭐',
       text: `${leader}! You have been re-elected with 100% of the vote. Again. Congratulations are, as ever, mandatory. Permit your humble Chief of Staff to present the Republic.` },
     { sel: '#map', title: 'Your glorious dominion',
-      text: 'Behold the Nation, surveyed from on high. Drag to parade across it, scroll to zoom, Q or E to spin it for the cameras. Every pixel adores you.' },
+      text: 'Behold the Nation, surveyed from on high. Drag to parade across it, scroll to zoom, Q or E to spin it for the cameras. Every pixel adores you.',
+      try: 'Go on — drag, scroll, and Q/E to spin. I shall wait.' },
     { sel: '#tiers', title: 'Chain of command',
-      text: 'WORLD ▸ STATE ▸ CITY. Descend from the heavens into any province, Excellency — click a city to enter, zoom out when the peasants bore you.' },
+      text: 'WORLD ▸ STATE ▸ CITY. Descend from the heavens into any province, Excellency — click a city to enter, zoom out when the peasants bore you.',
+      try: 'Click a province to descend into it.' },
     { sel: '#panel-guide', title: 'Ministry briefing',
       text: 'Your dossier decodes every banner and rooftop in the realm. Memorize it — or do not; who would dare correct you?' },
     { sel: '#hotel', title: 'The loyal workforce',
-      text: 'Your tireless citizens — each a Claude Code agent — check in here to labor for the Motherland. Hover one to read its devoted assignment.' },
+      text: 'Your tireless citizens — each a Claude Code agent — check in here to labor for the Motherland. Hover one to read its devoted assignment.',
+      try: 'Hover a worker to read its task.' },
     { sel: '#ticker', title: 'The State Record',
       text: 'Every decree your agents carry out scrolls through this log the instant it happens — official, unbiased, entirely factual news of the Republic. Approved by you, naturally.' },
     { sel: '#forge', title: 'The annexation office',
@@ -44,15 +48,19 @@
     { center: 1, title: `⭐ ${city.toUpperCase()} CITY ⭐`,
       text: `${leader}, welcome to ${city} — jewel of the Republic, raised stone by stone in your honor (and entirely by your decree). Your Chief of Staff, at your service.` },
     { sel: '#map', title: 'Survey your city',
-      text: 'Drag to stroll your boulevards, scroll to zoom upon the rooftops, Q or E to spin the skyline. The city builds itself — for you, ceaselessly.' },
+      text: 'Drag to stroll your boulevards, scroll to zoom upon the rooftops, Q or E to spin the skyline. The city builds itself — for you, ceaselessly.',
+      try: 'Try it now — drag, scroll, Q/E to spin.' },
     { sel: '#mapctl', title: 'The royal controls',
-      text: 'Zoom, rotate, and reset your view here, Excellency — and press ⊔ Share to flaunt your city before the envious neighboring states.' },
+      text: 'Zoom, rotate, and reset your view here, Excellency — and press ⊔ Share to flaunt your city before the envious neighboring states.',
+      try: 'Press the controls — zoom or spin the skyline.' },
     { sel: '#legend', title: 'Secrets of the skyline',
       text: 'This guide decodes the city — floors are code, lit windows are fresh toil, cranes mark unfinished debt. Knowledge is power. You, of course, possess both.' },
     { sel: '#city-shape', title: 'Shape the skyline',
-      text: 'A rare grant of choice, Excellency: reshape every building by file family, rarity, size, age — or a tasteful uniform decree. The look of the city bends to your aesthetic whim.' },
+      text: 'A rare grant of choice, Excellency: reshape every building by file family, rarity, size, age — or a tasteful uniform decree. The look of the city bends to your aesthetic whim.',
+      try: 'Change it now — watch the whole city re-shape.' },
     { sel: '#hotel', title: 'The dispatch floor',
-      text: 'Each pixel worker below is a live agent serving you this very moment. Hover to inspect their devotion. Idle hands are, naturally, unconstitutional.' },
+      text: 'Each pixel worker below is a live agent serving you this very moment. Hover to inspect their devotion. Idle hands are, naturally, unconstitutional.',
+      try: 'Hover an agent to inspect its devotion.' },
     { sel: '#ticker', title: 'The State Record',
       text: 'And here, the official log — every file your agents touch, every command they run, scrolling by as it happens. The chronicle of your tireless administration.' },
     { sel: '#replay', force: 1, title: 'Now — the founding myth',
@@ -64,17 +72,23 @@
     { center: 1, title: '⭐ THE FOUNDING, REPLAYED ⭐',
       text: `Roll the reel, ${pres} — the official history of ${city}, rising commit by commit. This is your royal screening room; every lever of the chronicle obeys you here.` },
     { sel: '#tl-play', title: 'Play & pause the chronicle',
-      text: '▶ Begin or halt the documentary at your pleasure. History waits for you — it always has.' },
+      text: '▶ Begin or halt the documentary at your pleasure. History waits for you — it always has.',
+      try: 'Press ▶ — start the reel yourself.' },
     { sel: '#tl-seek', title: 'Scrub through the ages',
-      text: 'Drag to leap to any era of your glorious reign — the founding, the boom years, the present golden age — in an instant.' },
+      text: 'Drag to leap to any era of your glorious reign — the founding, the boom years, the present golden age — in an instant.',
+      try: 'Drag the scrubber across the ages.' },
     { sel: '#tl-speed', title: 'The pace of progress',
-      text: 'A leisurely crawl, or a triumphant 10× sprint. The Republic advances precisely as fast as you decree.' },
+      text: 'A leisurely crawl, or a triumphant 10× sprint. The Republic advances precisely as fast as you decree.',
+      try: 'Change the pace — try 10×.' },
     { sel: '#tl-trans', title: 'Urban renewal, by decree',
-      text: 'Choose how the city RE-FORMS between eras — a smooth hybrid, a clean slide, or full demolition-and-rebuild. Progress is sometimes loud.' },
+      text: 'Choose how the city RE-FORMS between eras — a smooth hybrid, a clean slide, or full demolition-and-rebuild. Progress is sometimes loud.',
+      try: 'Pick a mode — then scrub across an era.' },
     { sel: '#tl-shape', title: 'Reshape every building',
-      text: 'The same grant of taste as your live city: shape the skyline by file family, rarity, size, age — or uniform decree. Reshape an entire history with a single flick. (Uniformity is, of course, encouraged.)' },
+      text: 'The same grant of taste as your live city: shape the skyline by file family, rarity, size, age — or uniform decree. Reshape an entire history with a single flick. (Uniformity is, of course, encouraged.)',
+      try: 'Reshape the skyline — pick another mode.' },
     { sel: '#explain', title: 'The living dossier',
-      text: 'As the city grows, this panel narrates each district and landmark in real time — the official record of your achievements, updated as they become true.' },
+      text: 'As the city grows, this panel narrates each district and landmark in real time — the official record of your achievements, updated as they become true.',
+      try: 'Hover a card — watch the streets it names light up.' },
     { sel: '#tl-exit', title: 'Return to the present',
       text: 'When the documentary has suitably flattered you, press ■ live to return to the breathing city. Duty calls, Excellency.' },
     { center: 1, title: '⭐ LONG LIVE THE PRESIDENT ⭐',
@@ -86,13 +100,17 @@
     { center: 1, title: '⭐ WELCOME TO THE REPUBLIC ⭐',
       text: `${leader}! Your capital is rebuilding its entire glorious history before your very eyes. Permit your Chief of Staff to narrate the spectacle.` },
     { sel: '#map', title: 'The founding, replayed',
-      text: 'Watch the city raise itself from a single humble commit into the metropolis it was always destined to become. It plays itself — as all things do, for you.' },
+      text: 'Watch the city raise itself from a single humble commit into the metropolis it was always destined to become. It plays itself — as all things do, for you.',
+      try: 'Drag, scroll, and spin while it builds.' },
     { sel: '#transport', title: 'Your screening controls',
-      text: '▶ Play or pause, drag to scrub through the ages, set the pace of progress. The chronicle obeys your hand.' },
+      text: '▶ Play or pause, drag to scrub through the ages, set the pace of progress. The chronicle obeys your hand.',
+      try: 'Press play, or drag the scrubber.' },
     { sel: '#tl-shape', title: 'Shape the skyline',
-      text: 'A grant of taste, Excellency: reshape every building by file family, rarity, size, age — or a tasteful uniform decree. The look of the Republic bends to your whim.' },
+      text: 'A grant of taste, Excellency: reshape every building by file family, rarity, size, age — or a tasteful uniform decree. The look of the Republic bends to your whim.',
+      try: 'Reshape the skyline — pick a mode.' },
     { sel: '#hotel', title: 'The tireless citizenry',
-      text: 'Your loyal pixel workers scurry across the dispatch floor without rest. Idle hands are, naturally, unconstitutional.' },
+      text: 'Your loyal pixel workers scurry across the dispatch floor without rest. Idle hands are, naturally, unconstitutional.',
+      try: 'Hover a citizen to read its labor.' },
     { sel: '#forge', title: 'A leader BUILDS',
       text: 'But watching is for subjects — a President BUILDS. One simply enters a territory’s address here. Permit me to demonstrate, Excellency.',
       typeInto: '#forge input', typeUrl: 'https://github.com/chalk/ansi-styles',
@@ -103,9 +121,11 @@
     { center: 1, title: '⭐ A TERRITORY ANNEXED ⭐',
       text: `Behold, ${pres} — a foreign province, raising itself stone by stone from its first commit at your command. And now, the briefing you were denied back home...` },
     { sel: '#explain', title: 'Your living war-room dossier',
-      text: 'The dispatch floor yields to your briefing — and it rewrites ITSELF every commit. "Now Playing" names the commit at hand; the ledger counts your holdings; the Formation card reveals the very metrics that CHOSE this city’s shape; and each district reports its strength.' },
+      text: 'The dispatch floor yields to your briefing — and it rewrites ITSELF every commit. "Now Playing" names the commit at hand; the ledger counts your holdings; the Formation card reveals the very metrics that CHOSE this city’s shape; and each district reports its strength.',
+      try: 'Read the cards — they refresh with every commit.' },
     { sel: '#explain', title: 'The map answers to you',
-      text: 'Hover any card and the streets it names PULSE to attention. Hover a building, and its card rises to meet your gaze. Dossier and city are one — and cards appear or vanish as your history makes them true.' },
+      text: 'Hover any card and the streets it names PULSE to attention. Hover a building, and its card rises to meet your gaze. Dossier and city are one — and cards appear or vanish as your history makes them true.',
+      try: 'Hover a card now — watch the city pulse in answer.' },
     { sel: '#tl-exit', title: 'Return to the present',
       text: 'Press ■ live when the chronicle has flattered you sufficiently — or ⊔ Share this conquest with the lesser nations.' },
     { center: 1, title: '⭐ NOW GO BUILD, PRESIDENT ⭐',
@@ -157,13 +177,22 @@
 
   function build() {
     const css = `
-      #tour-block{position:fixed;inset:0;z-index:40}
+      #tour-block{position:fixed;inset:0;z-index:40;pointer-events:none}
+      .tour-mask{position:fixed;z-index:40;pointer-events:auto;transition:all .35s ease}
       #tour-hole{position:fixed;z-index:41;border:3px solid var(--gold);border-radius:6px;pointer-events:none;
         box-shadow:0 0 0 9999px rgba(26,10,20,.8),0 0 22px rgba(212,169,83,.6);transition:all .35s ease}
-      #tour-hole.center{opacity:0}
+      #tour-hole.scrim{border-color:transparent;left:50%;top:50%;width:0;height:0;
+        box-shadow:0 0 0 9999px rgba(26,10,20,.82)}
       #tour-hole.force{animation:tour-pulse 1.1s ease-in-out infinite}
       @keyframes tour-pulse{0%,100%{box-shadow:0 0 0 9999px rgba(26,10,20,.8),0 0 10px rgba(212,169,83,.5)}
         50%{box-shadow:0 0 0 9999px rgba(26,10,20,.8),0 0 28px 6px rgba(212,169,83,.95)}}
+      /* screening room: the movie IS the content — never wash it dark. The spotlit element reads from its
+         gold outline + glow alone, and the four-panel cutout still gates interaction. */
+      #tour-block.nodim #tour-hole{box-shadow:0 0 22px 3px rgba(212,169,83,.75)}
+      #tour-block.nodim #tour-hole.scrim{box-shadow:none}
+      #tour-block.nodim #tour-hole.force{animation:tour-pulse-light 1.1s ease-in-out infinite}
+      @keyframes tour-pulse-light{0%,100%{box-shadow:0 0 10px rgba(212,169,83,.6)}
+        50%{box-shadow:0 0 28px 6px rgba(212,169,83,.98)}}
       #tour-card{position:fixed;z-index:42;width:340px;max-width:calc(100vw - 24px);background:var(--plum);
         border:4px solid var(--gold);box-shadow:0 14px 30px rgba(0,0,0,.5);font-family:'Silkscreen',monospace;
         color:var(--cream);transition:top .35s ease,bottom .35s ease,left .35s ease}
@@ -185,6 +214,8 @@
       #tour-card .skip{background:transparent;border:0;color:var(--pink-deep);padding:7px 4px;font-size:9px}
       #tour-card .skip:hover{background:transparent;color:var(--gold)}
       #tour-card .nudge{font-size:9px;color:var(--gold);padding:7px 4px;animation:tour-bob 1.1s ease-in-out infinite}
+      #tour-card .try{margin:0 12px 10px;padding:6px 9px;font-size:9px;line-height:1.5;color:var(--plum);
+        background:var(--gold);box-shadow:2px 2px 0 var(--plum-soft)}
       #tour-badge{position:fixed;left:14px;bottom:14px;z-index:30;cursor:pointer;width:42px;height:42px;
         font-size:20px;line-height:1;background:var(--plum-soft);color:var(--gold);border:2px solid var(--gold);
         box-shadow:3px 3px 0 var(--plum);font-family:'Silkscreen',monospace}
@@ -193,14 +224,17 @@
     document.head.appendChild(document.createElement('style')).textContent = css;
 
     const block = el('div', { id: 'tour-block' });
+    if (screeningRoom) block.classList.add('nodim');          // movie/demo open undimmed so the visualization shows
+    const masks = [0, 1, 2, 3].map(() => el('div', { className: 'tour-mask' }));   // frame the spotlit element
     const hole = el('div', { id: 'tour-hole' });
     const card = el('div', { id: 'tour-card' });
     card.innerHTML = `<div class="body"><canvas id="tour-sprite"></canvas>
       <div class="txt"><h3></h3><p></p><span class="who">— your Chief of Staff</span></div></div>
+      <div class="try" hidden></div>
       <div class="bar"><button class="skip">skip tour</button><div class="dots"></div>
       <span class="nudge" hidden>press it ↑</span>
       <button class="back">back</button><button class="next">next ▸</button></div>`;
-    block.append(hole, card);
+    block.append(...masks, hole, card);
     document.body.appendChild(block);
     drawAide(card.querySelector('#tour-sprite'));
     card.querySelector('.skip').onclick = end;
@@ -214,9 +248,10 @@
       }
       go(at + 1);
     };
-    ui = { block, hole, card, h3: card.querySelector('h3'), p: card.querySelector('p'),
+    ui = { block, hole, card, masks, h3: card.querySelector('h3'), p: card.querySelector('p'),
            dots: card.querySelector('.dots'), back: card.querySelector('.back'),
-           next: card.querySelector('.next'), nudge: card.querySelector('.nudge') };
+           next: card.querySelector('.next'), nudge: card.querySelector('.nudge'),
+           tryEl: card.querySelector('.try') };
   }
 
   function show(i) {
@@ -224,26 +259,45 @@
     const step = steps[i];
     const target = step.center ? null : document.querySelector(step.sel);
     const forced = !!step.force && !!target;
-    ui.block.style.pointerEvents = forced ? 'none' : 'auto';   // forced: let the real control receive the click
     if (target) {
       const r = target.getBoundingClientRect();
       ui.hole.className = forced ? 'force' : '';
-      Object.assign(ui.hole.style, { left: r.left - 8 + 'px', top: r.top - 8 + 'px',
-        width: r.width + 16 + 'px', height: r.height + 16 + 'px' });
+      const hx = r.left - 8, hy = r.top - 8, hw = r.width + 16, hh = r.height + 16;
+      Object.assign(ui.hole.style, { left: hx + 'px', top: hy + 'px', width: hw + 'px', height: hh + 'px' });
+      mask(hx, hy, hw, hh);                                    // block everything BUT the spotlit element — it stays live
       place(r);
       if (forced) arm(target, step);
     } else {
-      ui.hole.className = 'center';
+      scrim();                                                 // full-screen dim, no cutout
+      maskFull();                                              // block all interaction during intro / close
       Object.assign(ui.card.style, { left: '50%', top: '50%', bottom: 'auto', transform: 'translate(-50%,-50%)' });
     }
     ui.h3.textContent = step.title;
     type(step.text);
+    ui.tryEl.hidden = !(step.try && target);                   // encourage hands-on play with the live element
+    if (step.try && target) ui.tryEl.textContent = '👆 ' + step.try;
     ui.dots.innerHTML = steps.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('');
     ui.back.style.visibility = i ? 'visible' : 'hidden';
     ui.next.hidden = forced;                                   // forced: the only way on is the real button
     ui.nudge.hidden = !forced;
     ui.next.textContent = step.nav ? (step.navLabel || 'show me ▸')
       : i === steps.length - 1 ? 'done ✓' : 'next ▸';
+  }
+
+  // ---- interaction cutout: four transparent panels frame the spotlit element, blocking clicks everywhere
+  //      else so the user can pan/zoom/toggle/hover the very thing being explained — and nothing else. ----
+  const setBox = (m, x, y, w, h) => Object.assign(m.style,
+    { left: x + 'px', top: y + 'px', width: Math.max(0, w) + 'px', height: Math.max(0, h) + 'px' });
+  function mask(hx, hy, hw, hh) {
+    const [top, bottom, left, right] = ui.masks;
+    setBox(top, 0, 0, innerWidth, hy);
+    setBox(bottom, 0, hy + hh, innerWidth, innerHeight - (hy + hh));
+    setBox(left, 0, hy, hx, hh);
+    setBox(right, hx + hw, hy, innerWidth - (hx + hw), hh);
+  }
+  function maskFull() {                                        // one panel covers the screen; the rest collapse
+    setBox(ui.masks[0], 0, 0, innerWidth, innerHeight);
+    for (const m of ui.masks.slice(1)) setBox(m, 0, 0, 0, 0);
   }
 
   function arm(target, step) {                                 // pressing the real control carries the tour onward
@@ -290,8 +344,21 @@
 
   function go(i) { if (i < 0) return; if (i >= steps.length) return end(); show(i); }
 
-  async function start() {
+  function scrim() {                                           // dim the whole screen with no spotlight cutout
+    ui.hole.className = 'scrim';
+    Object.assign(ui.hole.style, { left: '', top: '', width: '', height: '' });   // let .scrim fill the viewport
+  }
+
+  function start() {                                          // dim the screen INSTANTLY, then bring the card in when ready
     if (!ui) build();
+    ui.block.style.display = 'block';
+    scrim();                                                   // immediate overlay shadow — focus before the UI can overwhelm
+    maskFull();                                                // block interaction until the first step decides what's live
+    ui.card.style.visibility = 'hidden';                       // the card waits until its steps are on screen
+    ready();
+  }
+
+  async function ready() {
     if (ctx === 'movie' || ctx === 'demo-land') await waitFor('#transport');   // the bar is built after the timeline loads
     if (ctx === 'demo-cards') await waitFor('#explain', 20000);                // forge clone + dossier need a beat
     steps = LISTS[ctx].filter(s => {                           // drop steps whose element isn't on screen
@@ -299,7 +366,7 @@
       const b = document.querySelector(s.sel)?.getBoundingClientRect();
       return b && b.width > 0 && b.height > 0;
     });
-    ui.block.style.display = 'block';
+    ui.card.style.visibility = 'visible';
     show(0);
   }
 
@@ -315,17 +382,18 @@
   badge.onclick = start;
   document.body.appendChild(badge);
 
+  const active = () => ui && ui.block.style.display !== 'none' && ui.card.style.visibility !== 'hidden';
   addEventListener('keydown', e => {
-    if (!ui || ui.block.style.display === 'none') return;
+    if (!active()) return;                                     // ignore keys during the card-less opening scrim
     if (e.key === 'Escape') end();
     else if ((e.key === 'ArrowRight' || e.key === 'Enter') && !steps[at]?.force) typing ? finishType() : go(at + 1);
     else if (e.key === 'ArrowLeft') go(at - 1);
   });
-  addEventListener('resize', () => { if (ui && ui.block.style.display !== 'none') show(at); });
+  addEventListener('resize', () => { if (active()) show(at); });
 
   if (ctx === 'movie' || ctx === 'demo-cards') {              // resume-only: continued from a forced/driven navigation
-    if (localStorage.getItem(RESUME)) { localStorage.removeItem(RESUME); setTimeout(start, 500); }
+    if (localStorage.getItem(RESUME)) { localStorage.removeItem(RESUME); start(); }
   } else if (!localStorage.getItem(DONE)) {
-    setTimeout(start, ctx === 'demo-land' ? 1600 : 600);      // first visit; let a hero movie breathe a beat first
+    start();                                                   // first visit: dim the screen at once so the UI never overwhelms
   }
 })();
