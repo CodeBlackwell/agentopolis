@@ -589,6 +589,13 @@ const City = (() => {
     for (const b of data.buildings) (byComp[b.component] ??= []).push(b);
     (data._planFn || PLANS[data.zone.plan] || choosePlan(data))(state, data, byComp);   // _planFn pins a formation per epoch
     state.formation = data._formationId || data.zone.plan || chooseFormation(data).id;   // the stage, for ambient dressing
+    if (state.cityHall) {                                   // the hall's grandeur tracks the repo's scale, repo-relative
+      const st = statsOf(data);
+      const span = FORM_CUT.spineFiles - FORM_CUT.files;    // village ceiling → spine-city: the growth runway
+      state.cityHall.grandeur = Math.max(0, Math.min(1, (st.nbuild - FORM_CUT.files) / span));
+      state.cityHall.columns = Math.max(2, Math.min(8, st.n + 1));   // one portico column per district
+      state.cityHall.dome = st.dominance >= FORM_CUT.dominance;      // a dominant hub earns a capitol dome
+    }
     addCemetery(state, data);
     sprinkle(state);
     if (state.village && state.cityHall) {                  // a well anchors the green commons
@@ -1064,38 +1071,90 @@ const City = (() => {
     ctx.globalAlpha = 1;
   }
 
-  function drawCityHall(ctx, cam, x, y) {
-    const s = cam.s;
-    const box = (r, dz) => spin(cam, [proj(cam, x - r, y - r), proj(cam, x + r, y - r),
-                                      proj(cam, x + r, y + r), proj(cam, x - r, y + r)])
-                           .map(p => lift(p, dz));
-    const iso = (pts, tops, color) => {
-      quad(ctx, pts[3], pts[2], tops[2], tops[3], shade(color, .55));
-      quad(ctx, pts[2], pts[1], tops[1], tops[2], shade(color, .75));
-      quad(ctx, tops[0], tops[1], tops[2], tops[3], shade(color, 1.05));
-    };
-    const ph = 5 * s, h = 30 * s;
-    const b0 = box(1.1, ph), b1 = box(1.1, ph + h);
-    iso(box(1.35, 0), box(1.35, ph), '#b08c3e');            // plinth
-    iso(b0, b1, '#d4a953');                                 // body
-    for (const [a, c, col] of [[b0[3], b0[2], '#ddcfb4'], [b0[2], b0[1], '#f9efe3']])
-      for (let i = 0; i < 5; i++) {                         // colonnade, both faces
-        const u = .1 + i * .2;
-        ctx.fillStyle = col;
-        ctx.fillRect(a.sx + (c.sx - a.sx) * u - 1.5 * s, a.sy + (c.sy - a.sy) * u - h * .92,
-                     3 * s, h * .92);
-      }
-    const apex = lift(proj(cam, x, y), ph + h + 18 * s);    // hipped roof
-    for (const [a, c, f] of [[b1[3], b1[2], .6], [b1[2], b1[1], .85]]) {
-      ctx.fillStyle = shade('#b08c3e', f);
-      ctx.beginPath();
-      ctx.moveTo(a.sx, a.sy); ctx.lineTo(c.sx, c.sy); ctx.lineTo(apex.sx, apex.sy);
+  // --- City hall: a civic monument, not an office tower. A wide, low columned temple on a stepped
+  // podium, crowned by a singular landmark chosen by the repo's shape (clock tower / dome / belfry).
+  function hallRing(cam, x, y, rad, z) {                    // four lifted footprint corners; near corner = [2]
+    return spin(cam, [proj(cam, x - rad, y - rad), proj(cam, x + rad, y - rad),
+                      proj(cam, x + rad, y + rad), proj(cam, x - rad, y + rad)]).map(p => lift(p, z));
+  }
+  function hallPrism(ctx, cam, x, y, rad, z0, z1, color) {  // an iso box; returns its top ring for stacking
+    const b = hallRing(cam, x, y, rad, z0), t = hallRing(cam, x, y, rad, z1);
+    quad(ctx, b[3], b[2], t[2], t[3], shade(color, .55));
+    quad(ctx, b[2], b[1], t[1], t[2], shade(color, .78));
+    quad(ctx, t[0], t[1], t[2], t[3], shade(color, 1.08));
+    return t;
+  }
+  function hallGable(ctx, cam, top, apex, color) {          // the two visible roof faces rising to a peak
+    for (const [a, c, f] of [[top[3], top[2], .62], [top[2], top[1], .88]]) {
+      ctx.fillStyle = shade(color, f);
+      ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(c.sx, c.sy); ctx.lineTo(apex.sx, apex.sy);
       ctx.closePath(); ctx.fill();
     }
-    ctx.fillStyle = '#5a2c4d';
-    ctx.fillRect(apex.sx - .75 * s, apex.sy - 13 * s, 1.5 * s, 13 * s);
-    ctx.fillStyle = '#c0395b';
-    ctx.fillRect(apex.sx + .75 * s, apex.sy - 13 * s, 9 * s, 5 * s);
+  }
+  function civicClockTower(ctx, cam, x, y, z0, r, g) {      // town/city landmark: a clock tower
+    const s = cam.s, tr = Math.max(.3, r * .28), th = (22 + 16 * g) * s;
+    const top = hallPrism(ctx, cam, x, y, tr, z0, z0 + th, '#d9be6a');
+    const lo = hallRing(cam, x, y, tr, z0);
+    const c = lerp(lerp(lo[2], lo[1], .5), lerp(top[2], top[1], .5), .74);   // clock face high on the near wall
+    const rad = Math.hypot(top[2].sx - top[1].sx, top[2].sy - top[1].sy) * .3;
+    ctx.fillStyle = '#f4ead2'; ctx.beginPath(); ctx.arc(c.sx, c.sy, rad, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#5a2c4d'; ctx.lineWidth = Math.max(1, 1.2 * s);
+    ctx.beginPath(); ctx.arc(c.sx, c.sy, rad, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(c.sx, c.sy); ctx.lineTo(c.sx - rad * .5, c.sy - rad * .4);   // hands ~10:10
+    ctx.moveTo(c.sx, c.sy); ctx.lineTo(c.sx + rad * .45, c.sy - rad * .5); ctx.stroke();
+    const apex = lift(proj(cam, x, y), z0 + th + (12 + 6 * g) * s);
+    hallGable(ctx, cam, top, apex, '#8a3a52');
+    ctx.fillStyle = '#c0395b'; ctx.beginPath(); ctx.arc(apex.sx, apex.sy, 2 * s, 0, Math.PI * 2); ctx.fill();
+  }
+  function civicDome(ctx, cam, x, y, z0, r, g) {            // dominant-hub capitol: drum + dome + lantern
+    const s = cam.s, dr = r * .5, dh = (7 + 5 * g) * s;
+    hallPrism(ctx, cam, x, y, dr, z0, z0 + dh, '#cdb45f');
+    const cen = lift(proj(cam, x, y), z0 + dh), rx = 2 * dr * HW * s, ry = (15 + 10 * g) * s;
+    ctx.fillStyle = shade('#d4a953', .95);
+    ctx.beginPath(); ctx.ellipse(cen.sx, cen.sy, rx, ry, 0, Math.PI, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f4ead2';
+    ctx.beginPath(); ctx.ellipse(cen.sx - rx * .28, cen.sy, rx * .5, ry * .82, 0, Math.PI, Math.PI * 2); ctx.fill();
+    const lz = z0 + dh + ry;
+    hallPrism(ctx, cam, x, y, dr * .32, lz, lz + 8 * s, '#e6d7a6');   // lantern cupola
+    const lt = lift(proj(cam, x, y), lz + 8 * s), tip = lift(proj(cam, x, y), lz + 20 * s);
+    ctx.strokeStyle = '#5a2c4d'; ctx.lineWidth = 1.5 * s;
+    ctx.beginPath(); ctx.moveTo(lt.sx, lt.sy); ctx.lineTo(tip.sx, tip.sy); ctx.stroke();
+    ctx.fillStyle = '#c0395b'; ctx.beginPath(); ctx.arc(tip.sx, tip.sy, 2.3 * s, 0, Math.PI * 2); ctx.fill();
+  }
+  function civicBelfry(ctx, cam, x, y, z0, r) {             // hamlet meeting house: an open rustic bell tower
+    const s = cam.s, br = r * .42, bh = 11 * s;
+    const b = hallRing(cam, x, y, br, z0), t = hallRing(cam, x, y, br, z0 + bh);
+    ctx.strokeStyle = shade('#8a5a3c', .9); ctx.lineWidth = Math.max(1.5, 2 * s);
+    for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(b[i].sx, b[i].sy); ctx.lineTo(t[i].sx, t[i].sy); ctx.stroke(); }
+    const bell = lift(proj(cam, x, y), z0 + bh * .55);
+    ctx.fillStyle = '#5a2c4d'; ctx.beginPath(); ctx.arc(bell.sx, bell.sy, 3.2 * s, 0, Math.PI * 2); ctx.fill();
+    const apex = lift(proj(cam, x, y), z0 + bh + 9 * s);
+    hallGable(ctx, cam, t, apex, '#8a5a3c');
+    ctx.fillStyle = '#5a2c4d'; ctx.fillRect(apex.sx - .6 * s, apex.sy - 9 * s, 1.2 * s, 9 * s);
+    ctx.fillStyle = '#c0395b'; ctx.fillRect(apex.sx, apex.sy - 9 * s, 6 * s, 4 * s);   // weather pennant
+  }
+  function drawCityHall(ctx, cam, hall) {
+    const { x, y } = hall, s = cam.s;
+    const g = hall.grandeur || 0;                           // 0 hamlet → 1 capitol, by repo size
+    const cols = hall.columns || 5;                         // one portico column per district
+    const r = 1.15 + .45 * g;                               // civic buildings sprawl wide, not tall
+    for (let i = 0; i < 3; i++)                             // stepped podium — three receding civic stairs
+      hallPrism(ctx, cam, x, y, r + .34 - i * .12, i * 2.5 * s, (i + 1) * 2.5 * s, '#b8a05a');
+    const podZ = 7.5 * s, colH = (16 + 10 * g) * s, bodyTop = podZ + colH;
+    hallPrism(ctx, cam, x, y, r, podZ, bodyTop, '#d4a953');   // cella wall behind the colonnade
+    const base = hallRing(cam, x, y, r, podZ);
+    for (const [a, c, col] of [[base[3], base[2], '#ddcfb4'], [base[2], base[1], '#f9efe3']])
+      for (let i = 0; i < cols; i++) {                       // colonnade — a column per district
+        const u = (i + .5) / cols;
+        ctx.fillStyle = col;
+        ctx.fillRect(a.sx + (c.sx - a.sx) * u - 1.5 * s, a.sy + (c.sy - a.sy) * u - colH, 3 * s, colH);
+      }
+    const entab = hallPrism(ctx, cam, x, y, r + .08, bodyTop, bodyTop + 3 * s, '#c9a544');   // overhanging architrave
+    const ebTop = bodyTop + 3 * s;
+    hallGable(ctx, cam, entab, lift(proj(cam, x, y), ebTop + (4 + 1.5 * g) * s), '#b08c3e');   // shallow classical pediment
+    if (hall.dome) civicDome(ctx, cam, x, y, ebTop, r, g);            // dominant hub → capitol dome
+    else if (g < .34) civicBelfry(ctx, cam, x, y, ebTop, r);         // hamlet → rustic belfry
+    else civicClockTower(ctx, cam, x, y, ebTop, r, g);              // town/city → landmark clock tower
   }
 
   function drawCloud(ctx, cam, cloud, t) {
@@ -1160,7 +1219,7 @@ const City = (() => {
                      .map(([dx, dy]) => k({ x: hall.x + 1.35 * dx, y: hall.y + 1.35 * dy }))) : Infinity;
     let hallDrawn = !hall;
     for (const it of state.items) {
-      if (!hallDrawn && k(it) > hallKey) { drawCityHall(ctx, cam, hall.x, hall.y); hallDrawn = true; }
+      if (!hallDrawn && k(it) > hallKey) { drawCityHall(ctx, cam, hall); hallDrawn = true; }
       if (it.kind) {                                        // _alpha lets a transition cross-fade dressing
         if (it.hidden) continue;
         if (it._alpha !== undefined) ctx.globalAlpha = it._alpha;
@@ -1168,7 +1227,7 @@ const City = (() => {
         ctx.globalAlpha = 1;
       } else drawBuilding(ctx, cam, it, t);
     }
-    if (!hallDrawn) drawCityHall(ctx, cam, hall.x, hall.y);
+    if (!hallDrawn) drawCityHall(ctx, cam, hall);
     if (!opts.embedded && state.docker.length) CityScape.drawPort(ctx, cam, state, t);   // ships ride the rotating harbor
     if (opts.embedded) return;
     ctx.fillStyle = 'rgba(243,207,217,.6)';
