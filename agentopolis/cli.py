@@ -78,13 +78,14 @@ def main() -> None:
                     "replay its git history as a time-lapse movie, or crawl a folder of repos for the "
                     "best movies.")
     parser.add_argument("command", nargs="?", default="serve",
-                        choices=["serve", "movie", "crawl", "attach", "detach"],
-                        help="serve the live city (default), play the git-history movie, "
-                             "crawl a folder of repos for the best movies, or attach/detach hooks")
+                        choices=["serve", "movie", "marathon", "crawl", "attach", "detach"],
+                        help="serve the live city (default), play one repo's movie, run a marathon of every "
+                             "repo's movie, crawl a folder for the best movies, or attach/detach hooks")
     parser.add_argument("target", nargs="?",
-                        help="for `movie`: a local repo dir or a github url; for `crawl`: a folder of "
-                             "repos to scan (default: current dir)")
+                        help="for `movie`: a local repo dir or a github url; for `marathon`/`crawl`: a "
+                             "folder of repos to scan (default: current dir)")
     parser.add_argument("--json", action="store_true", help="for `crawl`: emit results as JSON")
+    parser.add_argument("--top", type=int, help="for `marathon`: cap the playlist to the top N movies")
     parser.add_argument("--repo", default=".", help="git repo to map as the city (default: cwd)")
     parser.add_argument("--zone", help="zoning manifest (default: <repo>/.agentopolis.json, else auto-zoned)")
     parser.add_argument("--root", help="map every git repo under this dir as a nation of cities")
@@ -101,6 +102,9 @@ def main() -> None:
         return
     if args.command == "crawl":
         run_crawl(args.target or ".", args.json)
+        return
+    if args.command == "marathon":
+        run_marathon(args.target or ".", args.port, args.no_open, args.top)
         return
 
     open_path, label = "", "City"                        # open_path is appended to the base url in the browser
@@ -158,6 +162,54 @@ def run_crawl(root: str, as_json: bool) -> None:
               f"{r['transitions']:>5} {r['deaths']:>6}  {r['ladder']}")
     best = rows[0]
     print(f"\n  ▶ best: {best['repo']} — play it with  agentopolis movie {best['path']}\n")
+
+
+def run_marathon(root: str, port: int, no_open: bool, top: int | None) -> None:
+    """Grab every repo's movie under `root` (cached per repo+HEAD), then serve a ranked, auto-advancing
+    playlist with a selection bar — fully local and offline."""
+    repos = survey.find_repos(root)
+    if not repos:
+        print(f"\n  🎬  no git repos found under {Path(root).resolve()}\n")
+        return
+    print(f"\n  🎬  grabbing movies from {len(repos)} repos under {Path(root).resolve()} "
+          f"(cached — instant next time):")
+    rows, bundles = [], {}
+    for i, repo in enumerate(repos, 1):
+        try:
+            metrics, bundle = survey.movie_cached(repo)
+        except Exception as exc:                              # one unreadable repo shouldn't sink the marathon
+            print(f"     [{i:>2}/{len(repos)}] {Path(repo).name[:26]:26} skipped — {exc}")
+            continue
+        if not metrics or not bundle:
+            continue
+        slug, base, k = metrics["repo"], metrics["repo"], 2     # unique id per playlist entry
+        while slug in bundles:
+            slug, k = f"{base}-{k}", k + 1
+        metrics["id"] = slug
+        rows.append(metrics)
+        bundles[slug] = bundle
+        print(f"     [{i:>2}/{len(repos)}] {metrics['repo'][:26]:26} {metrics['ladder']}")
+    if not rows:
+        print(f"\n  🎬  no repos with playable history under {Path(root).resolve()}\n")
+        return
+    rows.sort(key=lambda r: r["score"], reverse=True)
+    if top:
+        rows = rows[:top]
+        bundles = {r["id"]: bundles[r["id"]] for r in rows}
+    server.configure_marathon(rows, bundles)
+    free_port(port)
+    url = f"http://localhost:{port}"
+    print(f"\n  ▶ marathon of {len(rows)} movies on {url}  (best first: {rows[0]['repo']})\n")
+    if not no_open:
+        opener = threading.Timer(1, lambda: webbrowser.open(url + "/?marathon"))
+        opener.daemon = True
+        opener.start()
+    runner = uvicorn.Server(uvicorn.Config(server.app, port=port,
+                                           log_level="warning", timeout_graceful_shutdown=2))
+    try:
+        runner.run()
+    except KeyboardInterrupt:
+        pass
 
 
 def configure_movie(args) -> bool:

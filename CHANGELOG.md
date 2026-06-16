@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-06-16
+
+### Added
+- `agentopolis marathon [folder]` — grab every repo's movie under a folder (and
+  one level of subrepos) and play them best-first in one auto-advancing reel,
+  with a selection bar to jump between them. Fully local and offline; each movie
+  bundle is cached per repo + HEAD so re-runs are instant, and `--top N` caps the
+  playlist.
+
 ## [0.10.0] - 2026-06-16
 
 ### Added
@@ -15,9 +24,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A friendly note instead of a blank city when agentopolis is run outside a git
   repo, on a repo with no commits, or with `--root` over a folder containing no
   git repos — each with the relevant next step.
-- `agentopolis crawl [folder]` — scan a folder of git repos and rank them by
-  time-lapse "movie" potential (size-tier journey, history length, deletions,
-  HEAD formation) from cheap git metadata. `--json` for machine output.
+- `agentopolis crawl [folder]` — scan a folder of git repos (and one level of
+  subrepos, e.g. a mono-repo's packages) and rank them by time-lapse "movie"
+  potential. Reports each repo's full formation ladder (`village → radial →
+  spine → grid`) and transition count, ported from the renderer's epoch
+  detection and validated to match the live engine. `--json` for machine output.
 - Stage-keyed passive ambient life, each tied to a repo-relative signal and shown
   only when that signal is present: pedestrians (∝ district recency), traffic that
   drives multi-turn routes on paved roads (∝ commit volume), a plaza fountain whose

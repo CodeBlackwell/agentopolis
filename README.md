@@ -27,6 +27,9 @@ agentopolis                         # its city on http://localhost:4242
 agentopolis movie                   # replay this repo's git history as a growing city
 agentopolis movie ../other-repo     # …or any local repo
 agentopolis movie https://github.com/owner/repo   # …or any public github repo
+
+agentopolis crawl ~/code            # rank a folder of repos by movie potential
+agentopolis marathon ~/code         # play every repo's movie back-to-back, with a selection bar
 ```
 
 Open http://localhost:4242, then start any Claude Code session — new sessions
@@ -40,6 +43,12 @@ or a public github url; github repos download only the minimum git data (a
 `blob:none` clone removed right after seeding) and the city is held in memory
 only. Run outside a git repo and agentopolis tells you how to point it at one
 instead of opening a blank map.
+
+**Crawl & marathon** scan a folder of repos. `agentopolis crawl <folder>` ranks
+them by movie potential (formation ladder, history length, deletions). `agentopolis
+marathon <folder>` then grabs every repo's movie and plays them best-first in one
+auto-advancing reel with a selection bar to jump around — all local and offline,
+and cached per repo+HEAD so the next run is instant. `--top N` caps the playlist.
 
 **Zoning:** if the repo has a `.agentopolis.json` manifest it defines the city's
 components, layers, and clouds (see `city/maisight.json` for a full example);

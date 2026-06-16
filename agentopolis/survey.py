@@ -4,9 +4,12 @@ A good movie *transforms*: it climbs the formation ladder (village → radial / 
 over enough history to be watchable, with deletions for drama. This ports the renderer's epoch detection
 (city-timelapse.js detectEpochs + city-render.js statsOf/chooseFormation) so the reported ladder matches
 what the movie actually plays — validated against the live engine."""
+import hashlib
+import json
 import os
 
-from .seed import seed
+from . import forge
+from .seed import git, seed
 from .timeline import build_timeline
 from .zone import load_zone
 
@@ -90,8 +93,46 @@ def _formation(zone, alive):                             # statsOf + chooseForma
 def evaluate(repo: str) -> dict | None:
     """Movie metrics for one repo (ladder matches the renderer), or None if it has no mappable history."""
     zone = load_zone(repo, None)
-    head = seed(repo, zone, walk_history=False)["buildings"]
+    data = seed(repo, zone, walk_history=False)
     commits = build_timeline(repo)["commits"]
+    m = _metrics(zone, data["buildings"], commits)
+    return _label(m, repo) if m else None
+
+
+def build_movie(repo: str):
+    """Return (metrics, bundle) for marathon: the same metrics as evaluate() plus the {data, timeline}
+    bundle the time-lapse engine plays — computed in one pass so nothing is seeded twice."""
+    zone = load_zone(repo, None)
+    data = seed(repo, zone, walk_history=False)
+    tl = build_timeline(repo)
+    m = _metrics(zone, data["buildings"], tl["commits"])
+    if not m:
+        return None, None
+    return _label(m, repo), {"data": data, "timeline": tl}
+
+
+def _label(m: dict, repo: str) -> dict:
+    return {"repo": os.path.basename(repo.rstrip("/")), "path": os.path.abspath(repo), **m}
+
+
+def movie_cached(repo: str):
+    """build_movie() with a disk cache keyed by repo path + HEAD — re-runs are instant until the repo
+    gains new commits (a new HEAD → a new key → a rebuild). Returns (metrics, bundle)."""
+    head = git(repo, "rev-parse", "HEAD").strip()
+    key = hashlib.sha256((os.path.abspath(repo) + "@" + head).encode()).hexdigest()[:16]
+    path = forge.CACHE_DIR / f"movie-{key}.json"
+    if forge.disk_cache and head and path.exists():
+        obj = json.loads(path.read_text())
+        return obj["metrics"], obj["bundle"]
+    metrics, bundle = build_movie(repo)
+    if metrics and forge.disk_cache and head:
+        forge.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"metrics": metrics, "bundle": bundle}))
+    return metrics, bundle
+
+
+def _metrics(zone: dict, head: list, commits: list) -> dict | None:
+    """The ladder/score computation shared by evaluate() and build_movie(); None if no history."""
     n = len(commits)
     if not head or not n:
         return None
@@ -174,8 +215,7 @@ def evaluate(repo: str) -> dict | None:
              + min(transitions, 5) * 8                   # re-formations, capped so noisy flappers don't dominate
              + min(n, 3000) / 40                         # length: more history to watch (capped)
              + min(deaths, 150) / 5)                     # ruins add drama
-    return {"repo": os.path.basename(repo.rstrip("/")), "path": os.path.abspath(repo),
-            "commits": n, "buildings": len(head), "peak": peak, "deaths": deaths,
+    return {"commits": n, "buildings": len(head), "peak": peak, "deaths": deaths,
             "transitions": transitions, "ladder": " → ".join(ladder), "score": round(score, 1)}
 
 
@@ -205,7 +245,7 @@ def crawl(root: str) -> list[dict]:
             row = evaluate(repo)
             if row:
                 rows.append(row)
-        except Exception:
-            continue                                     # a repo we can't read shouldn't sink the crawl
+        except Exception as exc:                         # a repo we can't read shouldn't sink the crawl
+            print(f"  skipped {os.path.basename(repo)} — {exc}")
     rows.sort(key=lambda r: r["score"], reverse=True)
     return rows

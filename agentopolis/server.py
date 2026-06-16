@@ -42,6 +42,7 @@ nation = {"root": None, "manifest": None}
 showcase = {"dir": os.environ.get("AGENTOPOLIS_SHOWCASE"),    # serve baked fixtures, no live git
             "city": os.environ.get("AGENTOPOLIS_DEMO_CITY")}  # demo-only: land on this city, not the nation
 forge_gate = threading.BoundedSemaphore(2)                    # cap concurrent clones on a public box
+marathon = {"rows": [], "bundles": {}}                        # `agentopolis marathon`: ranked movies + in-memory bundles
 
 # dev mode: env vars survive uvicorn --reload cycles; cli.py still wins when used directly
 if showcase["dir"]:                              # showcase is nation mode fed by fixtures
@@ -56,6 +57,10 @@ timelines: dict[str, dict] = {}     # repo path -> {head, data}, cached per git 
 
 def configure(repo: str, zone_path: str | None) -> None:
     city.update(repo=repo, zone_path=zone_path)
+
+
+def configure_marathon(rows: list, bundles: dict) -> None:
+    marathon.update(rows=rows, bundles=bundles)
 
 
 def configure_nation(root: str, manifest: str | None) -> None:
@@ -204,6 +209,12 @@ def forge_timelapse_city(url: str):              # full-history clone → {data,
         forge_gate.release()
 
 
+@app.get("/marathon/movie/{mid}")
+def marathon_movie(mid: str):                    # in-memory {data, timeline} bundle for one playlist entry
+    bundle = marathon["bundles"].get(mid)
+    return bundle if bundle is not None else Response(status_code=404)
+
+
 @app.get("/events")
 async def events(request: Request) -> StreamingResponse:
     queue: asyncio.Queue = asyncio.Queue()
@@ -250,8 +261,16 @@ def root(request: Request) -> HTMLResponse:
     forge = qp.get("forge")
     auto_city = bool(showcase["dir"] and showcase["city"]) and "nation" not in qp
     timeline_src = "timeline.json"
+    marathon_json = "null"
     movie = False
-    if forge:
+    if "marathon" in qp and marathon["rows"]:    # playlist of pre-built movies, switched without re-seeding
+        rows = marathon["rows"]
+        cur = qp.get("m") if qp.get("m") in marathon["bundles"] else rows[0]["id"]
+        name, mode, movie = next(r["repo"] for r in rows if r["id"] == cur), "city", True
+        src = "/marathon/movie/" + quote(cur, safe="")
+        keep = ("id", "repo", "ladder", "transitions", "commits", "score")
+        marathon_json = json.dumps({"movies": [{k: r[k] for k in keep} for r in rows], "current": cur})
+    elif forge:
         name = forge.rstrip("/").split("/")[-1].removesuffix(".git")   # heading: "<repo> City"
         mode = "city"
         movie = "static" not in qp           # a forged repo plays its history by default; ?static = the quick city
@@ -267,7 +286,8 @@ def root(request: Request) -> HTMLResponse:
                         .replace("{{HALL_LEVEL}}", mode).replace("{{HALL_NAME}}", name)
                         .replace("{{CITY_SRC}}", src).replace("{{TIMELINE_SRC}}", timeline_src)
                         .replace("{{DEMO}}", "1" if showcase["dir"] else "")
-                        .replace("{{DEMO_CITY}}", showcase["city"] if auto_city else ""))
+                        .replace("{{DEMO_CITY}}", showcase["city"] if auto_city else "")
+                        .replace("{{MARATHON}}", marathon_json))
 
 
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")
