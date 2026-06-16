@@ -1085,10 +1085,10 @@ function propBox(p) {                                       // a point-prop's fo
 function focusShapes(focus) {                              // hit-rects (buildings, cars) + rail segments to outline
   const [type, arg] = focus.split(':');
   const drawn = (state.items || []).filter(b => b.screen && !b.kind);
-  if (type === 'district') return drawn.filter(b => b.component === arg).map(b => b.screen);
-  if (type === 'hub') return drawn.filter(b => b.hub).map(b => b.screen);
-  if (type === 'debt') return drawn.filter(b => b.debt).map(b => b.screen);
-  if (type === 'graves') return drawn.filter(b => b.ruined).map(b => b.screen);
+  if (type === 'district') return drawn.filter(b => b.component === arg);   // buildings → footprint silhouette
+  if (type === 'hub') return drawn.filter(b => b.hub);
+  if (type === 'debt') return drawn.filter(b => b.debt);
+  if (type === 'graves') return drawn.filter(b => b.ruined);
   if (type === 'deps') return (state.hits || []).filter(h => /freight|package/i.test(h.tip || ''));
   if (type === 'docker') return (state.hits || []).filter(h => /service|image/i.test(h.tip || ''));
   if (type === 'relics') return (state.items || []).filter(p => RELIC_KIND[p.kind]).map(propBox);
@@ -1108,12 +1108,58 @@ function drawFocus(focus) {
     for (let i = 1; i < 4; i++) ctx.lineTo(c[i].sx, c[i].sy);
     ctx.closePath(); ctx.stroke(); ctx.restore(); return;
   }
+  const foots = [];                                        // every item → an iso diamond, unioned into one silhouette
   for (const sh of focusShapes(focus)) {
-    if (sh.ax !== undefined) {                             // rail segment: re-stroke the line thick
+    if (sh.foot !== undefined) foots.push(footPoly(sh));   // a real building: its projected footprint
+    else if (sh.ax !== undefined) {                        // rail segment: re-stroke the line thick
       ctx.beginPath(); ctx.moveTo(sh.ax, sh.ay); ctx.lineTo(sh.bx, sh.by); ctx.stroke();
-    } else ctx.strokeRect(sh.x0, sh.y0, sh.x1 - sh.x0, sh.y1 - sh.y0);
+    } else foots.push(diamondFromBox(sh));                 // fixture hit-rect: inscribed diamond, same silhouette look
   }
+  if (foots.length) drawSilhouette(ctx, foots);
   ctx.restore();
+}
+
+// A building's iso footprint: four base corners projected to screen (same square drawBuilding stands on).
+function footPoly(b) {
+  const f = (b.foot || 1) / 2;
+  return [[b.x - f, b.y - f], [b.x + f, b.y - f], [b.x + f, b.y + f], [b.x - f, b.y + f]]
+    .map(([x, y]) => City.proj(cam, x, y));
+}
+// A fixture has only a screen-space hit-rect (no world footprint) — inscribe a diamond so it joins the silhouette.
+function diamondFromBox(b) {
+  const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+  return [{ sx: cx, sy: b.y0 }, { sx: b.x1, sy: cy }, { sx: cx, sy: b.y1 }, { sx: b.x0, sy: cy }];
+}
+
+// True silhouette: fill the union of all footprints on an offscreen mask, erase the interior shrunk
+// by a band, colour what's left. Overlapping diamonds merge — only the outer boundary survives, so a
+// district reads as one outline instead of a pile of boxes. The glow is the same gold highlighter.
+let maskCv;
+function drawSilhouette(ctx, polys) {
+  const W = tlCanvas.width, H = tlCanvas.height, band = Math.max(2, 2.5 * cam.s);
+  if (!maskCv) maskCv = document.createElement('canvas');
+  if (maskCv.width !== W || maskCv.height !== H) { maskCv.width = W; maskCv.height = H; }
+  const m = maskCv.getContext('2d');
+  m.clearRect(0, 0, W, H);
+  m.fillStyle = '#fff'; fillPolys(m, polys);                          // solid union
+  m.globalCompositeOperation = 'destination-out';
+  fillPolys(m, polys.map(p => insetPoly(p, band)));                   // punch out the interior → leaves the rim
+  m.globalCompositeOperation = 'source-in';
+  m.fillStyle = '#ffd678'; m.fillRect(0, 0, W, H);                    // tint the rim gold
+  m.globalCompositeOperation = 'source-over';
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,214,120,.7)'; ctx.shadowBlur = 8 * cam.s;
+  ctx.drawImage(maskCv, 0, 0);
+  ctx.restore();
+}
+function fillPolys(c, polys) {                             // one path, nonzero winding → overlaps union, not cancel
+  c.beginPath();
+  for (const p of polys) { c.moveTo(p[0].sx, p[0].sy); for (let i = 1; i < p.length; i++) c.lineTo(p[i].sx, p[i].sy); c.closePath(); }
+  c.fill();
+}
+function insetPoly(p, d) {                                 // pull each corner d px toward the centroid
+  const cx = (p[0].sx + p[1].sx + p[2].sx + p[3].sx) / 4, cy = (p[0].sy + p[1].sy + p[2].sy + p[3].sy) / 4;
+  return p.map(q => { const dx = cx - q.sx, dy = cy - q.sy, L = Math.hypot(dx, dy) || 1; return { sx: q.sx + dx / L * d, sy: q.sy + dy / L * d }; });
 }
 
 // The hover link runs both ways: a hovered card OR a hovered building/fixture resolves to one focus.
