@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.16.0] - 2026-06-16
 
 ### Added
 - `agentopolis .` — a zero-setup one-shot: it attaches the Claude Code hooks on start
@@ -12,7 +12,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   needed for a quick session. It only detaches hooks it added itself, so a prior manual
   `agentopolis attach` is left untouched.
 
+### Fixed
+- Mobile demo: the "+ build a city" CTA was painted on top of the movie transport bar,
+  leaving the play / scrub controls unreachable — it now sits above the transport so both
+  are fully tappable.
+- Mobile demo: the movie "■ live" exit button no longer clips off the right edge of the
+  transport bar on narrow screens (the scrubber track kept a desktop min-width).
+- Onboarding tour on phones: the "cut the ribbon" climax step targets the forge input,
+  which lives in a closed bottom sheet — the tour now opens the sheet first so the typed
+  URL and button are on screen instead of below the fold.
+- Movie date stamp is right-anchored to the canvas edge so it no longer overlaps the
+  city title.
+
 ### Changed
+- Onboarding tour text adapts to touch: scroll/Q-E/spacebar/arrow/click/hover instructions
+  are rewritten to the phone gestures the canvases actually use (pinch, two-finger twist,
+  tap, tap & hold) on coarse-pointer devices.
+- The tour "skip tour" control is now a clearly-bordered button (with an ✕ glyph) instead
+  of a faint borderless label, so it reads as a dismiss affordance.
+- Mobile demo header: the "explore the BLACKBOX nation" banner is constrained to a single
+  line so it clears the city's canvas labels.
 - Map control panel (`#mapctl`) polish: icon buttons are flex-centered at a larger glyph
   size; RESET / SHARE are full-width text bars with proper padding; the Share arrow no
   longer wraps onto its own line.
