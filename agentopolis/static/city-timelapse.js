@@ -11,7 +11,7 @@ autosizeCanvas(tlCanvas, () => { if (state) City.fit(cam, tlCanvas, state, 150, 
 let groundFinal = null, groundBirth = null, decaySpan = 0;
 let layouts = [], epochIndex = -1;                        // one fixed layout per formation epoch
 let transition = null;                                    // active demolish-and-rebuild between two epochs
-let ptr = -1, playing = false, speed = 12, acc = 0, last = 0, slider = null, label = null;
+let ptr = -1, playing = false, speed = 12, acc = 0, last = 0, slider = null, label = null, dateEl = null;
 let megaCommit = 15;                                      // commit-size gate for coupling; set relatively in index()
 
 const citySrc = window.CITY_SRC || 'city-data.json';
@@ -80,6 +80,15 @@ try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');
 })().catch(e => { loading.remove(); console.error('timelapse load failed', e); });
 
 const autoSpeed = () => Math.max(3, Math.min(120, commits.length / 45));   // commits/sec → ~45s history walk
+
+const fmtDate = ts => {                                   // "September 16, 2025 - 3:15am UTC" for the current commit
+  const d = new Date(ts * 1000);
+  const date = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  let h = d.getUTCHours();
+  const ap = h < 12 ? 'am' : 'pm';
+  h = h % 12 || 12;
+  return `${date} - ${h}:${String(d.getUTCMinutes()).padStart(2, '0')}${ap} UTC`;
+};
 
 // A hard-hat pixel worker — the forge's own sprite (NOT the tour aide). Drawn 1x into a 28x34 grid,
 // canvas backed x3 + image-rendering:pixelated for crisp blocks; same technique as tour.js drawAide.
@@ -556,6 +565,7 @@ function recompute(i) {                                   // set targets + visib
         + `   (${i + 1}/${commits.length})  ·  ${layouts[epochIndex].ep.formation.id}`
       : `0/${commits.length}`;
   }
+  if (dateEl) dateEl.textContent = commits[i] ? fmtDate(commits[i].ts) : '';   // date stamp follows the playhead
   renderExplain(shown, i);                               // refresh the live legend for this commit
 }
 
@@ -619,7 +629,7 @@ function loop(t) {
     tlCtx.clearRect(0, 0, tlCanvas.width, tlCanvas.height);
     City.draw(tlCtx, cam, state, t);
     const af = activeFocus();                              // hover link, both ways: card⇄map
-    drawFocus(t, af.ping);                                 // ping the map items the focus describes
+    drawFocus(af.ping);                                    // gold-outline the map items the focus describes
     applyCardHighlight(af.cards);                          // raise the cards a hovered building belongs to
     syncScroll(af.ping);                                   // reveal that card if the map hover scrolled it off
     if (endCardAt) drawEndCard(t);                         // branded outro, only while recording a clip
@@ -798,10 +808,15 @@ function buildTransport() {
     #transport select{flex:0 0 auto;background:var(--plum-soft);color:var(--cream);border:1px solid var(--gold);font:inherit}
     #tl-label{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}
     #tl-exit{width:auto;padding:0 9px}
+    /* date stamp rides the top of the canvas, center-right, lightly faded — synced to the playhead */
+    #tl-date{position:absolute;top:14px;left:38%;right:18px;z-index:4;pointer-events:none;text-align:center;
+      font-family:'Silkscreen',monospace;font-size:13px;letter-spacing:.07em;color:var(--cream);
+      opacity:.5;text-shadow:0 2px 7px rgba(0,0,0,.75)}
     /* phones: trim to the video-player essentials (play / scrub / speed / exit), bigger touch targets */
     @media (max-width:720px){#transport{gap:7px;padding:8px 10px;font-size:11px}
       #transport button{width:40px;height:36px}#tl-trans,#tl-shape,#tl-label{display:none}
-      #tl-seek{min-width:90px}#tl-exit{padding:0 12px}}`;
+      #tl-seek{min-width:90px}#tl-exit{padding:0 12px}
+      #tl-date{font-size:10px;top:10px;left:26%}}`;
   document.head.appendChild(document.createElement('style')).textContent = css;
   const bar = document.createElement('div');
   bar.id = 'transport';
@@ -826,6 +841,7 @@ function buildTransport() {
   const wrap = document.querySelector('.mapwrap');
   wrap.classList.add('tl-mode');                          // column layout: canvas on top, bar in the strip below
   wrap.appendChild(bar);
+  dateEl = document.createElement('div'); dateEl.id = 'tl-date'; wrap.appendChild(dateEl);   // top center-right date stamp
   slider = bar.querySelector('#tl-seek');
   label = bar.querySelector('#tl-label');
   bar.querySelector('#tl-play').onclick = () => setPlay(!playing);
@@ -1050,64 +1066,43 @@ function renderExplain(shown, i) {
   box.innerHTML = cards.join('');
 }
 
-// ---- card → map ping: hovering a card pulses the items it names, in a colour that CONTRASTS each
-// item (the complement of its own colour) so a gold district never gets a gold ping. Driven off the
-// live :hover state each frame, so it survives the per-commit card rebuild with no listeners. ----
-function complement(hex) {                                  // hue-rotate 180° + lift toward a vivid glow
-  if (!hex || hex[0] !== '#') return '#7edeff';
-  const n = parseInt(hex.slice(1), 16);
-  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
-  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
-  let h = 0, s = mx === mn ? 0 : l > .5 ? (mx - mn) / (2 - mx - mn) : (mx - mn) / (mx + mn);
-  if (mx !== mn) h = mx === r ? ((g - b) / (mx - mn) + (g < b ? 6 : 0)) / 6
-    : mx === g ? ((b - r) / (mx - mn) + 2) / 6 : ((r - g) / (mx - mn) + 4) / 6;
-  h = (h + .5) % 1; s = Math.max(.65, s);
-  const q = l < .5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
-  const hue = u => { u = (u + 1) % 1; return u < 1 / 6 ? p + (q - p) * 6 * u : u < .5 ? q
-    : u < 2 / 3 ? p + (q - p) * (2 / 3 - u) * 6 : p; };
-  const to = u => Math.round(Math.min(1, hue(u) * 1.25) * 255);
-  return `rgb(${to(h + 1 / 3)},${to(h)},${to(h - 1 / 3)})`;
+// ---- card → map: hovering a card (or a building / fixture on the map) traces a thick gold outline
+// around every item it names — the same bold highlighter the freight rail wears. Driven off the live
+// :hover state each frame, so it survives the per-commit card rebuild with no listeners. ----
+function propBox(p) {                                       // a point-prop's footprint: a small box at its anchor
+  const { sx, sy } = City.proj(cam, p.x, p.y), s = cam.s;
+  return { x0: sx - 8 * s, x1: sx + 8 * s, y0: sy - 14 * s, y1: sy + 2 * s };
 }
-const hitCenter = h => h.ax !== undefined
-  ? { sx: (h.ax + h.bx) / 2, sy: (h.ay + h.by) / 2 } : { sx: (h.x0 + h.x1) / 2, sy: (h.y0 + h.y1) / 2 };
-
-function focusPoints(focus) {                              // screen points (with each item's own colour) to ping
+function focusShapes(focus) {                              // hit-rects (buildings, cars) + rail segments to outline
   const [type, arg] = focus.split(':');
   const drawn = (state.items || []).filter(b => b.screen && !b.kind);
-  const base = b => ({ sx: b.screen.sx, sy: b.screen.y1 ?? b.screen.top, color: b.color || '#d4a953' });
-  if (type === 'district') return drawn.filter(b => b.component === arg).map(base);
-  if (type === 'hub') return drawn.filter(b => b.hub).map(base);
-  if (type === 'debt') return drawn.filter(b => b.debt).map(base);
-  if (type === 'graves') return drawn.filter(b => b.ruined).map(b => ({ ...base(b), color: '#6e7178' }));
-  if (type === 'relics') return (state.items || []).filter(p => RELIC_KIND[p.kind])
-    .map(p => ({ ...City.proj(cam, p.x, p.y), color: '#8fb9a8' }));
-  if (type === 'deps') return (state.hits || []).filter(h => /freight|package/i.test(h.tip || ''))
-    .map(h => ({ ...hitCenter(h), color: '#2b2230' }));
-  if (type === 'docker') return (state.hits || []).filter(h => /service|image/i.test(h.tip || ''))
-    .map(h => ({ ...hitCenter(h), color: '#2b2230' }));
-  const kinds = type === 'street' ? ['walker', 'traffic'] : [type];   // ambient props ping at their anchor
-  return (state.items || []).filter(p => kinds.includes(p.kind))
-    .map(p => ({ ...City.proj(cam, p.x, p.y), color: '#8fb9a8' }));
+  if (type === 'district') return drawn.filter(b => b.component === arg).map(b => b.screen);
+  if (type === 'hub') return drawn.filter(b => b.hub).map(b => b.screen);
+  if (type === 'debt') return drawn.filter(b => b.debt).map(b => b.screen);
+  if (type === 'graves') return drawn.filter(b => b.ruined).map(b => b.screen);
+  if (type === 'deps') return (state.hits || []).filter(h => /freight|package/i.test(h.tip || ''));
+  if (type === 'docker') return (state.hits || []).filter(h => /service|image/i.test(h.tip || ''));
+  if (type === 'relics') return (state.items || []).filter(p => RELIC_KIND[p.kind]).map(propBox);
+  const kinds = type === 'street' ? ['walker', 'traffic'] : [type];   // ambient props
+  return (state.items || []).filter(p => kinds.includes(p.kind)).map(propBox);
 }
 
-function drawFocus(t, focus) {
+function drawFocus(focus) {
   if (!focus || !state) return;
-  const ctx = tlCtx, k = (Math.sin(t / 260) + 1) / 2;   // 0..1 breathe
+  const ctx = tlCtx, s = cam.s;
   ctx.save();
-  if (focus.startsWith('shape')) {                         // the whole footprint: one breathing diamond
+  ctx.strokeStyle = '#ffd678'; ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(2.5, 3 * s);
+  if (focus.startsWith('shape')) {                         // the whole footprint: one gold diamond
     const c = [[0, 0], [state.W, 0], [state.W, state.H], [0, state.H]].map(([x, y]) => City.proj(cam, x, y));
-    ctx.strokeStyle = '#7edeff'; ctx.shadowColor = '#7edeff'; ctx.shadowBlur = 8 + 12 * k;
-    ctx.globalAlpha = .3 + .5 * k; ctx.lineWidth = Math.max(2, 2.5 * cam.s);
     ctx.beginPath(); ctx.moveTo(c[0].sx, c[0].sy);
     for (let i = 1; i < 4; i++) ctx.lineTo(c[i].sx, c[i].sy);
     ctx.closePath(); ctx.stroke(); ctx.restore(); return;
   }
-  ctx.lineWidth = Math.max(1.5, 1.6 * cam.s);
-  for (const p of focusPoints(focus)) {
-    const col = complement(p.color), rx = (6 + 9 * k) * cam.s;
-    ctx.strokeStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 6 + 10 * k;
-    ctx.globalAlpha = .35 + .55 * k;
-    ctx.beginPath(); ctx.ellipse(p.sx, p.sy, rx, rx * .55, 0, 0, Math.PI * 2); ctx.stroke();
+  for (const sh of focusShapes(focus)) {
+    if (sh.ax !== undefined) {                             // rail segment: re-stroke the line thick
+      ctx.beginPath(); ctx.moveTo(sh.ax, sh.ay); ctx.lineTo(sh.bx, sh.by); ctx.stroke();
+    } else ctx.strokeRect(sh.x0, sh.y0, sh.x1 - sh.x0, sh.y1 - sh.y0);
   }
   ctx.restore();
 }
