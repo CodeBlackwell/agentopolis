@@ -17,6 +17,10 @@
             : isMovie ? 'movie' : mode;                  // 'nation' | 'city' | 'movie' | 'demo-land' | 'demo-cards'
   if (!['nation', 'city', 'movie', 'demo-land', 'demo-cards'].includes(ctx)) return;
   const screeningRoom = ctx === 'movie' || ctx === 'demo-land' || ctx === 'demo-cards';   // the movie IS the content
+  // the paste-a-URL forge box is redundant when running locally (the CLI raises cities) — hide it in a local
+  // nation; the hosted demo keeps it, since demo visitors have no terminal.
+  if (mode === 'nation' && !demo)
+    document.head.appendChild(document.createElement('style')).textContent = '#forge,#build-btn{display:none!important}';
   const DONE = 'agentopolis-tour-done', RESUME = 'agentopolis-tour-resume';
   const leader = 'Permanent Democratically Elected Supreme President';   // the full, mandatory title
   const pres = 'Supreme President';                                      // the everyday short form
@@ -40,8 +44,11 @@
       try: 'Hover a worker to read its task.' },
     { sel: '#ticker', title: 'The State Record',
       text: 'Every decree your agents carry out scrolls through this log the instant it happens — official, unbiased, entirely factual news of the Republic. Approved by you, naturally.' },
-    { sel: '#forge', title: 'The ribbon-cutting office',
-      text: 'Fancy a new city for the Republic? Paste any public GitHub URL and we shall throw it a grand opening — ribbon, golden scissors, photographers, the works.' },
+    (demo                                                    // demo: spotlight the paste box; local: teach the CLI
+      ? { sel: '#forge', title: 'The ribbon-cutting office',
+          text: 'Fancy a new city for the Republic? Paste any public GitHub URL and we shall throw it a grand opening — ribbon, golden scissors, photographers, the works.' }
+      : { center: 1, title: 'Raise a foreign city',
+          text: `You command a terminal, ${pres} — no pasting required. From the command line, decree: agentopolis movie <github-url> — and any public repo rises as a city of its own, golden ribbon and all.` }),
     { center: 1, title: 'Long may you lead',
       text: `The Nation is yours, ${pres}. Summon me from my portrait beneath the controls whenever you require counsel (or applause). Now go forth and govern. Re-election pending — which is to say, guaranteed.` },
   ];
