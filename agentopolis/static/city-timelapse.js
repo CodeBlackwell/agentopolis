@@ -606,11 +606,10 @@ function showFinishCTA() {
   if (document.getElementById('tl-cta')) return;
   const cta = document.createElement('div');
   cta.id = 'tl-cta';
-  cta.innerHTML = `<div class="cta-h">${esc(document.body.dataset.hallName || 'this city')} — built from ${commits.length} commits.</div>`
-                + `<div class="cta-s">now build your own &#8595;</div>`;
-  const wrap = document.querySelector('.mapwrap') || document.body;
-  wrap.classList.add('cta-on');                          // drops the forge box below the headline
-  wrap.appendChild(cta);
+  cta.innerHTML = `<div class="cta-s">now build your own &#8593;</div>`
+                + `<div class="cta-h">${esc(document.body.dataset.hallName || 'this city')} — built from ${commits.length} commits.</div>`;
+  const forge = document.querySelector('#forge');        // flows in the forge box, just below the input
+  (forge || document.body).appendChild(cta);
   document.querySelector('#forge input')?.focus();
 }
 
@@ -689,8 +688,46 @@ const KIND_ROLE = { civic: 'the town center & shared root files', frontend: 'UI,
   docs: 'documentation & examples', service: 'application modules', auto: 'loose root files' };
 const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
-const card = (title, html, chip, focus) => `<div class="xcard"${focus ? ` data-focus="${focus}"` : ''}><h5>${chip
+const card = (title, html, chip, focus, tip = focus) => `<div class="xcard"${focus ? ` data-focus="${focus}"` : ''}`
+  + `${tip ? ` data-tip="${tip}"` : ''}><h5>${chip
   ? `<span class="chip" style="background:${chip}"></span>` : ''}${esc(title)}</h5><p>${html}</p></div>`;
+
+// ---- pedagogical tooltips: hover any card for the "why" behind the thing it names ----
+// Keyed by the card's data-tip topic (defaults to its focus key, so the landmark cards are covered for free).
+const TIP = {
+  commit: `<h6>One commit = one frame</h6>This movie replays the repo's git history commit by commit. The city is the repo as it stood at <b>this</b> commit — every file that existed is a building, and a building's height is the share of its own commits that have landed so far. The next commit redraws the frame; that's the growth you're watching.`,
+  stats: `<h6>Live readout</h6>A running census of the city at this commit. <b>buildings</b> = files alive now, <b>lines</b> = their summed lines of code, <b>districts</b> = code clusters grown big enough to show, and <b>shape</b> = the formation the metrics below have chosen for this moment.`,
+  reform: `<h6>Why the city re-formed</h6>The formation isn't fixed — it's recomputed as history unfolds. When the repo crosses a structural threshold (one area's imports start to dominate, the layers fall into balance, or it splinters into islands) the whole city re-forms. This card marks the exact commit it flipped, and which threshold did it.`,
+  'form:village': `<h6>Small Town</h6>The repo is still small — fewer files than the downtown threshold. No area is large or interconnected enough to anchor a center, so the city stays a loose green hamlet of neighborhoods. Most repos start here.`,
+  'form:acropolis': `<h6>Acropolis</h6>One dense core has outgrown a hamlet, but the repo still has only a district or two. Rather than sprawl, it terraces upward — a single concentrated core paved in concentric steps. The mark of an early codebase with one heavy center.`,
+  'form:radial': `<h6>Radial</h6>One district carries far more than its even share of the repo's import coupling — other code leans on it heavily (high "mass" and "dominance"). The city orbits that hub in rings, like a downtown wrapped around a single landmark.`,
+  'form:spine': `<h6>Spine</h6>The data-flow layers — front-end, services, storage — are roughly balanced in size. A full-stack boulevard stacks them back-to-front along one axis, so you can read the request path as a street.`,
+  'form:constellation': `<h6>Constellation</h6>The repo has many districts, but a large fraction are islands — clusters that barely import from one another. Low cohesion turns the map into an archipelago of separate components bridged across water.`,
+  'form:grid': `<h6>Grid</h6>Many peer districts of comparable weight, with no single coupling hub dominating. With no center to orbit, the city lays out as a downtown grid of equals — the look of a mature, modular codebase.`,
+  district: `<h6>Districts & the coupling hub</h6>Files are clustered into districts by what they do — UI, storage, API, tests, infra — inferred from their paths and imports. Each gets its own color and plot, and grows as files land in it. The ★ <b>coupling hub</b> is the district the rest of the codebase imports from most: the city's center of gravity.`,
+  hub: `<h6>Import hubs</h6>The tall antennas mark files in the repo's top 10% by incoming imports — the modules everything else depends on. They're load-bearing: a change to a hub file tends to ripple across the whole codebase, so they're worth watching.`,
+  debt: `<h6>TODO debt</h6>Cranes hover over the files in the top 10% by count of TODO / FIXME / HACK markers — the city's unfinished lots, work the codebase has flagged for itself but not yet built out.`,
+  deps: `<h6>Freight rail</h6>The freight line carries the project's third-party dependencies, read straight from its manifest (package.json, pyproject.toml, and the like). Each car is one external library the repo pulls in to run.`,
+  docker: `<h6>Docker harbor</h6>Ships moored at the harbor are the container services the project declares in its Dockerfiles and compose files — its deployable units, at a glance.`,
+  graves: `<h6>The graveyard</h6>Headstones below the city are files that once existed and were later deleted. They accumulate as the movie plays — the repo's archaeological layer, showing how much was torn down to get here.`,
+  relics: `<h6>Village relics</h6>When a hamlet grows into a city its rural fixtures don't just vanish: the old well becomes a fountain, and the herd and windmill migrate to a city farm on the outskirts. Relics are the visual memory of the repo's small-town beginnings.`,
+  street: `<h6>Street life</h6>Ambient life tracks recent activity — residents on foot and cars on the road thicken in whichever districts saw the most recent commits, and thin where work has gone quiet. A glanceable heat-map of where the action is now.`,
+  stall: `<h6>Market stalls</h6>Stalls ring the central plaza, one per district still receiving commits at this point in history. As parts of the codebase fall dormant their stalls disappear, so the market shows the repo's currently-active surface.`,
+  boat: `<h6>Canal traffic</h6>Canals divide the data-flow layers of the city. The boats working them stand for traffic between those layers — a nod to how data moves through the stack from one tier to the next.`,
+};
+let tipEl = null;
+function hideTip() { if (tipEl) tipEl.style.display = 'none'; }
+function placeTip(cardEl) {                                // float above the card, flip below + clamp if no room
+  const r = cardEl.getBoundingClientRect(), t = tipEl.getBoundingClientRect();
+  const left = Math.max(8, Math.min(r.left + r.width / 2 - t.width / 2, innerWidth - t.width - 8));
+  const top = r.top - t.height - 10;
+  tipEl.style.left = left + 'px';
+  tipEl.style.top = (top < 8 ? r.bottom + 10 : top) + 'px';
+}
+function showTip(cardEl) {
+  const html = TIP[cardEl.dataset.tip]; if (!html) return hideTip();
+  tipEl.innerHTML = html; tipEl.style.display = 'block'; placeTip(cardEl);
+}
 
 function buildExplain() {
   const dock = document.getElementById('dock');
@@ -716,10 +753,20 @@ function buildExplain() {
     .xcard p{font:9px 'Silkscreen',monospace;color:var(--cream);line-height:1.55;padding:7px 9px;margin:0}
     .xcard .em{color:var(--gold)}
     #explain .stat-grid{margin:0}
-    #explain .stat-value{color:var(--cream)}`;
+    #explain .stat-value{color:var(--cream)}
+    .xcard[data-tip]{cursor:help}
+    #xtip{position:fixed;z-index:60;max-width:300px;display:none;pointer-events:none;
+    background:rgba(28,10,24,.98);border:2px solid var(--gold);box-shadow:5px 5px 0 var(--plum-soft);
+    padding:9px 11px;font:9px 'Silkscreen',monospace;color:var(--cream);line-height:1.6}
+    #xtip h6{margin:0 0 5px;font:700 10px 'Silkscreen',monospace;color:var(--pink-deep);
+    letter-spacing:.08em;text-transform:uppercase}
+    #xtip b{color:var(--gold)}`;
   document.head.appendChild(document.createElement('style')).textContent = css;
   const box = document.createElement('div'); box.id = 'explain';
   dock.appendChild(box);
+  tipEl = document.createElement('div'); tipEl.id = 'xtip'; document.body.appendChild(tipEl);
+  box.addEventListener('mouseover', e => { const c = e.target.closest('.xcard[data-tip]'); if (c) showTip(c); });
+  box.addEventListener('mouseout', e => { const c = e.target.closest('.xcard[data-tip]'); if (c && !c.contains(e.relatedTarget)) hideTip(); });
 }
 
 const FORM_TITLE = { village: 'Small Town', acropolis: 'Acropolis', radial: 'Radial', spine: 'Spine',
@@ -744,7 +791,7 @@ function formationCard(id, s) {                            // the secret sauce, 
     grid: `<span class="em">${pl(s.n, 'peer district')}</span> with no dominant coupling hub
       (dominance ${d} < ${k.dominance}) and no balanced layer stack — a downtown grid of equals.`,
   };
-  return card('Shape · ' + (FORM_TITLE[id] || id), why[id] || '', null, 'shape:' + (s.hub || ''));
+  return card('Shape · ' + (FORM_TITLE[id] || id), why[id] || '', null, 'shape:' + (s.hub || ''), 'form:' + id);
 }
 
 function reformReason(to, s) {                             // the one threshold the repo crossed to trigger the re-form
@@ -766,7 +813,7 @@ function reformedCard() {
   const at = layouts[epochIndex].ep.start, c = commits[at];
   const s = City.statsOf({ zone: state.zone, buildings: layouts[epochIndex].ep.buildingsAlive });
   const when = c ? `commit ${at + 1} · ${new Date(c.ts * 1000).toLocaleDateString()}` : `commit ${at + 1}`;
-  return `<div class="xcard live" style="border-color:var(--pink-deep)"><h5>⟳ Re-Formed · ${FORM_TITLE[to] || to}</h5>`
+  return `<div class="xcard live" data-tip="reform" style="border-color:var(--pink-deep)"><h5>⟳ Re-Formed · ${FORM_TITLE[to] || to}</h5>`
     + `<p><span class="em">${FORM_TITLE[from] || from}</span> → <span class="em">${FORM_TITLE[to] || to}</span> at <span class="em">${when}</span>`
     + ` — ${reformReason(to, s)}${c ? `<br>"${esc(c.subject)}"` : ''}</p></div>`;
 }
@@ -774,6 +821,7 @@ function reformedCard() {
 function renderExplain(shown, i) {
   const box = document.getElementById('explain');
   if (!box || !state) return;
+  hideTip();                                              // DOM is about to be rebuilt; drop any open tooltip
   const c = commits[i], id = layouts[epochIndex].ep.formation.id;
   const s = City.statsOf({ zone: state.zone, buildings: shown });
   const perDist = {};                                     // standing buildings per district at this commit
@@ -790,8 +838,8 @@ function renderExplain(shown, i) {
   const stat = (l, v) => `<div class="stat-cell"><span class="stat-label">${l}</span><span class="stat-value">${v}</span></div>`;
   const cards = [];
   if (c) cards.push(card('Now Playing', `<span class="em">${esc(new Date(c.ts * 1000).toLocaleDateString())}</span> · ${esc(c.author)}`
-    + ` · ${pl(c.files.length, 'file')} changed<br>"${esc(c.subject)}"`));   // always first: the commit driving this frame
-  cards.push(`<div class="xcard live"><h5>${esc(state.zone.repo || 'city')} · live</h5><div class="stat-grid">`
+    + ` · ${pl(c.files.length, 'file')} changed<br>"${esc(c.subject)}"`, null, null, 'commit'));   // always first: the commit driving this frame
+  cards.push(`<div class="xcard live" data-tip="stats"><h5>${esc(state.zone.repo || 'city')} · live</h5><div class="stat-grid">`
     + stat('commit', `${i + 1}/${commits.length}`) + stat('date', c ? new Date(c.ts * 1000).toLocaleDateString() : '—')
     + stat('buildings', shown.length) + stat('lines', loc.toLocaleString())
     + stat('districts', districts.length) + stat('shape', id) + `</div></div>`);
@@ -799,7 +847,7 @@ function renderExplain(shown, i) {
   cards.push(formationCard(id, s));
   for (const d of districts)
     cards.push(card(d.name, `<span class="em">${pl(perDist[d.id], 'file')}</span> · ${KIND_ROLE[d.kind] || d.kind}`
-      + (d.id === s.hub ? ' · <span class="em">★ coupling hub</span>' : ''), d.color, 'district:' + d.id));
+      + (d.id === s.hub ? ' · <span class="em">★ coupling hub</span>' : ''), d.color, 'district:' + d.id, 'district'));
   if (hubs) cards.push(card('Import Hubs', `Antennas mark ${pl(hubs, 'file')} in the repo's top 10% by imports — the wiring others lean on.`, null, 'hub'));
   if (debts) cards.push(card('TODO Debt', `Cranes hang over ${pl(debts, 'file')} in the top 10% by TODO / FIXME count.`, null, 'debt'));
   if (state.deps.length) cards.push(card('Freight Rail', `${state.deps.length} package deps ride the freight line — read from the manifest.`, null, 'deps'));

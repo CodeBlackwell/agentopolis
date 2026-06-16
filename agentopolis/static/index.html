@@ -177,21 +177,24 @@
      as per-collision CSS patches injected from JS. */
   .mapwrap.tl-mode { flex-direction: column; gap: 8px; }
   .mapwrap.tl-mode #map { height: auto; flex: 1; min-height: 0; }
-  .mapwrap.tl-mode #forge { top: 12px; bottom: auto; }
+  /* the github build box rides the left rail under the title stack — left-justified, clear of the
+     city it's pointing at (not centered over the visualization) */
+  .mapwrap.tl-mode #forge { top: 150px; bottom: auto; left: 14px; transform: none; }
   /* the transport bar owns the bottom strip in a movie; the stats button (mobile) would overlap it,
      and the movie's dock already shows this repo's legend — so drop it here */
   .mapwrap.tl-mode #drawer-btn { display: none; }
-  /* demo movie's end card: a headline above the forge box (which drops to make room) so "↓" points at it */
-  #tl-cta { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 9;
-            text-align: center; font-family: 'Silkscreen', monospace; color: var(--cream);
+  /* demo movie's end card: flows in the forge box just below the input, pointing back up at it */
+  #tl-cta { margin-top: 10px; text-align: left; font-family: 'Silkscreen', monospace; color: var(--cream);
             text-shadow: 0 2px 7px rgba(0,0,0,.85); pointer-events: none; }
   #tl-cta .cta-h { font-size: 13px; letter-spacing: .06em; }
-  #tl-cta .cta-s { font-size: 10px; color: var(--gold); margin-top: 3px; }
-  .mapwrap.tl-mode.cta-on #forge { top: 58px; }
+  #tl-cta .cta-s { font-size: 10px; color: var(--gold); margin-bottom: 3px; }
   .demo-only { display: none; }
   body[data-demo="1"] .demo-only { display: block; }
   .demo-only a { color: var(--gold); text-decoration: none; }
   .demo-only a:hover { color: var(--cream); }
+  .forge-hint { font-family: 'Silkscreen', monospace; font-size: 11px; letter-spacing: .16em;
+                text-transform: uppercase; color: var(--gold); margin-bottom: 6px;
+                text-shadow: 0 2px 7px rgba(0,0,0,.75); }
   #forge input { width: 420px; max-width: 64vw; padding: 7px 11px;
                  font-family: 'Silkscreen', monospace; font-size: 10px; color: var(--cream);
                  background: rgba(42,16,36,.88); border: 2px solid var(--gold);
@@ -269,10 +272,10 @@
       <h1><span class="m-nation">Agentopolis Nation</span><span class="m-city">{{HALL_NAME}} City</span></h1>
       <p class="m-nation">drag to pan<br>scroll to zoom<br>click a city to enter<br>zoom out to leave<br>Q/E rotate</p>
       <button id="back" class="m-nation" title="back to world map">&#8593; WORLD MAP</button>
-      <p class="m-city">scroll to zoom in &amp; out &middot; drag to pan &middot; the city builds itself</p>
-      <p class="m-city demo-only"><a href="/?nation">&#9656; explore the whole BLACKBOX nation</a></p>
+      <p class="m-city">scroll to zoom in &amp; out<br>drag to pan<br>the city builds itself</p>
       <button id="replay" class="m-city" title="replay this repo's git history as a time-lapse"
               onclick="location.search='?timelapse'">&#9654; replay history</button>
+      <p class="m-city demo-only"><a href="/?nation">&#9656; explore the whole BLACKBOX nation</a></p>
     </header>
     <div id="tiers" class="m-nation">
       <button data-tier="world">WORLD</button><span class="sep">&#9656;</span>
@@ -288,6 +291,7 @@
     </div>
     <form id="forge"
           onsubmit="location.href='/?forge='+encodeURIComponent(this.url.value.trim());return false">
+      <div class="forge-hint demo-only">try it yourself!</div>
       <input name="url" autocomplete="off" spellcheck="false"
              placeholder="paste a public github url &rarr; build it as a city">
     </form>

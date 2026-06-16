@@ -78,6 +78,25 @@ def build_nation(root: str) -> dict:
     return dedup(nat)
 
 
+def curate(nat: dict, manifest: dict) -> dict:
+    """Trim the nation to the showcase's curated repos, rename surviving states, and apply
+    custom city names — so `just bake` reproduces the tailored demo deterministically."""
+    keep = set(manifest.get("keep", []))
+    city_names = manifest.get("cities", {})
+    nat["cities"] = [c for c in nat["cities"] if c["repo"] in keep]
+    for c in nat["cities"]:
+        c["name"] = city_names.get(c["repo"], c["repo"])
+    state_names = manifest.get("states", {})
+    states = []
+    for st in nat["states"]:
+        st["repos"] = [r for r in st["repos"] if r in keep]
+        if st["repos"]:
+            st["name"] = state_names.get(st["id"], st["name"])
+            states.append(st)
+    nat["states"] = states
+    return nat
+
+
 def main() -> None:
     root = sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).resolve().parents[2])
     out = Path(sys.argv[2]) if len(sys.argv) > 2 else Path(__file__).parent / "showcase"
@@ -86,6 +105,13 @@ def main() -> None:
     demo = os.environ.get("AGENTOPOLIS_DEMO_CITY")     # only the landing city plays a movie → only it needs a timeline
 
     nat = build_nation(root)
+    manifest_path = out / "manifest.json"
+    if manifest_path.exists():                         # showcase only; a plain bake keeps every repo
+        nat = curate(nat, json.loads(manifest_path.read_text()))
+        keep = {c["repo"] for c in nat["cities"]}
+        for stale in (out / "cities").glob("*.json"):  # drop fixtures for repos no longer in the demo
+            if stale.stem not in keep:
+                stale.unlink()
     (out / "nation.json").write_text(json.dumps(nat))
 
     for c in nat["cities"]:
