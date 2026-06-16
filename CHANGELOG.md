@@ -9,6 +9,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 - Demo/app header box (title, hints, forge input, install badges, run-locally accordion)
   is scaled down ~20% so it occupies less of the map canvas.
+- Mobile map controls: the on-screen zoom buttons are replaced by the rotate buttons
+  (pinch already zooms; the two-finger twist is the awkward gesture), and the control
+  panel is scaled down 40%.
+- Movie transport bar: emoji/plain-triangle controls replaced with crisp SVG play /
+  pause / chapter icons; the scrubber is restyled with a square gold thumb; the speed /
+  transition / shape pickers are now fully themed custom dropdowns (the native macOS
+  select popup couldn't be themed). The live-exit button is renamed to "Exit" with a
+  styled tooltip naming the city it returns to, and is hidden on the public demo (the
+  "build your own" CTA and nation link already cover leaving the movie there).
+
+### Fixed
+- Mobile ribbon-cut: the forge input is 16px so iOS no longer auto-zooms on focus and
+  hides the GitHub URL being typed during the scripted demo.
+
+### Removed
+- Onboarding tour step that claimed you could tap & hold a citizen to read its labor —
+  that interaction does not exist.
 
 ## [0.16.0] - 2026-06-16
 

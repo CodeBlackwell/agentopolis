@@ -277,11 +277,12 @@
     #dock { gap: 0; }
     #tiers { top: 12px; right: 12px; }
     #tiers button { padding: 8px 11px; font-size: 12px; }
-    #mapctl { top: 58px; right: 12px; grid-template-columns: repeat(2, 42px); }
+    #mapctl { top: 58px; right: 12px; grid-template-columns: repeat(2, 42px);
+              transform: scale(.6); transform-origin: top right; }   /* 40% smaller box */
     #mapctl button { width: 42px; height: 42px; font-size: 20px; }
     #mapctl .wide { height: auto; font-size: 13px; padding: 11px 0; }
     #mapctl .wide .ico { font-size: 15px; }
-    #mapctl [data-act="rot-"], #mapctl [data-act="rot+"] { display: none; }  /* two-finger twist rotates instead */
+    #mapctl [data-act="zoom+"], #mapctl [data-act="zoom-"] { display: none; }  /* pinch zooms instead; on-screen controls rotate */
     #back { padding: 9px 14px; }
     #forge input { max-width: 86vw; }
 
@@ -308,7 +309,7 @@
     #forge-chips button:active { background: var(--gold); color: var(--plum); }
     #clip-chip { background: var(--gold); color: var(--plum); }
     #forge-slot #forge { position: static; transform: none; display: block; }
-    #forge-slot #forge input { width: 100%; max-width: none; font-size: 12px; padding: 12px; }
+    #forge-slot #forge input { width: 100%; max-width: none; font-size: 16px; padding: 12px; }  /* 16px stops iOS focus-zoom from hiding the typed URL */
   }
 </style>
 </head>

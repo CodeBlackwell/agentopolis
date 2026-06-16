@@ -16,6 +16,14 @@ let transition = null;                                    // active demolish-and
 let ptr = -1, playing = false, speed = 12, acc = 0, last = 0, slider = null, label = null, dateEl = null;
 let megaCommit = 15;                                      // commit-size gate for coupling; set relatively in index()
 
+// crisp filled-glyph transport icons (currentColor → flip to plum on hover) instead of emoji/plain-triangle
+const ICONS = {
+  prev: '<svg viewBox="0 0 14 12"><rect x="1.5" y="1.5" width="2.2" height="9"/><path d="M12.5 1.5 L5 6 L12.5 10.5 Z"/></svg>',
+  next: '<svg viewBox="0 0 14 12"><path d="M1.5 1.5 L9 6 L1.5 10.5 Z"/><rect x="10.3" y="1.5" width="2.2" height="9"/></svg>',
+  play: '<svg viewBox="0 0 12 12"><path d="M2.5 1 L10.5 6 L2.5 11 Z"/></svg>',
+  pause: '<svg viewBox="0 0 12 12"><rect x="2" y="1.5" width="3" height="9"/><rect x="7" y="1.5" width="3" height="9"/></svg>',
+};
+
 const citySrc = window.CITY_SRC || 'city-data.json';
 const isForge = citySrc.includes('forge-timelapse');
 // consume the "this forge was scripted by the demo tour" flag once, at load — so the grand-opening confetti
@@ -666,7 +674,7 @@ function stepIntro(t) {
 function setPlay(p) {
   playing = p; last = 0;
   if (p && ptr >= commits.length - 1) seek(-1);          // replay from the start
-  document.getElementById('tl-play').textContent = playing ? '⏸' : '▶';
+  document.getElementById('tl-play').innerHTML = playing ? ICONS.pause : ICONS.play;
   if (!p && window.DEMO_MOVIE && ptr >= commits.length - 1) showFinishCTA();   // the demo holds on the finished city
 }
 
@@ -792,54 +800,82 @@ function buildTransport() {
   // so the single view never scrolls. Fixed outer width + ellipsis label keep it from jittering per frame.
   // exit mirrors the entry: a local repo's movie returns to its live city, a forge returns to its quick
   // static city. A marathon is a curated playlist with no single live counterpart, so it gets no exit.
+  // the demo already exits the movie via its "build your own" CTA + nation link, so the live-exit is redundant there
   const fm = citySrc.match(/url=([^&]+)/);
-  const liveHref = fm ? '/?forge=' + fm[1] + '&static'
+  const liveHref = window.DEMO_MOVIE ? null
+    : fm ? '/?forge=' + fm[1] + '&static'
     : new URLSearchParams(location.search).has('marathon') ? null : '/';
   const css = `#transport{flex:0 0 auto;align-self:center;width:min(680px,100%);box-sizing:border-box;
     display:flex;align-items:center;gap:10px;padding:7px 12px;background:rgba(42,16,36,.9);
     border:2px solid var(--gold);box-shadow:3px 3px 0 var(--plum);font-family:'Silkscreen',monospace;
     color:var(--cream);font-size:10px}
     #transport button{cursor:pointer;background:var(--plum-soft);color:var(--cream);border:1px solid var(--gold);
-    font:inherit;width:30px;height:26px;flex:0 0 auto}#transport button:hover{background:var(--gold);color:var(--plum)}
+    font:inherit;width:30px;height:26px;flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+    #transport button:hover{background:var(--gold);color:var(--plum)}
+    #transport button svg{width:13px;height:13px;fill:currentColor;display:block}
     #tl-track{flex:3 1 auto;min-width:120px;position:relative;display:flex;align-items:center}
-    #tl-track #tl-seek{flex:1 1 auto;min-width:0;margin:0;accent-color:var(--gold)}
+    /* retro slider: square gold thumb riding a plum track, no native chrome */
+    #tl-seek{-webkit-appearance:none;appearance:none;flex:1 1 auto;min-width:0;margin:0;height:10px;
+      background:transparent;cursor:pointer}
+    #tl-seek::-webkit-slider-runnable-track{height:8px;background:var(--plum-soft);border:1px solid var(--gold);
+      box-shadow:inset 0 0 0 1px rgba(26,10,20,.6)}
+    #tl-seek::-moz-range-track{height:8px;background:var(--plum-soft);border:1px solid var(--gold)}
+    #tl-seek::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:16px;margin-top:-5px;
+      background:var(--gold);border:1px solid var(--cream);box-shadow:1px 1px 0 var(--plum)}
+    #tl-seek::-moz-range-thumb{width:12px;height:16px;border-radius:0;background:var(--gold);
+      border:1px solid var(--cream);box-shadow:1px 1px 0 var(--plum)}
+    #tl-seek:hover::-webkit-slider-thumb{background:var(--cream)}#tl-seek:hover::-moz-range-thumb{background:var(--cream)}
     #tl-ticks{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:13px;pointer-events:none}
     #tl-ticks i{position:absolute;top:0;width:2px;height:13px;margin-left:-1px;background:var(--cream);
       opacity:.6;box-shadow:0 0 2px rgba(26,10,20,.8)}
-    #transport input[type=range]{accent-color:var(--gold)}
-    #transport select{flex:0 0 auto;background:var(--plum-soft);color:var(--cream);border:1px solid var(--gold);font:inherit}
+    /* fully custom dropdowns (native select popups can't be themed on macOS) — gold caret trigger + plum menu */
+    .tl-dd{position:relative;flex:0 0 auto;font:inherit}
+    .tl-dd-trigger{height:26px;display:flex;align-items:center;justify-content:center;padding:0 22px 0 9px;
+      background-color:var(--plum-soft);color:var(--cream);border:1px solid var(--gold);cursor:pointer;white-space:nowrap;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='%23d4a953' d='M0 0 L10 0 L5 6 Z'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 8px center;background-size:8px 5px}
+    .tl-dd-trigger:hover,.tl-dd.open .tl-dd-trigger{border-color:var(--cream)}
+    .tl-dd-menu{position:absolute;bottom:calc(100% + 6px);right:0;min-width:100%;z-index:6;display:none;
+      background:var(--plum);border:1px solid var(--gold);box-shadow:2px 2px 0 var(--plum-soft);
+      max-height:264px;overflow-y:auto}
+    .tl-dd.open .tl-dd-menu{display:block}
+    .tl-dd-opt{padding:7px 14px;color:var(--cream);cursor:pointer;white-space:nowrap;text-align:center;
+      border-bottom:1px solid rgba(212,169,83,.22)}
+    .tl-dd-opt:last-child{border-bottom:0}#transport .tl-dd-opt:hover{background:var(--plum-soft)}
+    .tl-dd-opt[aria-selected=true]{background:var(--gold);color:var(--plum)}
     #tl-label{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}
-    #tl-exit{width:auto;padding:0 9px}
+    #tl-exit{width:auto;height:26px;padding:0 16px;letter-spacing:.08em;position:relative}
+    /* stylized hover tooltip: pixel plaque above the button naming the city it returns to */
+    #tl-exit::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);right:0;z-index:5;
+      white-space:nowrap;background:rgba(42,16,36,.97);color:var(--cream);border:1px solid var(--gold);
+      box-shadow:2px 2px 0 var(--plum);padding:5px 8px;font-size:9px;letter-spacing:.05em;
+      opacity:0;visibility:hidden;transition:opacity .12s ease;pointer-events:none}
+    #tl-exit:hover::after{opacity:1;visibility:visible}
     /* date stamp rides the top-right of the canvas, hugging the edge so it clears the title — synced to the playhead */
     #tl-date{position:absolute;top:14px;right:18px;z-index:4;pointer-events:none;text-align:right;
       font-family:'Silkscreen',monospace;font-size:13px;letter-spacing:.07em;color:var(--cream);
       opacity:.5;text-shadow:0 2px 7px rgba(0,0,0,.75)}
     /* phones: trim to the video-player essentials (play / scrub / speed / exit), bigger touch targets */
     @media (max-width:720px){#transport{gap:6px;padding:8px 8px;font-size:11px}
-      #transport button{width:36px;height:36px}#tl-trans,#tl-shape,#tl-label{display:none}
-      #tl-track{min-width:50px}#tl-seek{min-width:0}#tl-exit{padding:0 9px}
+      #transport button{width:36px;height:36px}#transport button svg{width:16px;height:16px}
+      #tl-trans,#tl-shape,#tl-label{display:none}
+      #tl-track{min-width:50px}#tl-seek{min-width:0}
+      #tl-exit{height:36px;font-size:14px;text-align:center;padding:0 18px}#tl-exit::after{font-size:11px;padding:6px 9px}
+      #tl-speed .tl-dd-trigger{height:36px;font-size:14px;padding:0 28px 0 13px;
+        background-position:right 10px center;background-size:11px 7px}
+      #tl-speed .tl-dd-opt{font-size:14px;padding:10px 16px}
       #tl-date{font-size:10px;top:10px}}`;
   document.head.appendChild(document.createElement('style')).textContent = css;
   const bar = document.createElement('div');
   bar.id = 'transport';
   bar.innerHTML =
-    `<button id="tl-prev" title="previous chapter (,)">⏮</button>` +
-    `<button id="tl-play" title="play / pause (space)">▶</button>` +
-    `<button id="tl-next" title="next chapter (.)">⏭</button>` +
+    `<button id="tl-prev" title="previous chapter (,)">${ICONS.prev}</button>` +
+    `<button id="tl-play" title="play / pause (space)">${ICONS.play}</button>` +
+    `<button id="tl-next" title="next chapter (.)">${ICONS.next}</button>` +
     `<div id="tl-track"><input id="tl-seek" type="range" min="-1" max="${commits.length - 1}" value="-1"` +
        ` title="scrub (← →)"><div id="tl-ticks"></div></div>` +
-    `<select id="tl-speed" title="playback speed">
-       <option value="auto" selected>auto</option><option value="6">0.5×</option><option value="12">1×</option>
-       <option value="24">2×</option><option value="40">3×</option><option value="60">5×</option>
-       <option value="120">10×</option><option value="240">20×</option></select>` +
-    `<select id="tl-trans" title="how the city re-forms between formations">` +
-       TRANSITION_MODES.map(m => `<option value="${m}"${m === transMode ? ' selected' : ''}>${m}</option>`).join('') +
-    `</select>` +
-    `<select id="tl-shape" title="how building shapes are chosen">` +
-       City.SHAPE_MODES.map(m => `<option value="${m}"${m === City.shapeMode ? ' selected' : ''}>${m}</option>`).join('') +
-    `</select>` +
-    `<span id="tl-label"></span>` +
-    (liveHref ? `<button id="tl-exit" title="back to the live city">&#9632; live</button>` : '');
+    `<span id="tl-label"></span>` +    // custom dropdowns (tl-speed / tl-trans / tl-shape) are inserted before this label below
+    (liveHref ? `<button id="tl-exit" data-tip="&larr; leave the replay for the live city &mdash; ${esc(document.body.dataset.hallName || 'this city')}">Exit</button>` : '');
   const wrap = document.querySelector('.mapwrap');
   wrap.classList.add('tl-mode');                          // column layout: canvas on top, bar in the strip below
   wrap.appendChild(bar);
@@ -857,13 +893,45 @@ function buildTransport() {
     mark.title = layouts[e].ep.formation.id;
     ticks.appendChild(mark);
   }
-  bar.querySelector('#tl-speed').onchange = e => speed = e.target.value === 'auto' ? autoSpeed() : +e.target.value;
-  bar.querySelector('#tl-trans').onchange = e => transMode = e.target.value;
-  bar.querySelector('#tl-shape').onchange = e => {          // re-shape every pre-built epoch; the loop repaints
-    City.setShapeMode(e.target.value);
-    for (const l of layouts) City.applyShapes(l.state);
-  };
+  const speedOpts = [['auto', 'auto'], ['6', '0.5×'], ['12', '1×'], ['24', '2×'], ['40', '3×'],
+    ['60', '5×'], ['120', '10×'], ['240', '20×']].map(([value, label]) => ({ value, label }));
+  const modeOpts = ms => ms.map(m => ({ value: m, label: m }));
+  bar.insertBefore(makeDropdown({ id: 'tl-speed', title: 'playback speed', options: speedOpts, value: 'auto',
+    onSelect: v => speed = v === 'auto' ? autoSpeed() : +v }), label);
+  bar.insertBefore(makeDropdown({ id: 'tl-trans', title: 'how the city re-forms between formations',
+    options: modeOpts(TRANSITION_MODES), value: transMode, onSelect: v => transMode = v }), label);
+  bar.insertBefore(makeDropdown({ id: 'tl-shape', title: 'how building shapes are chosen',
+    options: modeOpts(City.SHAPE_MODES), value: City.shapeMode,
+    onSelect: v => { City.setShapeMode(v); for (const l of layouts) City.applyShapes(l.state); } }), label);
+  document.addEventListener('click', () => document.querySelectorAll('.tl-dd.open').forEach(d => d.classList.remove('open')));
   if (liveHref) bar.querySelector('#tl-exit').onclick = () => location.href = liveHref;
+}
+
+// a themed select replacement: a caret trigger + a plum menu that opens upward over the canvas
+function makeDropdown({ id, title, options, value, onSelect }) {
+  const dd = document.createElement('div'); dd.className = 'tl-dd'; dd.id = id;
+  const trig = document.createElement('div'); trig.className = 'tl-dd-trigger'; trig.title = title;
+  trig.textContent = (options.find(o => o.value === value) || options[0]).label;
+  const menu = document.createElement('div'); menu.className = 'tl-dd-menu';
+  for (const o of options) {
+    const opt = document.createElement('div'); opt.className = 'tl-dd-opt'; opt.textContent = o.label;
+    if (o.value === value) opt.setAttribute('aria-selected', 'true');
+    opt.onclick = () => {
+      trig.textContent = o.label;
+      menu.querySelectorAll('.tl-dd-opt').forEach(x => x.removeAttribute('aria-selected'));
+      opt.setAttribute('aria-selected', 'true');
+      dd.classList.remove('open'); onSelect(o.value);
+    };
+    menu.appendChild(opt);
+  }
+  trig.onclick = e => {
+    e.stopPropagation();
+    const open = dd.classList.contains('open');
+    document.querySelectorAll('.tl-dd.open').forEach(d => d.classList.remove('open'));
+    if (!open) dd.classList.add('open');
+  };
+  dd.append(trig, menu);
+  return dd;
 }
 
 function buildLegend(data) {

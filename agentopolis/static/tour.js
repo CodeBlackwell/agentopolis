@@ -117,7 +117,7 @@
       text: 'As the city grows, this panel narrates each district and landmark in real time — the official record of your achievements, updated as they become true.',
       try: 'Hover a card — watch the streets it names light up.' },
     { sel: '#tl-exit', title: 'Return to the present',
-      text: 'When the documentary has suitably flattered you, press ■ live to return to the breathing city. Duty calls, Excellency.' },
+      text: 'When the documentary has suitably flattered you, press Exit to return to the breathing city. Duty calls, Excellency.' },
     { center: 1, title: '⭐ LONG LIVE THE PRESIDENT ⭐',
       text: `The tour is complete, ${pres}. You now command the Nation in full — to lead, to view, to build. My portrait beneath the controls recalls me anytime. The people thank you. Unanimously, as always.` },
   ];
@@ -135,9 +135,6 @@
     { sel: '#tl-shape', title: 'Shape the skyline',
       text: 'A grant of taste, Excellency: reshape every building by file family, rarity, size, age — or a tasteful uniform decree. The look of the Republic bends to your whim.',
       try: 'Reshape the skyline — pick a mode.' },
-    { sel: '#hotel', title: 'The tireless citizenry',
-      text: 'Your loyal pixel workers scurry across the dispatch floor without rest. Idle hands are, naturally, unconstitutional.',
-      try: 'Hover a citizen to read its labor.' },
     { sel: '#forge', title: 'A leader BUILDS',
       text: 'But watching is for subjects — a President BUILDS. One simply names a town here and we throw it a grand opening. Permit me to demonstrate, Excellency.',
       typeInto: '#forge input', typeUrl: 'https://github.com/colinhacks/zod',
@@ -154,7 +151,7 @@
       text: 'Hover any card and the streets it names PULSE to attention. Hover a building, and its card rises to meet your gaze. Dossier and city are one — and cards appear or vanish as your history makes them true.',
       try: 'Hover a card now — watch the city pulse in answer.' },
     { sel: '#tl-exit', title: 'Return to the present',
-      text: 'Press ■ live when the chronicle has flattered you sufficiently — or ⊔ Share your handiwork with the lesser nations.' },
+      text: 'Press Exit when the chronicle has flattered you sufficiently — or ⊔ Share your handiwork with the lesser nations.' },
     { center: 1, title: '⭐ NOW GO BUILD, PRESIDENT ⭐',
       text: `The demonstration is complete, ${pres}. Hold a grand opening of your own — paste any GitHub URL and cut the ribbon — or follow the banner to survey the entire BLACKBOX nation. My portrait beneath the controls recalls me anytime. The people are, as ever, unanimous.` },
   ];
