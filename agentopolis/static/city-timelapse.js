@@ -806,16 +806,23 @@ function reformReason(to, s) {                             // the one threshold 
   }[to] || '';
 }
 
-// Persists until the next transition: which two shapes, the exact commit it happened on, and why.
+// Additive history: one row per transition the repo has crossed so far — the full chain of how it
+// reached its current shape, each with the commit it happened on and the threshold that triggered it.
 function reformedCard() {
   if (epochIndex <= 0) return '';                          // epoch 0 was never re-formed into
-  const from = layouts[epochIndex - 1].ep.formation.id, to = layouts[epochIndex].ep.formation.id;
-  const at = layouts[epochIndex].ep.start, c = commits[at];
-  const s = City.statsOf({ zone: state.zone, buildings: layouts[epochIndex].ep.buildingsAlive });
-  const when = c ? `commit ${at + 1} · ${new Date(c.ts * 1000).toLocaleDateString()}` : `commit ${at + 1}`;
-  return `<div class="xcard live" data-tip="reform" style="border-color:var(--pink-deep)"><h5>⟳ Re-Formed · ${FORM_TITLE[to] || to}</h5>`
-    + `<p><span class="em">${FORM_TITLE[from] || from}</span> → <span class="em">${FORM_TITLE[to] || to}</span> at <span class="em">${when}</span>`
-    + ` — ${reformReason(to, s)}${c ? `<br>"${esc(c.subject)}"` : ''}</p></div>`;
+  const rows = [];
+  for (let k = 1; k <= epochIndex; k++) {
+    const from = layouts[k - 1].ep.formation.id, to = layouts[k].ep.formation.id;
+    const at = layouts[k].ep.start, c = commits[at];
+    const s = City.statsOf({ zone: state.zone, buildings: layouts[k].ep.buildingsAlive });
+    const when = c ? `commit ${at + 1} · ${new Date(c.ts * 1000).toLocaleDateString()}` : `commit ${at + 1}`;
+    rows.push(`<p><span class="em">${FORM_TITLE[from] || from}</span> → <span class="em">${FORM_TITLE[to] || to}</span> at <span class="em">${when}</span>`
+      + ` — ${reformReason(to, s)}${c ? `<br>"${esc(c.subject)}"` : ''}</p>`);
+  }
+  const now = layouts[epochIndex].ep.formation.id;
+  return `<div class="xcard live" data-tip="reform" style="border-color:var(--pink-deep)">`
+    + `<h5>⟳ Re-Formed · ${rows.length === 1 ? (FORM_TITLE[now] || now) : pl(rows.length, 'transition')}</h5>`
+    + rows.join('') + `</div>`;
 }
 
 function renderExplain(shown, i) {
