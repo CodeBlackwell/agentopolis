@@ -16,6 +16,10 @@ let megaCommit = 15;                                      // commit-size gate fo
 
 const citySrc = window.CITY_SRC || 'city-data.json';
 const isForge = citySrc.includes('forge-timelapse');
+// consume the "this forge was scripted by the demo tour" flag once, at load — so the grand-opening confetti
+// fires only for a user's OWN supplied repo, never the tour's canned ribbon-cut. (Read early so it can't linger.)
+const scriptedForge = sessionStorage.getItem('apx-scripted-forge') === '1';
+try { sessionStorage.removeItem('apx-scripted-forge'); } catch (e) {}
 window.MOVIE = true;                                      // tell hotel.js to stand down: no dispatch floor in a movie
 document.getElementById('replay')?.remove();             // already in the movie; drop the entry button
 
@@ -50,6 +54,9 @@ try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');
   if (resp && resp.timeline) { data = resp.data; tl = resp.timeline; }   // forge: one full-clone bundle
   else { data = resp; tl = await fetch(window.TIMELINE_SRC || 'timeline.json').then(r => r.ok ? r.json() : Promise.reject(r.status)); }
   commits = tl.commits;
+  const dr = data.sample || {};                          // headline stats for the share caption (#6/#7)
+  window.CITY_STATS = { files: data.buildings.reduce((n, b) => n + (b.files || 0), 0) + (dr.files?.dropped || 0),
+                        districts: data.buildings.length + (dr.buildings?.dropped || 0), commits: commits.length };
   const dead = reconstructDead(commits, data.buildings, data.zone)   // lifetime estate: files that died before HEAD
     .sort((a, b) => b.commits - a.commits).slice(0, 80);             // tuned: ruins feed formation detection, keep flat
   if (dead.length) data.buildings = data.buildings.concat(dead);
@@ -604,7 +611,7 @@ function loop(t) {
       if (target >= nextStart) { advance(nextStart - 1); beginTransition(e, e + 1, nextStart); }   // re-form first
       else advance(target);
     }
-    if (ptr >= commits.length - 1) setPlay(false);
+    if (ptr >= commits.length - 1) { const justFinished = playing; setPlay(false); if (justFinished) onMovieComplete(); }
   } else { last = 0; }
   if (!transition) {
     if (intro) stepIntro(t);
@@ -615,6 +622,7 @@ function loop(t) {
     drawFocus(t, af.ping);                                 // ping the map items the focus describes
     applyCardHighlight(af.cards);                          // raise the cards a hovered building belongs to
     syncScroll(af.ping);                                   // reveal that card if the map hover scrolled it off
+    if (endCardAt) drawEndCard(t);                         // branded outro, only while recording a clip
   }
   requestAnimationFrame(loop);
 }
@@ -650,6 +658,37 @@ function setPlay(p) {
   if (!p && window.DEMO_MOVIE && ptr >= commits.length - 1) showFinishCTA();   // the demo holds on the finished city
 }
 
+function jumpChapter(dir) {                               // ⏮ / ⏭ and , / . hop between formation transitions
+  setPlay(false);
+  const marks = layouts.map(l => l.ep.start);            // each epoch begins at a transition (chapter) commit
+  if (dir > 0) { const next = marks.find(m => m > ptr); seek(next !== undefined ? next : commits.length - 1); }
+  else { const before = marks.filter(m => m < ptr); seek(before.length ? before[before.length - 1] : -1); }
+}
+
+// ---- shareable end-card: a ~1s branded outro baked into the recorded clip, so the canonical link rides
+// in the pixels and survives platforms that strip outbound URLs. Drawn over the final frame while recording.
+const forgeParam = new URLSearchParams(location.search).get('forge');
+const canonText = () => {
+  const m = /github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(forgeParam || '');
+  return m ? `agentopolis.codeblackwell.ai/c/${m[1]}/${m[2]}` : 'agentopolis.codeblackwell.ai';
+};
+const captureFps = (cores) => ((cores ?? navigator.hardwareConcurrency ?? 8) <= 4 ? 24 : 30);  // lighter on weak phones
+let endCardAt = 0;
+function drawEndCard(t) {
+  const W = tlCanvas.width, H = tlCanvas.height, u = H / 18, k = Math.min(1, (t - endCardAt) / 300);
+  tlCtx.save();
+  tlCtx.globalAlpha = k * 0.9; tlCtx.fillStyle = '#241020'; tlCtx.fillRect(0, 0, W, H);
+  tlCtx.globalAlpha = k; tlCtx.textAlign = 'center'; tlCtx.textBaseline = 'middle';
+  tlCtx.fillStyle = '#f9efe3'; tlCtx.font = `${u * 1.7}px 'Silkscreen', monospace`;
+  tlCtx.fillText(document.body.dataset.hallName || 'this city', W / 2, H * 0.40);
+  tlCtx.fillStyle = '#d4a953'; tlCtx.font = `${u}px 'Silkscreen', monospace`;
+  tlCtx.fillText(canonText(), W / 2, H * 0.55);
+  tlCtx.fillStyle = '#c77aaa'; tlCtx.font = `${u * 0.8}px 'Silkscreen', monospace`;
+  tlCtx.fillText('built by Claude Code', W / 2, H * 0.65);
+  tlCtx.restore();
+}
+window.__endCard = { text: canonText, draw: drawEndCard, fps: captureFps };   // exposed for the end-card self-tests
+
 // record one fast replay pass of the movie as a short video to share — the build itself is the payload.
 // Resolves a Blob, or null if MediaRecorder/codecs are unavailable; share.js drives this in movie mode.
 window.recordTimelapseClip = () => new Promise(resolve => {
@@ -658,13 +697,17 @@ window.recordTimelapseClip = () => new Promise(resolve => {
   const TYPES = ['video/mp4;codecs=h264', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
   const mimeType = TYPES.find(t => MediaRecorder.isTypeSupported(t));
   let rec;
-  try { rec = new MediaRecorder(tlCanvas.captureStream(30), mimeType ? { mimeType } : undefined); }
+  try { rec = new MediaRecorder(tlCanvas.captureStream(captureFps()), mimeType ? { mimeType } : undefined); }
   catch (e) { return resolve(null); }
   const chunks = [];
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-  rec.onstop = () => resolve(new Blob(chunks, { type: rec.mimeType || 'video/webm' }));
+  rec.onstop = () => { endCardAt = 0; resolve(new Blob(chunks, { type: rec.mimeType || 'video/webm' })); };
   const prevSpeed = speed;
-  const finish = () => { clearTimeout(cap); clearInterval(poll); speed = prevSpeed; if (rec.state !== 'inactive') rec.stop(); };
+  const finish = () => {                                                 // build done → hold the branded outro, then cut
+    clearTimeout(cap); clearInterval(poll); speed = prevSpeed;
+    endCardAt = performance.now();
+    setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, 1200);
+  };
   const cap = setTimeout(finish, 20000);                                 // hard cap so a huge repo can't run away
   const poll = setInterval(() => { if (!playing && ptr >= commits.length - 1) finish(); }, 150);
   seek(-1); speed = Math.max(3, Math.min(120, commits.length / 11));     // pace the pass to land near ~12s
@@ -683,6 +726,54 @@ function showFinishCTA() {
   document.querySelector('#forge input')?.focus();
 }
 
+// ---- grand-opening celebration: pixel confetti + firework bursts over the finished city. Fires ONCE, only
+//      when a user's own forged repo first finishes building (not the demo's scripted ribbon-cut, not a re-watch). ----
+function celebrate() {
+  const cv = document.createElement('canvas');
+  cv.id = 'tl-confetti';
+  Object.assign(cv.style, { position: 'fixed', inset: '0', zIndex: 41, pointerEvents: 'none' });   // above the city, below the dialogue card (z42)
+  cv.width = innerWidth; cv.height = innerHeight;
+  document.body.appendChild(cv);
+  const g = cv.getContext('2d');
+  const COLORS = ['#d4a953', '#f3cfd9', '#52e3d4', '#7edeff', '#c0395b', '#f9efe3', '#e8a8bd'];
+  const rnd = (a, b) => a + Math.random() * (b - a), pick = () => COLORS[Math.floor(Math.random() * COLORS.length)];
+  const parts = [];
+  for (let i = 0; i < 170; i++)                            // confetti rains from above, tumbling
+    parts.push({ x: rnd(0, cv.width), y: rnd(-cv.height, 0), vx: rnd(-40, 40), vy: rnd(70, 220),
+      s: rnd(4, 9), rot: rnd(0, 6.3), vr: rnd(-7, 7), col: pick(), conf: true });
+  const burst = (cx, cy) => { const col = pick();          // a firework: a ring of sparks from one point
+    for (let i = 0; i < 48; i++) { const a = i / 48 * 6.283, sp = rnd(50, 170);
+      parts.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, s: rnd(3, 6), col, life: rnd(.9, 1.5), age: 0 }); } };
+  let start = 0, prev = 0, nextBurst = .15, fired = 0;
+  (function frame(t) {
+    if (!start) start = prev = t;
+    const dt = Math.min(.05, (t - prev) / 1000), el = (t - start) / 1000; prev = t;
+    if (el > nextBurst && fired < 6) { burst(rnd(cv.width * .15, cv.width * .85), rnd(cv.height * .15, cv.height * .5)); nextBurst += rnd(.25, .55); fired++; }
+    g.clearRect(0, 0, cv.width, cv.height);
+    for (const p of parts) {
+      p.vy += (p.conf ? 130 : 200) * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.conf) { p.rot += p.vr * dt; g.save(); g.translate(p.x, p.y); g.rotate(p.rot);
+        g.fillStyle = p.col; g.fillRect(-p.s / 2, -p.s / 2, p.s, p.s); g.restore(); }
+      else { p.age += dt; const a = Math.max(0, 1 - p.age / p.life);
+        if (a > 0) { g.globalAlpha = a; g.fillStyle = p.col; g.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s); g.globalAlpha = 1; } }
+    }
+    if (el < 5) requestAnimationFrame(frame); else cv.remove();
+  })(performance.now());
+}
+
+let celebrated = false;                                    // guard: at most one grand opening per page load
+function onMovieComplete() {
+  if (celebrated || !isForge || scriptedForge) return;     // a user's own forge only — not the demo's scripted ribbon-cut
+  const url = (citySrc.match(/url=([^&]+)/) || [])[1];
+  if (!url) return;
+  const key = 'apx-opened-' + url;
+  if (localStorage.getItem(key)) return;                   // already threw this repo its grand opening
+  localStorage.setItem(key, '1');
+  celebrated = true;
+  celebrate();
+  setTimeout(() => window.tourCelebrate?.(), 1300);          // once the confetti is flying, the Chief of Staff takes a bow
+}
+
 // ---- transport bar (built in JS so the shared shell stays untouched) ----
 function buildTransport() {
   // the bar lives in the map frame's flow, just below the canvas; the canvas yields a fixed strip for it
@@ -698,7 +789,11 @@ function buildTransport() {
     color:var(--cream);font-size:10px}
     #transport button{cursor:pointer;background:var(--plum-soft);color:var(--cream);border:1px solid var(--gold);
     font:inherit;width:30px;height:26px;flex:0 0 auto}#transport button:hover{background:var(--gold);color:var(--plum)}
-    #tl-seek{flex:3 1 auto;min-width:120px;accent-color:var(--gold)}
+    #tl-track{flex:3 1 auto;min-width:120px;position:relative;display:flex;align-items:center}
+    #tl-track #tl-seek{flex:1 1 auto;min-width:0;margin:0;accent-color:var(--gold)}
+    #tl-ticks{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:13px;pointer-events:none}
+    #tl-ticks i{position:absolute;top:0;width:2px;height:13px;margin-left:-1px;background:var(--cream);
+      opacity:.6;box-shadow:0 0 2px rgba(26,10,20,.8)}
     #transport input[type=range]{accent-color:var(--gold)}
     #transport select{flex:0 0 auto;background:var(--plum-soft);color:var(--cream);border:1px solid var(--gold);font:inherit}
     #tl-label{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}
@@ -711,12 +806,15 @@ function buildTransport() {
   const bar = document.createElement('div');
   bar.id = 'transport';
   bar.innerHTML =
-    `<button id="tl-play" title="play / pause">▶</button>` +
-    `<button id="tl-skip" title="skip to the finished city">⏭</button>` +
-    `<input id="tl-seek" type="range" min="-1" max="${commits.length - 1}" value="-1">` +
+    `<button id="tl-prev" title="previous chapter (,)">⏮</button>` +
+    `<button id="tl-play" title="play / pause (space)">▶</button>` +
+    `<button id="tl-next" title="next chapter (.)">⏭</button>` +
+    `<div id="tl-track"><input id="tl-seek" type="range" min="-1" max="${commits.length - 1}" value="-1"` +
+       ` title="scrub (← →)"><div id="tl-ticks"></div></div>` +
     `<select id="tl-speed" title="playback speed">
-       <option value="auto" selected>auto</option><option value="4">slow</option>
-       <option value="12">1×</option><option value="40">3×</option><option value="120">10×</option></select>` +
+       <option value="auto" selected>auto</option><option value="6">0.5×</option><option value="12">1×</option>
+       <option value="24">2×</option><option value="40">3×</option><option value="60">5×</option>
+       <option value="120">10×</option><option value="240">20×</option></select>` +
     `<select id="tl-trans" title="how the city re-forms between formations">` +
        TRANSITION_MODES.map(m => `<option value="${m}"${m === transMode ? ' selected' : ''}>${m}</option>`).join('') +
     `</select>` +
@@ -731,8 +829,16 @@ function buildTransport() {
   slider = bar.querySelector('#tl-seek');
   label = bar.querySelector('#tl-label');
   bar.querySelector('#tl-play').onclick = () => setPlay(!playing);
-  bar.querySelector('#tl-skip').onclick = () => { setPlay(false); seek(commits.length - 1); };
+  bar.querySelector('#tl-prev').onclick = () => jumpChapter(-1);
+  bar.querySelector('#tl-next').onclick = () => jumpChapter(1);
   slider.oninput = () => { setPlay(false); seek(+slider.value); };
+  const ticks = bar.querySelector('#tl-ticks');           // a chapter mark at each formation transition
+  for (let e = 1; e < layouts.length; e++) {
+    const mark = document.createElement('i');
+    mark.style.left = (layouts[e].ep.start + 1) / commits.length * 100 + '%';   // slider domain is [-1, len-1]
+    mark.title = layouts[e].ep.formation.id;
+    ticks.appendChild(mark);
+  }
   bar.querySelector('#tl-speed').onchange = e => speed = e.target.value === 'auto' ? autoSpeed() : +e.target.value;
   bar.querySelector('#tl-trans').onchange = e => transMode = e.target.value;
   bar.querySelector('#tl-shape').onchange = e => {          // re-shape every pre-built epoch; the loop repaints
@@ -1051,7 +1157,21 @@ const CTL = { 'rot-': () => rotate(-1), 'rot+': () => rotate(1),
 document.getElementById('mapctl').addEventListener('click', e => {
   const act = e.target.dataset.act; if (act && state) CTL[act]();
 });
-window.addEventListener('keydown', e => { if (e.key === 'q' || e.key === 'e') rotate(e.key === 'q' ? 1 : -1); });
+// keyboard transport — space play/pause, ← → scrub, , / . hop chapters, Home/End jump to ends, q/e rotate.
+// A focused input/select keeps its native keys; the tour owns the rest of the keyboard while its overlay is up.
+const tourActive = () => { const b = document.getElementById('tour-block'); return !!b && b.style.display === 'block'; };
+window.addEventListener('keydown', e => {
+  if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
+  if (e.key === 'q' || e.key === 'e') { rotate(e.key === 'q' ? 1 : -1); return; }   // rotate works even mid-tour
+  if (tourActive()) return;
+  if (e.key === ' ') { e.preventDefault(); setPlay(!playing); }
+  else if (e.key === 'ArrowRight') { setPlay(false); seek(Math.min(commits.length - 1, ptr + 1)); }
+  else if (e.key === 'ArrowLeft') { setPlay(false); seek(Math.max(-1, ptr - 1)); }
+  else if (e.key === '.' || e.key === '>') jumpChapter(1);
+  else if (e.key === ',' || e.key === '<') jumpChapter(-1);
+  else if (e.key === 'Home') { setPlay(false); seek(-1); }
+  else if (e.key === 'End') { setPlay(false); seek(commits.length - 1); }
+});
 tlCanvas.addEventListener('wheel', m => {
   m.preventDefault();
   const r = tlCanvas.getBoundingClientRect();
