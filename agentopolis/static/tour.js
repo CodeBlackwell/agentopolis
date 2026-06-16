@@ -121,8 +121,8 @@
       try: 'Hover a citizen to read its labor.' },
     { sel: '#forge', title: 'A leader BUILDS',
       text: 'But watching is for subjects — a President BUILDS. One simply names a town here and we throw it a grand opening. Permit me to demonstrate, Excellency.',
-      typeInto: '#forge input', typeUrl: 'https://github.com/chalk/ansi-styles',
-      nav: '/?forge=' + encodeURIComponent('https://github.com/chalk/ansi-styles'),
+      typeInto: '#forge input', typeUrl: 'https://github.com/colinhacks/zod',
+      nav: '/?forge=' + encodeURIComponent('https://github.com/colinhacks/zod'),
       resume: 'demo-cards', navLabel: 'cut the ribbon ▸', working: 'cutting the ribbon…' },
   ];
   const DEMO_CARDS = [
