@@ -35,6 +35,7 @@
   }
   /* title rides on the map canvas (over the sky) so the map reclaims the header row's height */
   header { position: absolute; top: 8px; left: 14px; z-index: 3; pointer-events: none;
+           transform: scale(.8); transform-origin: top left;
            text-shadow: 0 2px 7px rgba(0,0,0,.75), 1px 1px 0 var(--plum); }
   header h1 { font-family: 'Limelight', cursive; font-size: clamp(18px, 1.9vw, 26px);
               letter-spacing: .06em; color: var(--cream); }
