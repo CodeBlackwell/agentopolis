@@ -52,11 +52,28 @@ the city renders) but is missing **both ends** — the parts that make it spread
 
 | # | Step | State |
 |---|------|-------|
-| 1 | Responsive canvas + gestures (foundation) | **done** — see below |
-| 2 | Forge-and-share funnel UI | planned (this doc) |
-| 3 | The share loop (clip export + `navigator.share`) | planned (this doc) |
-| 4 | OG-image unfurling per forged repo | deferred — separate session |
-| 5 | Autoplay-the-wow on cold load | planned (this doc) |
+| 1 | Responsive canvas + gestures (foundation) | **done** (`autosizeCanvas`) |
+| 2 | Forge-and-share funnel UI | **done** — 2a–2e shipped 2026-06-16 |
+| 3a | Share loop — snapshot + `navigator.share` + OG warm | **done** — `static/share.js` (parallel session) |
+| 3b | Share loop — looping **video** clip (`MediaRecorder`) | open (optional) — `share.js` does a still, not a clip |
+| 4 | OG-image unfurling per forged repo | **done** — server `root()` dynamic OG + `/og/<hash>.png` |
+| 5 | Autoplay-the-wow on cold load | **done** — forge defaults to the movie; reduced-motion guard added |
+
+Only **3b** (the looping video-clip share) remains, and it is optional — a
+working share artifact (branded still + unfurling link) already ships via
+`share.js`. The build track from this plan is otherwise complete.
+
+### What landed (commits, 2026-06-16)
+
+- **Step 2:** `1b20fa9` two-finger twist + strip rotate buttons + touch in the
+  movie · `d09767b` bottom sheet · `ad37fd2` forge funnel (CTA + chips +
+  clipboard) · `f3a6234` transport bar tightened for phones.
+- **Step 5:** `1fa993f` `prefers-reduced-motion` guard on forge cold-load. The
+  auto-play itself was already wired server-side (`server.py:root()` defaults a
+  `?forge=` link to the movie engine).
+- **Steps 3a + 4** were delivered by the parallel showcase session in
+  `static/share.js` + `server.py` (per-repo OG capture → `/og`, dynamic
+  `_og_block`). This plan's Step 4 section below is superseded by that.
 
 ### Step 1 — Responsive canvas (shipped 2026-06-16)
 
