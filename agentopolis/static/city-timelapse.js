@@ -673,6 +673,7 @@ function stepIntro(t) {
 
 function setPlay(p) {
   playing = p; last = 0;
+  window.MOVIE_PLAYING = p;                                 // hotel.js reads this: agents only go frantic while the reel rolls
   if (p && ptr >= commits.length - 1) seek(-1);          // replay from the start
   document.getElementById('tl-play').innerHTML = playing ? ICONS.pause : ICONS.play;
   if (!p && window.DEMO_MOVIE && ptr >= commits.length - 1) showFinishCTA();   // the demo holds on the finished city

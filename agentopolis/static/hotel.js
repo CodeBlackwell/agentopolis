@@ -12,8 +12,10 @@ const TOOL_STATION = {
   WebSearch: 'telephone', WebFetch: 'telephone', Task: 'reception', TodoWrite: 'reception',
 };
 const HAIR = ['#2d1b12', '#6b3e1e', '#c9a227', '#3a3a3a'];
-const SPEED = window.DEMO_MOVIE ? 8 : 3.2;        // the demo movie cranks agent speed for the meme
-const BUBBLE_MS = window.DEMO_MOVIE ? 1600 : 4700;   // rapid demo: bubbles flash, not pile up
+const MOVIE = !!window.DEMO_MOVIE;
+const frantic = () => MOVIE && !!window.MOVIE_PLAYING;   // the meme: cranked only while the timelapse is actually playing
+const speed = () => frantic() ? 8 : 3.2;                 // calm 3.2 when paused / outside the movie
+const bubbleMs = () => frantic() ? 1600 : 4700;          // rapid: bubbles flash; calm: they linger
 const SEATS = [[0, 0], [.55, 0], [0, .55], [.55, .55], [-.5, .3], [.3, -.5], [-.5, -.5], [.7, .35]];
 
 const ctx = document.getElementById('hotel').getContext('2d');
@@ -145,11 +147,12 @@ function tick(e) {
   while (ticker.children.length > 40) ticker.lastChild.remove();
 }
 
-setInterval(() => {                         // idle agents wander to stations
+(function wander() {                        // idle agents drift between stations: brisk while frantic, languid when calm
   for (const av of avatars.values())
     if (av.isAgent && !av.leaving && av.state === 'idle' && Math.random() < .35)
       send(av, randomStation());
-}, window.DEMO_MOVIE ? 1600 : 5000);
+  setTimeout(wander, frantic() ? 1600 : 5000);
+})();
 
 let last = performance.now();
 function frame(t) {
@@ -157,14 +160,15 @@ function frame(t) {
   last = t;
   for (const av of [...avatars.values()]) {
     const dx = av.tx - av.x, dy = av.ty - av.y;
-    if (Math.abs(dx) > .05) av.x += Math.sign(dx) * Math.min(SPEED * dt, Math.abs(dx));
-    else if (Math.abs(dy) > .05) av.y += Math.sign(dy) * Math.min(SPEED * dt, Math.abs(dy));
+    const sp = speed();
+    if (Math.abs(dx) > .05) av.x += Math.sign(dx) * Math.min(sp * dt, Math.abs(dx));
+    else if (Math.abs(dy) > .05) av.y += Math.sign(dy) * Math.min(sp * dt, Math.abs(dy));
     else {
       av.x = av.tx; av.y = av.ty;
       if (av.leaving) { avatars.delete(av.id); continue; }
       av.state = av.pending;
     }
-    if (av.bubble && t - av.bubble.t > BUBBLE_MS) av.bubble = null;
+    if (av.bubble && t - av.bubble.t > bubbleMs()) av.bubble = null;
   }
   render(ctx, [...avatars.values()], t);
   requestAnimationFrame(frame);
@@ -217,9 +221,9 @@ source.onerror = () => lamp.classList.remove('on');
 source.onmessage = m => handle(JSON.parse(m.data));
 
 // Seeded loop: a busy crew works the real city on a timer (no live Claude session needed).
-// Generates an interleaved multi-agent stream — 4-5 subagents alive at once, cycling in and
-// out the door — so the floor scurries and the ticker streams. Reads the city's hottest buildings.
-function buildScript(buildings) {
+// Infinite generator of an interleaved multi-agent stream — crew size and pace read playback
+// state each round (see cap()), so the floor scurries while the reel rolls and calms when it stops.
+function* buildScript(buildings) {
   const s = 'demo';
   const base = p => (p || '').split('/').pop();
   const top = [...buildings].sort((a, b) => (b.commits || 0) - (a.commits || 0)).slice(0, 12);
@@ -228,34 +232,36 @@ function buildScript(buildings) {
   const TYPES = ['Explore', 'general-purpose', 'Plan', 'code-reviewer', 'Task'];
   const TOOLS = ['Read', 'Grep', 'Edit', 'Bash', 'Write', 'Glob', 'WebFetch'];
 
-  const ev = [{ event: 'SessionStart', session: s },
-              { event: 'UserPromptSubmit', session: s, detail: `ship the ${pick(0).component} feature` }];
   const live = [];                                  // agents currently in the room: {id, type, work}
-  let nextId = 0, k = 0;                             // k rotates tools + buildings so nothing repeats
-  const dispatch = () => {
+  let nextId = 0, k = 0, round = 0;                  // k rotates tools + buildings so nothing repeats
+  const dispatch = () => {                           // returns the dispatch event; agent appears on its first tool call
     const type = TYPES[nextId % TYPES.length];
-    ev.push({ event: 'PreToolUse', session: s, tool: 'Agent', agent_type: type, agent_name: `survey ${pick(nextId).component}` });
+    const e = { event: 'PreToolUse', session: s, tool: 'Agent', agent_type: type, agent_name: `survey ${pick(nextId).component}` };
     live.push({ id: `a${nextId}`, type, work: 5 + (nextId % 4) });   // each runs 5-8 tools, then leaves
     nextId++;
+    return e;
   };
   const act = a => {                                // one tool call → the agent scurries to its station + logs
     const b = pick(k), tool = TOOLS[k++ % TOOLS.length];
-    ev.push({ event: 'PreToolUse', session: s, agent_id: a.id, agent_type: a.type, tool, detail: base(b.path), path: b.path });
+    return { event: 'PreToolUse', session: s, agent_id: a.id, agent_type: a.type, tool, detail: base(b.path), path: b.path };
   };
-  for (let round = 0; round < 60; round++) {
-    while (live.length < 4) dispatch();             // keep the room full...
-    if (live.length < 5 && round % 4 === 0) dispatch();   // ...drifting up to five
-    for (const a of live) { act(a); a.work--; }
+  // Crew size tracks playback live: frantic 2-4 only while the reel rolls; otherwise a calm 1-3 (paused movie + nation/town).
+  const cap = () => frantic() ? [2, 4] : [1, 3];
+  yield { event: 'SessionStart', session: s };
+  yield { event: 'UserPromptSubmit', session: s, detail: `ship the ${pick(0).component} feature` };
+  while (true) {
+    const [min, max] = cap();
+    while (live.length < min) yield dispatch();     // keep the room at least min full...
+    if (live.length < max && round % 4 === 0) yield dispatch();   // ...drifting up to max
+    for (const a of live) { yield act(a); a.work--; }
     const b = pick(k);                              // the main agent works alongside the crew, committing now and then
-    ev.push(round % 8 === 7
+    yield round % 8 === 7
       ? { event: 'PreToolUse', session: s, tool: 'Bash', detail: 'git commit -m ship', commit: true }
-      : { event: 'PreToolUse', session: s, tool: TOOLS[k++ % TOOLS.length], detail: base(b.path), path: b.path });
-    for (let i = live.length - 1; i >= 0; i--)      // finished agents walk back out the door
-      if (live[i].work <= 0) ev.push({ event: 'SubagentStop', session: s, agent_id: live.splice(i, 1)[0].id });
+      : { event: 'PreToolUse', session: s, tool: TOOLS[k++ % TOOLS.length], detail: base(b.path), path: b.path };
+    for (let i = live.length - 1; i >= 0; i--)      // finished (or over-cap) agents walk back out the door
+      if (live[i].work <= 0 || live.length > max) yield { event: 'SubagentStop', session: s, agent_id: live.splice(i, 1)[0].id };
+    round++;
   }
-  while (live.length) ev.push({ event: 'SubagentStop', session: s, agent_id: live.pop().id });   // drain before the loop repeats
-  ev.push({ event: 'Stop', session: s });
-  return ev;
 }
 
 let demoTimer = null;
@@ -263,10 +269,14 @@ window.startDemoLoop = startDemoLoop;            // city-live.js / nation.js (se
 function startDemoLoop(buildings, opts = {}) {
   const forced = new URLSearchParams(location.search).has('demo');
   if (location.hostname === 'localhost' && !forced) return;   // local real-hook use: stay quiet
-  if (demoTimer) clearInterval(demoTimer);       // restart on the newly-focused city's buildings
+  if (demoTimer) clearTimeout(demoTimer);        // restart on the newly-focused city's buildings
   const script = buildScript(buildings || []);
-  let i = 0;
-  demoTimer = setInterval(() => handle(script[i++ % script.length]), opts.interval || 2600);
+  const fast = opts.interval || 2600;
+  const beat = () => {                            // self-rescheduling: in the movie, events stream fast while frantic, unhurried when calm
+    handle(script.next().value);
+    demoTimer = setTimeout(beat, MOVIE && !frantic() ? fast * 4 : fast);
+  };
+  beat();
 }
 
 // nation mode drives the loop per drilled-in city (nation.js); only kick a generic loop when not auto-drilling
