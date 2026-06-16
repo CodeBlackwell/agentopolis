@@ -18,7 +18,7 @@ nothing else and no other file imports from it.
 
 | Aspect | Behavior |
 |---|---|
-| **Trigger** | Auto-runs once on first visit (per-browser `localStorage` flag); the ⭐ badge replays it anytime |
+| **Trigger** | Auto-runs once on first visit of *any* view (per-browser `localStorage` flag) — including shared movie/forge links; a Chief-of-Staff "?" handle replays it anytime |
 | **Mascot** | A hand-drawn pixel aide (peaked cap, gold sash, medals) — never a reused dispatch-floor avatar |
 | **Spotlight** | One `#tour-hole` box with a screen-filling `box-shadow` scrim + gold outline |
 | **Interaction** | A four-panel cutout leaves the spotlit element live so the user can poke it mid-tour |
@@ -69,17 +69,31 @@ Two `localStorage` keys drive the lifecycle:
 At load:
 
 ```
-if (ctx is 'movie' or 'demo-cards')        // resume-only pages
-    if RESUME is set → consume it, start()
-else if DONE is not set                     // nation / city / demo-land
-    start()                                  // first visit
+if (RESUME is set)                 // a forced/driven hand-off is pending
+    consume it, start()            //   → continue the tour on this page
+else if (DONE is not set)          // a first-time visitor of ANY view
+    start()                        //   → auto-run, including a shared movie/forge link
 ```
 
-- The **⭐ badge** (bottom-left, always present) calls `start()` directly, so the
-  tour is replayable at any time regardless of the flags.
-- `end()` (Skip, the final "done ✓", or `Esc`) sets `DONE` and clears `RESUME`.
+- **Every context auto-runs on a first visit** — including someone who lands
+  straight on a shared movie or `?forge=…` link (the `movie`/`demo-cards` tracks
+  used to be resume-only and showed nothing on a direct visit).
+- The **"?" handle** (a small Chief-of-Staff sprite beneath the camera controls,
+  present in every mode) calls `start()` directly, so the tour is replayable at
+  any time regardless of the flags.
+- `end()` (the farewell's "got it ✓", or `Esc`) sets `DONE` and clears `RESUME`.
 - A **forced** or **driven** step sets `DONE` the moment the user acts, so the
-  just-seen portion never re-auto-runs after the page navigates.
+  just-seen portion never re-auto-runs after the page navigates. (The pending
+  `RESUME` flag still wins on the next page, so a hand-off continues even though
+  `DONE` is now set.)
+
+### The farewell beat
+
+When the tour ends — the final step's "done ✓" **or** Skip, at any point — it
+doesn't just vanish. It shows one last **dimmed** spotlight on the "?" handle
+("Summon me anytime…") so the user always learns where to find it again. This
+beat dims even in the screening room (via a `farewell-dim` class), and is shown
+once per run (`farewellShown`), after which the real `end()` fires.
 
 ---
 
@@ -97,7 +111,7 @@ e.g. mobile-hidden transport selectors simply don't appear.
 4. `#panel-guide` — Ministry briefing (field guide)
 5. `#hotel` — The loyal workforce (dispatch floor) — *try: hover a worker*
 6. `#ticker` — The State Record (event log)
-7. `#forge` — The annexation office (paste a GitHub URL)
+7. `#forge` — The ribbon-cutting office (paste a GitHub URL)
 8. *(center)* — Long may you lead — close
 
 ### `city` (9 steps)
@@ -131,7 +145,7 @@ e.g. mobile-hidden transport selectors simply don't appear.
 6. `#forge` — A leader BUILDS — **driven**: types a URL into the forge, then navigates (see below)
 
 ### `demo-cards` (5 steps) — resumes on the demo forge result, where cards render
-1. *(center)* — ⭐ A Territory Annexed ⭐
+1. *(center)* — ⭐ Grand Opening ⭐
 2. `#explain` — Your living war-room dossier — *try: read the cards, they refresh per commit*
 3. `#explain` — The map answers to you (bi-directional hover) — *try: hover a card, watch the city pulse*
 4. `#tl-exit` — Return to the present
@@ -156,9 +170,10 @@ e.g. mobile-hidden transport selectors simply don't appear.
   force: 1,                 // hides Next, shows the "press it ↑" nudge, arms a click listener
 
   // ---- driven step: the Next button performs a navigation ----
-  nav:       '/?forge=…',   // where to go
-  navLabel:  'annex it ▸',  // custom Next-button label
-  resume:    'demo-cards',  // value written to the RESUME flag before navigating
+  nav:       '/?forge=…',          // where to go
+  navLabel:  'cut the ribbon ▸',   // custom Next-button label
+  working:   'cutting the ribbon…',// label shown while driveType types the URL
+  resume:    'demo-cards',         // value written to the RESUME flag before navigating
   typeInto:  '#forge input',// optional: type into this input first…
   typeUrl:   'https://…',   // …this string, character by character, then navigate
 }
@@ -172,7 +187,7 @@ e.g. mobile-hidden transport selectors simply don't appear.
 
 | Element | z | pointer-events | Role |
 |---|---|---|---|
-| `#tour-badge` | 30 | auto | ⭐ replay button, bottom-left |
+| `#tour-help` | 9 | auto | the "?" replay handle — a small Chief-of-Staff sprite, fixed-positioned just beneath `#mapctl` (the camera controls) in every mode, repositioned via a `ResizeObserver` |
 | `#tour-block` | 40 | **none** | container (does not block by itself) |
 | `.tour-mask` ×4 | 40 | **auto** | the cutout — these are what actually block clicks |
 | `#tour-hole` | 41 | none | the visual spotlight: gold border + glow + the dark scrim (via `box-shadow`) |
@@ -265,10 +280,10 @@ listener that sets `RESUME` + `DONE` *before* the button's own navigation fires.
 The page lands on `?timelapse` (a `movie`), which resumes the `movie` list.
 
 **Driven step — demo landing → forge result.** The `demo-land` tour's last step
-(`#forge`) is a *driven* step. Clicking **"annex it ▸"** calls `driveType()`,
+(`#forge`) is a *driven* step. Clicking **"cut the ribbon ▸"** calls `driveType()`,
 which:
 1. types the GitHub URL into the real `#forge` input, ~45ms/char (the button
-   reads "annexing…", Back hides) — demonstrating the build gesture;
+   reads "cutting the ribbon…", Back hides) — demonstrating the build gesture;
 2. after a beat, sets `RESUME='demo-cards'` + `DONE` and navigates to
    `/?forge=…`.
 
@@ -298,7 +313,7 @@ A gentle CSS `tour-bob` animation makes it idle-bob beside the dialogue.
 | **Skip tour** | end immediately, set `DONE` |
 | **Esc** | end |
 | **← (Arrow Left)** | previous step |
-| **⭐ badge** | replay this context's tour |
+| **"?" handle** | replay this context's tour (the Chief-of-Staff sprite beneath the camera controls) |
 | window **resize** | re-frames the current step |
 
 Keyboard and resize are ignored while the opening scrim is up (card hidden).
