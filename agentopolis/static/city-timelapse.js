@@ -1131,21 +1131,23 @@ function diamondFromBox(b) {
   return [{ sx: cx, sy: b.y0 }, { sx: b.x1, sy: cy }, { sx: cx, sy: b.y1 }, { sx: b.x0, sy: cy }];
 }
 
-// True silhouette: fill the union of all footprints on an offscreen mask, erase the interior shrunk
-// by a band, colour what's left. Overlapping diamonds merge — only the outer boundary survives, so a
-// district reads as one outline instead of a pile of boxes. The glow is the same gold highlighter.
-let maskCv;
+// True silhouette: fill the union of all footprints on an offscreen mask, then erode THE UNION (not each
+// shape) by a band and subtract it — leaving only the outer rim. Eroding the union, rather than insetting
+// each diamond, is what kills the internal seams between adjacent buildings. The glow is the gold highlighter.
+let maskCv, erodeCv;
 function drawSilhouette(ctx, polys) {
-  const W = tlCanvas.width, H = tlCanvas.height, band = Math.max(2, 2.5 * cam.s);
-  if (!maskCv) maskCv = document.createElement('canvas');
-  if (maskCv.width !== W || maskCv.height !== H) { maskCv.width = W; maskCv.height = H; }
-  const m = maskCv.getContext('2d');
-  m.clearRect(0, 0, W, H);
-  m.fillStyle = '#fff'; fillPolys(m, polys);                          // solid union
-  m.globalCompositeOperation = 'destination-out';
-  fillPolys(m, polys.map(p => insetPoly(p, band)));                   // punch out the interior → leaves the rim
+  const W = tlCanvas.width, H = tlCanvas.height, band = Math.max(2, 2.2 * cam.s);
+  if (!maskCv) { maskCv = document.createElement('canvas'); erodeCv = document.createElement('canvas'); }
+  for (const cv of [maskCv, erodeCv]) if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const m = maskCv.getContext('2d'), e = erodeCv.getContext('2d');
+  m.clearRect(0, 0, W, H); m.fillStyle = '#fff'; fillPolys(m, polys);   // solid union
+  e.clearRect(0, 0, W, H); e.globalCompositeOperation = 'source-over'; e.drawImage(maskCv, 0, 0);
+  e.globalCompositeOperation = 'destination-in';                        // erode = intersection of ring-offset copies
+  for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) e.drawImage(maskCv, Math.cos(a) * band, Math.sin(a) * band);
+  e.globalCompositeOperation = 'source-over';
+  m.globalCompositeOperation = 'destination-out'; m.drawImage(erodeCv, 0, 0);   // union − eroded = rim only
   m.globalCompositeOperation = 'source-in';
-  m.fillStyle = '#ffd678'; m.fillRect(0, 0, W, H);                    // tint the rim gold
+  m.fillStyle = '#ffd678'; m.fillRect(0, 0, W, H);                      // tint the rim gold
   m.globalCompositeOperation = 'source-over';
   ctx.save();
   ctx.shadowColor = 'rgba(255,214,120,.7)'; ctx.shadowBlur = 8 * cam.s;
@@ -1156,10 +1158,6 @@ function fillPolys(c, polys) {                             // one path, nonzero 
   c.beginPath();
   for (const p of polys) { c.moveTo(p[0].sx, p[0].sy); for (let i = 1; i < p.length; i++) c.lineTo(p[i].sx, p[i].sy); c.closePath(); }
   c.fill();
-}
-function insetPoly(p, d) {                                 // pull each corner d px toward the centroid
-  const cx = (p[0].sx + p[1].sx + p[2].sx + p[3].sx) / 4, cy = (p[0].sy + p[1].sy + p[2].sy + p[3].sy) / 4;
-  return p.map(q => { const dx = cx - q.sx, dy = cy - q.sy, L = Math.hypot(dx, dy) || 1; return { sx: q.sx + dx / L * d, sy: q.sy + dy / L * d }; });
 }
 
 // The hover link runs both ways: a hovered card OR a hovered building/fixture resolves to one focus.
