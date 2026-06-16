@@ -978,18 +978,7 @@ const City = (() => {
       ctx.fillStyle = `rgba(82,227,212,${.55 + .35 * Math.sin(t / 600 + seed)})`;
       ctx.fillRect(cx - 7 * s, cy - 11.5 * s, 14 * s, 6 * s);
     },
-    tests(ctx, cam, b, base, top, h) {                      // hazard stripe band
-      const s = cam.s;
-      ctx.setLineDash([3 * s, 3 * s]);
-      ctx.strokeStyle = '#d4a953';
-      ctx.lineWidth = Math.max(1, 2 * s);
-      ctx.beginPath();
-      ctx.moveTo(base[3].sx, base[3].sy - h * .5);
-      ctx.lineTo(base[2].sx, base[2].sy - h * .5);
-      ctx.lineTo(base[1].sx, base[1].sy - h * .5);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    },
+    tests() {},                                             // no band; kept truthy so test files stay penthouse-free
     infra(ctx, cam, b, base, top, h, t) {                   // smokestack + puffs
       const s = cam.s, seed = hash(b.path);
       const cx = (top[1].sx + top[3].sx) / 2 + 4 * s, cy = (top[0].sy + top[2].sy) / 2;
@@ -1100,18 +1089,10 @@ const City = (() => {
     },
   };
 
-  const LANG = { py: '#3776ab', js: '#e8c41c', jsx: '#e8c41c', ts: '#3178c6', tsx: '#3178c6',
-                 md: '#c9b78a', html: '#e34c26', css: '#8e5d9f', json: '#8a8f98', yml: '#cb6c6c',
-                 yaml: '#cb6c6c', sh: '#89e051', go: '#00add8', rs: '#dea584', rb: '#cc342d',
-                 java: '#b5651d', sql: '#4a6b5c', kt: '#a97bff', c: '#a8b9cc', cc: '#9c6cb0',
-                 cpp: '#9c6cb0', h: '#a8b9cc', hpp: '#9c6cb0', cs: '#178600', swift: '#f05138',
-                 scala: '#c22d40', vue: '#42b883', svelte: '#ff3e00', mjs: '#e8c41c' };
-
   // ---- language-family silhouettes: the whole solid says what a code file is written in ----
   const cen = p => ({ sx: (p[0].sx + p[1].sx + p[2].sx + p[3].sx) / 4,
                       sy: (p[0].sy + p[1].sy + p[2].sy + p[3].sy) / 4 });
   const toward = (p, c, k) => ({ sx: c.sx + (p.sx - c.sx) * k, sy: c.sy + (p.sy - c.sy) * k });
-  const accentOf = b => LANG[b.ext] || shade(b.color, 1.35);   // exact-language colour over the family shape
 
   const MASS = {
     pyramid(ctx, cam, b, base, top, h, t) {                 // scripting (py/rb): hipped spire, steepness bounded
@@ -1129,11 +1110,6 @@ const City = (() => {
             ctx.fillRect(p.sx - 1.6 * cam.s, p.sy - 2 * cam.s, 3.2 * cam.s, 4 * cam.s);
           }
       }
-      const ridge = lerp(base[2], apex, .72);               // short lit arête near the tip, not a full-height spike
-      ctx.strokeStyle = accentOf(b); ctx.lineWidth = Math.max(1, 1.5 * cam.s);
-      ctx.beginPath(); ctx.moveTo(ridge.sx, ridge.sy); ctx.lineTo(apex.sx, apex.sy); ctx.stroke();
-      ctx.fillStyle = accentOf(b);
-      ctx.beginPath(); ctx.arc(apex.sx, apex.sy, Math.max(1.5, 2 * cam.s), 0, Math.PI * 2); ctx.fill();
     },
     ziggurat(ctx, cam, b, base, top, h, t) {                // compiled/systems (go/rs/java): stepped tiers
       const c = cen(base), n = Math.max(2, Math.min(4, Math.round(b.floors / 2) + 1));
@@ -1150,9 +1126,6 @@ const City = (() => {
           faceWindows(ctx, cam, lo[2], lo[1], h / n, 1, i + n, seed, glow, tint);
         }
       }
-      const tc = base.map(p => lift(toward(p, c, 1 - .55 * ((n - 1) / n)), h));   // accent cornice on the crown
-      ctx.strokeStyle = accentOf(b); ctx.lineWidth = Math.max(1, 1.5 * cam.s);
-      ctx.beginPath(); ctx.moveTo(tc[3].sx, tc[3].sy); ctx.lineTo(tc[2].sx, tc[2].sy); ctx.lineTo(tc[1].sx, tc[1].sy); ctx.stroke();
     },
     cylinder(ctx, cam, b, base, top, h, t) {                // web (js/ts): rounded drum/tower
       const c = cen(base), tcy = c.sy - h;
@@ -1170,8 +1143,6 @@ const City = (() => {
           for (const u of [.28, .5, .72]) ctx.fillRect(c.sx - rx + u * 2 * rx - 1.4 * cam.s, yy, 2.8 * cam.s, 3 * cam.s);
         }
       }
-      ctx.fillStyle = accentOf(b);
-      ctx.fillRect(c.sx - rx, tcy + ry + 2 * cam.s, rx * 2, Math.max(1.5, 2 * cam.s));   // language band
       ctx.fillStyle = shade(b.color, 1.08);
       ctx.beginPath(); ctx.ellipse(c.sx, tcy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();   // top cap
     },
@@ -1187,8 +1158,6 @@ const City = (() => {
       const apex = lift(c, h + Math.min(12 * cam.s, h * .45));
       tri(ctx, tp[3], tp[2], apex, shade(b.color, .7));
       tri(ctx, tp[2], tp[1], apex, shade(b.color, .92));
-      ctx.fillStyle = accentOf(b);
-      ctx.beginPath(); ctx.arc(apex.sx, apex.sy, Math.max(1.5, 2 * cam.s), 0, Math.PI * 2); ctx.fill();
     },
   };
 
