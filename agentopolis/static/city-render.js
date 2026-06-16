@@ -1293,9 +1293,8 @@ const City = (() => {
     }
     CityScape.drawGround(ctx, cam, state, t);
     if (!opts.embedded && state.deps.length) CityScape.drawStation(ctx, cam, state, t);   // freight hugs the grid
-    const k = dkey(R), hall = state.cityHall;                // hall sorts by its front footprint corner so
-    const hallKey = hall ? Math.max(...[[-1, -1], [1, -1], [1, 1], [-1, 1]]   // buildings in front draw over it
-                     .map(([dx, dy]) => k({ x: hall.x + 1.35 * dx, y: hall.y + 1.35 * dy }))) : Infinity;
+    const k = dkey(R), hall = state.cityHall;                // hall sorts by its centre, like any building, so
+    const hallKey = hall ? k(hall) : Infinity;               // neighbours in front draw over it and those behind don't
     let hallDrawn = !hall;
     for (const it of state.items) {
       if (!hallDrawn && k(it) > hallKey) { drawCityHall(ctx, cam, hall); hallDrawn = true; }
