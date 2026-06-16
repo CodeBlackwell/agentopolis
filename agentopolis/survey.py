@@ -106,6 +106,24 @@ def evaluate(repo: str) -> dict | None:
     return _label(m, repo) if m else None
 
 
+def head_formation(repo: str) -> str | None:
+    """The repo's current formation — the shape its *static* city wears (chooseFormation over HEAD), which
+    is what you see when you open the city. One seed, no timeline; cached by repo+HEAD so the nation map
+    pays the seed cost once and reuses it until the repo gains commits."""
+    head = git(repo, "rev-parse", "HEAD").strip()
+    key = hashlib.sha256((os.path.abspath(repo) + "@form@" + head).encode()).hexdigest()[:16]
+    path = forge.CACHE_DIR / f"form-{key}.json"
+    if forge.disk_cache and head and path.exists():
+        return json.loads(path.read_text())["formation"]
+    zone = load_zone(repo, None)
+    data = seed(repo, zone)
+    form = _formation(zone, data["buildings"]) if data["buildings"] else None
+    if form and forge.disk_cache and head:
+        forge.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"formation": form}))
+    return form
+
+
 def build_movie(repo: str):
     """Return (metrics, bundle) for marathon: the same metrics as evaluate() plus the {data, timeline}
     bundle the time-lapse engine plays — computed in one pass so nothing is seeded twice."""
