@@ -171,7 +171,7 @@
   }
 
   // ---- overlay (built once, lazily) ----
-  let steps = [], at = 0, typing = null, ui = null, help = null, farewellShown = false;
+  let steps = [], at = 0, typing = null, ui = null, help = null, farewellShown = false, prefetched = false;
   const el = (tag, props) => Object.assign(document.createElement(tag), props);
   const waitFor = (sel, ms = 8000) => new Promise(res => {     // async transport bar isn't there on load
     const t0 = performance.now();
@@ -271,6 +271,7 @@
 
   function show(i) {
     at = i;
+    if (i >= 2) prefetchForge();                             // a few steps in = intent to finish → start the clone NOW
     const step = steps[i];
     const fw = !!step.farewell, cel = !!step.celebrate;
     const target = step.center ? null : document.querySelector(step.sel);
@@ -366,6 +367,16 @@
   }
 
   function go(i) { if (i < 0) return; if (i >= steps.length) return finish(); show(i); }
+
+  // Warm the forge cache the moment the President is clearly proceeding (a few steps in), so the driven
+  // "cut the ribbon" lands on an already-built movie — no clone wait, the best possible first impression.
+  function prefetchForge() {
+    if (prefetched) return;
+    const fstep = steps.find(s => s.typeUrl);               // the driven forge step (demo-land only)
+    if (!fstep) return;
+    prefetched = true;
+    fetch('/forge-timelapse?url=' + encodeURIComponent(fstep.typeUrl)).then(r => r.text()).catch(() => {});
+  }
 
   // tour end OR skip → one last dimmed beat that points at the replay handle, then truly end
   function finish() {

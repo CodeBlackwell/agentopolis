@@ -74,12 +74,12 @@ try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');
   seek(-1);
   loading.remove();
   startIntro();                                           // open on the live view's frame, then ease to the village
-  speed = autoSpeed();                                    // size playback to ~finish in 20s regardless of repo size
+  speed = autoSpeed();                                    // size the walk to ~45s regardless of repo size (calm, not chaotic)
   setPlay(true);                                          // a movie plays itself
   requestAnimationFrame(loop);
 })().catch(e => { loading.remove(); console.error('timelapse load failed', e); });
 
-const autoSpeed = () => Math.max(3, Math.min(120, commits.length / 20));   // commits per second
+const autoSpeed = () => Math.max(3, Math.min(120, commits.length / 45));   // commits/sec → ~45s history walk
 
 // A hard-hat pixel worker — the forge's own sprite (NOT the tour aide). Drawn 1x into a 28x34 grid,
 // canvas backed x3 + image-rendering:pixelated for crisp blocks; same technique as tour.js drawAide.
