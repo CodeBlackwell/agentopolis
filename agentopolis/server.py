@@ -346,8 +346,10 @@ def root(request: Request) -> HTMLResponse:
               else f"{base}/og-image.png")
     og_tags = _og_block(og_title, og_desc, og_img, og_url)
 
+    repo_url = forge or ""           # forge cities link their title back to the source repo; private/local cities don't
     html = (Path(__file__).parent / "static" / "index.html").read_text()
     return HTMLResponse(html.replace("{{MODE}}", mode).replace("{{ENGINE}}", engine)
+                        .replace("{{REPO_URL}}", repo_url)
                         .replace("{{HALL_LEVEL}}", mode).replace("{{HALL_NAME}}", name)
                         .replace("{{CITY_SRC}}", src).replace("{{TIMELINE_SRC}}", timeline_src)
                         .replace("{{DEMO}}", "1" if showcase["dir"] else "")
