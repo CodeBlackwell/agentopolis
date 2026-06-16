@@ -196,6 +196,10 @@
   #forge input::placeholder { color: rgba(245,230,211,.5); }
   #forge input:focus { border-color: var(--cream); }
 
+  /* mobile forge funnel: a thumb CTA opens a bottom sheet of example chips + the url input.
+     Both are desktop-hidden; the phone media query shows them where forging is enabled. */
+  #build-btn, #forge-sheet { display: none; }
+
   /* ---- phones: single column; the rail + event log fold into a slide-in drawer ---- */
   #drawer-btn { display: none; position: absolute; bottom: 12px; right: 12px; z-index: 8;
                 cursor: pointer; background: var(--plum-soft); color: var(--cream);
@@ -230,6 +234,28 @@
     #back { padding: 9px 14px; }
     #forge { bottom: 64px; }
     #forge input { max-width: 86vw; }
+
+    /* forge funnel — the CTA + sheet appear only where the server enables forging (toggle via body attrs) */
+    body[data-mode="nation"] #build-btn, body[data-demo="1"] #build-btn { display: block; }
+    body[data-mode="nation"] #forge-sheet, body[data-demo="1"] #forge-sheet { display: block; }
+    #build-btn { position: absolute; bottom: 12px; left: 12px; right: 92px; z-index: 8; cursor: pointer;
+                 background: var(--gold); color: var(--plum); border: 2px solid var(--gold);
+                 box-shadow: 3px 3px 0 var(--plum); font-family: 'Silkscreen', monospace;
+                 font-size: 13px; font-weight: 700; letter-spacing: .04em; padding: 13px 10px; text-align: center; }
+    #forge-sheet { position: fixed; left: 0; right: 0; bottom: 0; top: auto; transform: translateY(100%);
+                   transition: transform .3s ease; z-index: 20; background: var(--plum);
+                   border: 4px solid var(--gold); border-bottom: none; border-radius: 16px 16px 0 0;
+                   padding: 14px 14px max(18px, env(safe-area-inset-bottom)); box-shadow: 0 -14px 30px rgba(61,24,50,.5); }
+    #forge-sheet.open { transform: none; }
+    #forge-sheet h3 { font-family: 'Silkscreen', monospace; font-size: 11px; color: var(--gold);
+                      letter-spacing: .06em; text-transform: uppercase; text-align: center; margin-bottom: 11px; line-height: 1.5; }
+    #forge-chips { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; margin-bottom: 11px; }
+    #forge-chips button { cursor: pointer; background: var(--plum-soft); color: var(--cream);
+                          border: 1px solid var(--gold); font-family: 'Silkscreen', monospace; font-size: 10px; padding: 9px 11px; }
+    #forge-chips button:active { background: var(--gold); color: var(--plum); }
+    #clip-chip { background: var(--gold); color: var(--plum); }
+    #forge-slot #forge { position: static; transform: none; display: block; }
+    #forge-slot #forge input { width: 100%; max-width: none; font-size: 12px; padding: 12px; }
   }
 </style>
 </head>
@@ -263,6 +289,7 @@
              placeholder="paste a public github url &rarr; build it as a city">
     </form>
     <button id="drawer-btn" title="stats &amp; event log">&#9432; stats</button>
+    <button id="build-btn" title="build a city from a github repo">&#43; build a city</button>
   </div>
 
   <div id="side">
@@ -302,6 +329,16 @@
 
   <div id="tooltip"></div>
   <div id="roster"></div>
+  <div id="forge-sheet">
+    <h3>build a city from any public github repo</h3>
+    <div id="forge-chips">
+      <button id="clip-chip" hidden></button>
+      <button data-repo="chalk/ansi-styles">chalk/ansi-styles</button>
+      <button data-repo="expressjs/express">expressjs/express</button>
+      <button data-repo="vercel/swr">vercel/swr</button>
+    </div>
+    <div id="forge-slot"></div>
+  </div>
   <div id="scrim"></div>
   <script src="city-render.js"></script>
   <script src="city-scape.js"></script>
@@ -315,21 +352,45 @@
   <script src="marathon.js"></script>
   <script src="share.js"></script>
   <script>
-    // phones: a bottom sheet holds the rail + event log; relocate #ticker into it on mobile
+    // phones: bottom sheets hold the rail/log and the forge funnel; relocate #ticker + #forge into them
     (() => {
       const mq = matchMedia('(max-width: 720px)');
       const side = document.getElementById('side'), dock = document.getElementById('dock');
       const ticker = document.getElementById('ticker'), scrim = document.getElementById('scrim');
-      const btn = document.getElementById('drawer-btn'), handle = document.getElementById('sheet-handle');
-      const setOpen = o => { side.classList.toggle('open', o); scrim.classList.toggle('open', o); };
-      btn.addEventListener('click', () => setOpen(!side.classList.contains('open')));
-      scrim.addEventListener('click', () => setOpen(false));
-      // drag the handle down to dismiss; release under the threshold snaps it back open
+      const handle = document.getElementById('sheet-handle'), mapwrap = document.querySelector('.mapwrap');
+      const statsBtn = document.getElementById('drawer-btn'), buildBtn = document.getElementById('build-btn');
+      const forge = document.getElementById('forge'), forgeSheet = document.getElementById('forge-sheet');
+      const forgeSlot = document.getElementById('forge-slot');
+
+      const closeAll = () => { side.classList.remove('open'); forgeSheet.classList.remove('open'); scrim.classList.remove('open'); };
+      const openSheet = s => { closeAll(); s.classList.add('open'); scrim.classList.add('open'); };
+      statsBtn.addEventListener('click', () => side.classList.contains('open') ? closeAll() : openSheet(side));
+      buildBtn.addEventListener('click', () => { openSheet(forgeSheet); detectClipboard(); });
+      scrim.addEventListener('click', closeAll);
+
+      // example + clipboard chips forge on tap
+      forgeSheet.addEventListener('click', e => { const repo = e.target.dataset.repo;
+        if (repo) location.href = '/?forge=' + encodeURIComponent('https://github.com/' + repo); });
+
+      async function detectClipboard() {            // best-effort: surface the github url already on the clipboard
+        const chip = document.getElementById('clip-chip');
+        try {
+          const m = (await navigator.clipboard.readText()).match(/github\.com\/([\w.-]+\/[\w.-]+?)(?:\.git|\/|$)/i);
+          if (m) { chip.textContent = '📋 ' + m[1]; chip.dataset.repo = m[1]; chip.hidden = false; return; }
+        } catch (e) {}
+        chip.hidden = true; delete chip.dataset.repo;
+      }
+
+      // drag the side-sheet handle down to dismiss
       let startY = 0, dy = 0;
       handle.addEventListener('touchstart', e => { startY = e.touches[0].clientY; dy = 0; side.style.transition = 'none'; }, { passive: true });
       handle.addEventListener('touchmove', e => { dy = Math.max(0, e.touches[0].clientY - startY); side.style.transform = `translateY(${dy}px)`; }, { passive: true });
-      handle.addEventListener('touchend', () => { side.style.transition = ''; side.style.transform = ''; if (dy > 80) setOpen(false); });
-      const apply = () => { (mq.matches ? side : dock).appendChild(ticker); if (!mq.matches) setOpen(false); };
+      handle.addEventListener('touchend', () => { side.style.transition = ''; side.style.transform = ''; if (dy > 80) closeAll(); });
+
+      const apply = () => {
+        if (mq.matches) { side.appendChild(ticker); forgeSlot.appendChild(forge); }
+        else { dock.appendChild(ticker); mapwrap.appendChild(forge); closeAll(); }
+      };
       mq.addEventListener('change', apply); apply();
     })();
   </script>
