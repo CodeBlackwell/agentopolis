@@ -635,7 +635,7 @@ function buildTransport() {
     #tl-exit{width:auto;padding:0 9px}
     /* phones: trim to the video-player essentials (play / scrub / speed / exit), bigger touch targets */
     @media (max-width:720px){#transport{gap:7px;padding:8px 10px;font-size:11px}
-      #transport button{width:40px;height:36px}#tl-trans,#tl-label{display:none}
+      #transport button{width:40px;height:36px}#tl-trans,#tl-shape,#tl-label{display:none}
       #tl-seek{min-width:90px}#tl-exit{padding:0 12px}}`;
   document.head.appendChild(document.createElement('style')).textContent = css;
   const bar = document.createElement('div');
@@ -650,6 +650,9 @@ function buildTransport() {
     `<select id="tl-trans" title="how the city re-forms between formations">` +
        TRANSITION_MODES.map(m => `<option value="${m}"${m === transMode ? ' selected' : ''}>${m}</option>`).join('') +
     `</select>` +
+    `<select id="tl-shape" title="how building shapes are chosen">` +
+       City.SHAPE_MODES.map(m => `<option value="${m}"${m === City.shapeMode ? ' selected' : ''}>${m}</option>`).join('') +
+    `</select>` +
     `<span id="tl-label"></span>` +
     (liveHref ? `<button id="tl-exit" title="back to the live city">&#9632; live</button>` : '');
   const wrap = document.querySelector('.mapwrap');
@@ -662,6 +665,10 @@ function buildTransport() {
   slider.oninput = () => { setPlay(false); seek(+slider.value); };
   bar.querySelector('#tl-speed').onchange = e => speed = e.target.value === 'auto' ? autoSpeed() : +e.target.value;
   bar.querySelector('#tl-trans').onchange = e => transMode = e.target.value;
+  bar.querySelector('#tl-shape').onchange = e => {          // re-shape every pre-built epoch; the loop repaints
+    City.setShapeMode(e.target.value);
+    for (const l of layouts) City.applyShapes(l.state);
+  };
   if (liveHref) bar.querySelector('#tl-exit').onclick = () => location.href = liveHref;
 }
 

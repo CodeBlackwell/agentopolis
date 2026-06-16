@@ -53,6 +53,14 @@ const City = (() => {
     ctx.fill();
   }
 
+  function tri(ctx, a, b, c, fill) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.lineTo(c.sx, c.sy);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   // ---- city plan: the layout FORM follows the repo's structure. Three generators emit the
   //      same blocks + ground contract; choosePlan picks one (or .agentopolis.json pins "plan"). ----
   // codes: 0 street, 1 avenue, 2 green, 3 plaza, 4 river, 5 bridge, 6 cemetery, 10+id district pavement
@@ -688,6 +696,7 @@ const City = (() => {
       imports: q(data.buildings.map(b => b.imports || 0), .9),
       todos: q(data.buildings.map(b => b.todos || 0), .9) };
     for (const block of state.blocks) fillBlock(state, block);
+    assignMasses(state);                                    // pick each building's silhouette under the active paradigm
     ambientDressing(state, data);                           // stage-keyed, data-tied passive life
     state.sortedRot = 0;
     const k0 = dkey(0);
@@ -706,6 +715,37 @@ const City = (() => {
   const RANK = { storefront: 1, vault: 1, shed: 2, garage: 2, silo: 2, house: 3 };   // towers downtown, houses outermost
   const FCAP = { house: 1, shed: 1, garage: 1, storefront: 2, silo: 3, vault: 2 };
   const FFOOT = { house: .5, shed: .55, garage: .6, storefront: .9, silo: .6, vault: .7 };
+  // code files carry no role-FORM, so their whole solid says what language they're in
+  const LANGMASS = { py: 'pyramid', rb: 'pyramid',
+                     js: 'cylinder', ts: 'cylinder', jsx: 'cylinder', tsx: 'cylinder', mjs: 'cylinder', vue: 'cylinder', svelte: 'cylinder',
+                     go: 'ziggurat', rs: 'ziggurat', java: 'ziggurat', kt: 'ziggurat', cs: 'ziggurat', swift: 'ziggurat', scala: 'ziggurat',
+                     c: 'obelisk', cc: 'obelisk', cpp: 'obelisk', h: 'obelisk', hpp: 'obelisk' };
+
+  // ---- shape paradigms: how a building's silhouette is chosen. Toggleable; forms keep their role shape ----
+  // The ladder runs plainest→most exotic; "more common = more normal" reads off rank 0 = box.
+  const LADDER = [null, 'ziggurat', 'cylinder', 'obelisk', 'pyramid'];
+  const SHAPE_MODES = ['family', 'rarity', 'size', 'age', 'uniform'];
+  let shapeMode = 'family';
+  const SHAPERS = {
+    family: { mass: b => LANGMASS[b.ext] || null },         // language family → fixed shape
+    rarity: {                                               // the rarer the language, the more exotic the shape
+      stats(bs) { const c = {}; for (const b of bs) if (!b.form) c[b.ext] = (c[b.ext] || 0) + 1;
+                  const rank = {}; Object.keys(c).sort((a, b) => c[b] - c[a]).forEach((e, i) => rank[e] = i); return rank; },
+      mass: (b, rank) => LADDER[Math.min(LADDER.length - 1, rank[b.ext] ?? LADDER.length - 1)] },
+    size: {                                                 // bigger files become monuments
+      stats(bs) { const v = bs.filter(b => !b.form).map(b => b.loc); return { lo: q(v, 1 / 3), hi: q(v, .85) }; },
+      mass: (b, s) => b.loc >= s.hi ? 'obelisk' : b.loc >= (s.lo + s.hi) / 2 ? 'ziggurat' : b.loc > s.lo ? 'cylinder' : null },
+    age: {                                                  // fresh code is fancy, old code settles into plain boxes
+      stats(bs) { const v = bs.filter(b => !b.form).map(b => b.age_days); return { young: q(v, 1 / 3), mid: q(v, 2 / 3) }; },
+      mass: (b, s) => b.age_days <= s.young ? 'pyramid' : b.age_days <= s.mid ? 'cylinder' : null },
+    uniform: { mass: () => null },                          // classic skyline: every code file a box
+  };
+  function assignMasses(state) {
+    const shaper = SHAPERS[shapeMode] || SHAPERS.family;
+    const ctx = shaper.stats ? shaper.stats(state.buildings) : null;
+    state._shaper = shaper; state._shapeCtx = ctx;          // live-added buildings reuse the active shaper
+    for (const b of state.buildings) b.mass = b.form ? null : shaper.mass(b, ctx);
+  }
 
   function fillBlock(state, block) {
     const under = block.comp.layer === 'under';
@@ -743,7 +783,8 @@ const City = (() => {
     b.color = block.comp.color;
     b.arch = block.comp.kind;                               // NOT b.kind — that flags props
     b.heightScale = under ? .35 : 1;
-    b.form = FORM[b.ext];
+    b.form = FORM[b.ext];                                   // initial build: assignMasses overwrites; live adds reuse the shaper
+    b.mass = b.form ? null : (state._shaper ? state._shaper.mass(b, state._shapeCtx) : LANGMASS[b.ext] || null);
     b.foot = FFOOT[b.form]
            ?? (b.floors === 1 && !under ? .96               // minnows join into terraces
               : .55 + .38 * Math.min(1, Math.log10(b.loc + 1) / 4));
@@ -850,26 +891,31 @@ const City = (() => {
     const shx = 3 * cam.s + h * .16, shy = 1.5 * cam.s + h * .08;   // contact shadow: footprint nudged away
     const sh = base.map(p => ({ sx: p.sx + shx, sy: p.sy + shy }));  // from the sun, longer as the body rises
     quad(ctx, sh[0], sh[1], sh[2], sh[3], 'rgba(12,6,16,.22)');      // body draws over it → grounding crescent
-    quad(ctx, base[3], base[2], top[2], top[3], shade(b.color, .55));
-    quad(ctx, base[2], base[1], top[1], top[2], shade(b.color, .75));
-    quad(ctx, top[0], top[1], top[2], top[3], shade(b.color, 1.05));
-    if (pop === 1 && h > 6 * cam.s) {                       // rim light: warm sun-catch on the lit-face silhouette
-      ctx.strokeStyle = 'rgba(255,226,165,.4)';
-      ctx.lineWidth = Math.max(1, cam.s);
-      ctx.beginPath();
-      ctx.moveTo(top[2].sx, top[2].sy); ctx.lineTo(top[1].sx, top[1].sy);   // sunlit roofline
-      ctx.lineTo(base[1].sx, base[1].sy);                                   // leading vertical edge
-      ctx.stroke();
+    const silh = h > 0 && MASS[b.mass];                    // language-family solid replaces the box body
+    let pent = false;
+    if (silh) {
+      silh(ctx, cam, b, base, top, h, t);
+    } else {
+      quad(ctx, base[3], base[2], top[2], top[3], shade(b.color, .55));
+      quad(ctx, base[2], base[1], top[1], top[2], shade(b.color, .75));
+      quad(ctx, top[0], top[1], top[2], top[3], shade(b.color, 1.05));
+      if (pop === 1 && h > 6 * cam.s) {                     // rim light: warm sun-catch on the lit-face silhouette
+        ctx.strokeStyle = 'rgba(255,226,165,.4)';
+        ctx.lineWidth = Math.max(1, cam.s);
+        ctx.beginPath();
+        ctx.moveTo(top[2].sx, top[2].sy); ctx.lineTo(top[1].sx, top[1].sy);   // sunlit roofline
+        ctx.lineTo(base[1].sx, base[1].sy);                                   // leading vertical edge
+        ctx.stroke();
+      }
+      const form = FORMS[b.form];
+      if (h > 14 * cam.s && !form && b.arch !== 'storage' && b.arch !== 'docs')
+        drawWindows(ctx, cam, base, h, b, t);
+      pent = pop === 1 && !form && !ARCH[b.arch] && b.classes >= 2 && b.floors >= 2;
+      if (form) form(ctx, cam, b, base, top, h, t);         // file-type massing beats district dressing
+      else if (ARCH[b.arch]) ARCH[b.arch](ctx, cam, b, base, top, h, t);
+      else if (pent) drawPenthouse(ctx, cam, b, h);
+      else if (pop === 1) roofProps(ctx, cam, b, top, t);
     }
-    const form = FORMS[b.form];
-    if (h > 14 * cam.s && !form && b.arch !== 'storage' && b.arch !== 'docs')
-      drawWindows(ctx, cam, base, h, b, t);
-    const pent = pop === 1 && !form && !ARCH[b.arch] && b.classes >= 2 && b.floors >= 2;
-    if (form) form(ctx, cam, b, base, top, h, t);           // file-type massing beats district dressing
-    else if (ARCH[b.arch]) ARCH[b.arch](ctx, cam, b, base, top, h, t);
-    else if (pent) drawPenthouse(ctx, cam, b, h);
-    else if (pop === 1) roofProps(ctx, cam, b, top, t);
-    if (pop === 1 && !pent) langSign(ctx, cam, b, top);
     if (pop === 1 && b.hub && b.floors >= 2) drawAntennas(ctx, cam, b, top, t);
     if (pop === 1 && b.debt && b.floors >= 2 && !pent) drawCrane(ctx, cam, b, top, t);
     if (b.scaffold) drawScaffold(ctx, cam, base, h);
@@ -878,26 +924,31 @@ const City = (() => {
                  x0: base[3].sx, x1: base[1].sx, y0: top[2].sy, y1: base[2].sy };
   }
 
-  function drawWindows(ctx, cam, base, h, b, t) {
-    const seed = hash(b.path);
-    const glow = Math.max(b.lit, (seed % 10 < 3 ? .35 : 0) + Math.sin(t / 900 + seed) * .04);
-    const tint = b.arch === 'frontend' ? '126,222,255' : '255,214,120';   // glass vs warm
-    for (let k = 0; k < b.floors; k++) {
-      const y = -((k + .55) / b.floors) * h;
-      for (const [a, c, off] of [[base[3], base[2], 0], [base[2], base[1], b.floors]]) {
-        const lit = glow > 0 && (seed >> (k + off)) % 3 !== 0;
-        ctx.fillStyle = lit ? `rgba(${tint},${Math.min(1, .25 + glow)})` : 'rgba(20,12,24,.55)';
-        for (const u of [.3, .65]) {
-          const x = a.sx + (c.sx - a.sx) * u, yy = a.sy + (c.sy - a.sy) * u + y;
-          ctx.fillRect(x - 2 * cam.s, yy, 4 * cam.s, 5 * cam.s);
-        }
+  const litGlow = (b, seed, t) => Math.max(b.lit, (seed % 10 < 3 ? .35 : 0) + Math.sin(t / 900 + seed) * .04);
+  const winTint = b => b.arch === 'frontend' || b.mass === 'cylinder' ? '126,222,255' : '255,214,120';   // glass vs warm
+
+  // lit windows climbing one vertical face (bottom edge a→c, rising h, `rows` storeys)
+  function faceWindows(ctx, cam, a, c, h, rows, off, seed, glow, tint, cols = [.3, .65]) {
+    for (let k = 0; k < rows; k++) {
+      const y = -((k + .55) / rows) * h;
+      const lit = glow > 0 && (seed >> (k + off)) % 3 !== 0;
+      ctx.fillStyle = lit ? `rgba(${tint},${Math.min(1, .25 + glow)})` : 'rgba(20,12,24,.55)';
+      for (const u of cols) {
+        const x = a.sx + (c.sx - a.sx) * u, yy = a.sy + (c.sy - a.sy) * u + y;
+        ctx.fillRect(x - 2 * cam.s, yy, 4 * cam.s, 5 * cam.s);
       }
     }
   }
 
+  function drawWindows(ctx, cam, base, h, b, t) {
+    const seed = hash(b.path), glow = litGlow(b, seed, t), tint = winTint(b);
+    faceWindows(ctx, cam, base[3], base[2], h, b.floors, 0, seed, glow, tint);
+    faceWindows(ctx, cam, base[2], base[1], h, b.floors, b.floors, seed, glow, tint);
+  }
+
   // ---- kind-specific dressing, drawn over the base box; replaces roofProps ----
   const ARCH = {
-    storage(ctx, cam, b, base, top, h) {                    // domed tank with seams
+    storage(ctx, cam, b, base, top, h, t) {                 // domed tank with seams
       const cx = (top[1].sx + top[3].sx) / 2, cy = (top[0].sy + top[2].sy) / 2;
       const rx = Math.abs(top[1].sx - top[3].sx) / 2;       // abs: rotation can flip the sign (ellipse rejects negative)
       ctx.fillStyle = shade(b.color, 1.25);
@@ -910,6 +961,10 @@ const City = (() => {
         ctx.lineTo(base[2].sx, base[2].sy - h * k);
         ctx.lineTo(base[1].sx, base[1].sy - h * k);
         ctx.stroke();
+      }
+      if (h > 8 * cam.s) {                                  // lit gauge ports on the tank wall
+        const seed = hash(b.path), glow = litGlow(b, seed, t);
+        faceWindows(ctx, cam, base[2], base[1], h, 1, 0, seed, glow, '126,222,255', [.35, .65]);
       }
     },
     api(ctx, cam, b, base, top, h, t) {                     // gateway arches + lamp
@@ -990,7 +1045,7 @@ const City = (() => {
       ctx.fillStyle = b.lit > .1 || hash(b.path) % 2 ? 'rgba(255,214,120,.85)' : 'rgba(20,12,24,.55)';
       ctx.fillRect(win.sx - 2 * s, win.sy - h * .55, 4 * s, h * .3);
     },
-    shed(ctx, cam, b, base, top, h) {                       // corrugated seams
+    shed(ctx, cam, b, base, top, h, t) {                    // corrugated seams + a lit window
       ctx.strokeStyle = shade(b.color, .4);
       ctx.lineWidth = Math.max(1, cam.s);
       ctx.beginPath();
@@ -1000,8 +1055,12 @@ const City = (() => {
           ctx.moveTo(p.sx, p.sy); ctx.lineTo(p.sx, p.sy - h * .8);
         }
       ctx.stroke();
+      if (h > 6 * cam.s) {
+        const seed = hash(b.path);
+        faceWindows(ctx, cam, base[2], base[1], h, 1, 0, seed, litGlow(b, seed, t), '255,214,120', [.3, .7]);
+      }
     },
-    garage(ctx, cam, b, base, top, h) {                     // slatted roll-up door
+    garage(ctx, cam, b, base, top, h, t) {                  // slatted roll-up door + a lit window
       const p0 = lerp(base[2], base[1], .18), p1 = lerp(base[2], base[1], .82);
       quad(ctx, p0, p1, lift(p1, h * .72), lift(p0, h * .72), '#8a8f98');
       ctx.strokeStyle = '#4a3a4e';
@@ -1011,6 +1070,10 @@ const City = (() => {
         ctx.moveTo(p0.sx, p0.sy - h * k); ctx.lineTo(p1.sx, p1.sy - h * k);
       }
       ctx.stroke();
+      if (h > 6 * cam.s) {
+        const seed = hash(b.path);
+        faceWindows(ctx, cam, base[3], base[2], h, 1, 1, seed, litGlow(b, seed, t), '255,214,120', [.35, .65]);
+      }
     },
     storefront(ctx, cam, b, base, top, h) {                 // glass front + awning band
       const s = cam.s;
@@ -1021,7 +1084,7 @@ const City = (() => {
       }
     },
     silo: ARCH.storage,                                     // sql: domed tank
-    vault(ctx, cam, b, base, top, h) {                      // secrets/keys: windowless, reinforced band + round door
+    vault(ctx, cam, b, base, top, h, t) {                   // secrets/keys: reinforced band + round door + slit lights
       if (h <= 0) return;                                   // mid-reveal in time-lapse: body hasn't risen yet
       const s = cam.s;
       ctx.strokeStyle = shade(b.color, .35);                // reinforced band wrapping both visible faces
@@ -1042,30 +1105,104 @@ const City = (() => {
         ctx.beginPath(); ctx.moveTo(c.sx, cy);
         ctx.lineTo(c.sx + Math.cos(a) * r * .55, cy + Math.sin(a) * r * .48); ctx.stroke();
       }
+      if (h > 8 * s) {                                      // dim security slits high on the band
+        const seed = hash(b.path), glow = litGlow(b, seed, t) * .6;   // never as bright as a home
+        faceWindows(ctx, cam, base[3], base[2], h, 1, 2, seed, glow, '255,180,90', [.3, .7]);
+      }
     },
   };
 
   const LANG = { py: '#3776ab', js: '#e8c41c', jsx: '#e8c41c', ts: '#3178c6', tsx: '#3178c6',
                  md: '#c9b78a', html: '#e34c26', css: '#8e5d9f', json: '#8a8f98', yml: '#cb6c6c',
                  yaml: '#cb6c6c', sh: '#89e051', go: '#00add8', rs: '#dea584', rb: '#cc342d',
-                 java: '#b5651d', sql: '#4a6b5c' };
+                 java: '#b5651d', sql: '#4a6b5c', kt: '#a97bff', c: '#a8b9cc', cc: '#9c6cb0',
+                 cpp: '#9c6cb0', h: '#a8b9cc', hpp: '#9c6cb0', cs: '#178600', swift: '#f05138',
+                 scala: '#c22d40', vue: '#42b883', svelte: '#ff3e00', mjs: '#e8c41c' };
 
-  function langSign(ctx, cam, b, top) {                     // dominant-language rooftop sign
-    const col = LANG[b.ext], seed = hash(b.path);
-    if (!col || b.form || b.floors < 2 || (seed >> 3) % 2) return;   // forms own their roof
-    if (['frontend', 'infra', 'storage'].includes(b.arch)) return;   // roof already busy
-    const s = cam.s, x = (top[1].sx + top[3].sx) / 2 - 7 * s, y = (top[0].sy + top[2].sy) / 2;
-    ctx.fillStyle = '#1a0a16';
-    ctx.fillRect(x - .75 * s, y - 5 * s, 1.5 * s, 5 * s);
-    ctx.fillStyle = col;
-    ctx.fillRect(x - 3.5 * s, y - 11 * s, 7 * s, 6 * s);
-    if (s >= .9) {
-      ctx.fillStyle = '#140c18';
-      ctx.font = `bold ${Math.round(5 * s)}px Silkscreen, monospace`;
-      ctx.textAlign = 'center';
-      ctx.fillText(b.ext.slice(0, 2).toUpperCase(), x, y - 6.5 * s);
-    }
-  }
+  // ---- language-family silhouettes: the whole solid says what a code file is written in ----
+  const cen = p => ({ sx: (p[0].sx + p[1].sx + p[2].sx + p[3].sx) / 4,
+                      sy: (p[0].sy + p[1].sy + p[2].sy + p[3].sy) / 4 });
+  const toward = (p, c, k) => ({ sx: c.sx + (p.sx - c.sx) * k, sy: c.sy + (p.sy - c.sy) * k });
+  const accentOf = b => LANG[b.ext] || shade(b.color, 1.35);   // exact-language colour over the family shape
+
+  const MASS = {
+    pyramid(ctx, cam, b, base, top, h, t) {                 // scripting (py/rb): hipped spire, steepness bounded
+      const baseW = Math.abs(base[1].sx - base[3].sx) || 10 * cam.s;
+      const apex = lift(cen(base), Math.min(h, baseW * 2.2));   // cap steepness so tall files aren't needles
+      tri(ctx, base[3], base[2], apex, shade(b.color, .58));
+      tri(ctx, base[2], base[1], apex, shade(b.color, .82));
+      if (h > 10 * cam.s) {                                 // lit slits climbing the faces, narrowing to the tip
+        const seed = hash(b.path), glow = litGlow(b, seed, t), rows = Math.max(2, Math.min(4, b.floors));
+        for (const [a, c, off] of [[base[3], base[2], 0], [base[2], base[1], rows]])
+          for (let k = 0; k < rows; k++) {
+            const fr = (k + .4) / rows, lit = glow > 0 && (seed >> (k + off)) % 3 !== 0;
+            const p = lerp(lerp(a, apex, fr), lerp(c, apex, fr), .5);
+            ctx.fillStyle = lit ? `rgba(255,214,120,${Math.min(1, .25 + glow)})` : 'rgba(20,12,24,.5)';
+            ctx.fillRect(p.sx - 1.6 * cam.s, p.sy - 2 * cam.s, 3.2 * cam.s, 4 * cam.s);
+          }
+      }
+      const ridge = lerp(base[2], apex, .72);               // short lit arête near the tip, not a full-height spike
+      ctx.strokeStyle = accentOf(b); ctx.lineWidth = Math.max(1, 1.5 * cam.s);
+      ctx.beginPath(); ctx.moveTo(ridge.sx, ridge.sy); ctx.lineTo(apex.sx, apex.sy); ctx.stroke();
+      ctx.fillStyle = accentOf(b);
+      ctx.beginPath(); ctx.arc(apex.sx, apex.sy, Math.max(1.5, 2 * cam.s), 0, Math.PI * 2); ctx.fill();
+    },
+    ziggurat(ctx, cam, b, base, top, h, t) {                // compiled/systems (go/rs/java): stepped tiers
+      const c = cen(base), n = Math.max(2, Math.min(4, Math.round(b.floors / 2) + 1));
+      const seed = hash(b.path), glow = litGlow(b, seed, t), tint = winTint(b);
+      for (let i = 0; i < n; i++) {
+        const k = 1 - .55 * (i / n);
+        const lo = base.map(p => lift(toward(p, c, k), h * i / n));
+        const hi = base.map(p => lift(toward(p, c, k), h * (i + 1) / n));
+        quad(ctx, lo[3], lo[2], hi[2], hi[3], shade(b.color, .55));
+        quad(ctx, lo[2], lo[1], hi[1], hi[2], shade(b.color, .75));
+        quad(ctx, hi[0], hi[1], hi[2], hi[3], shade(b.color, i === n - 1 ? 1.05 : .95));
+        if (h > 12 * cam.s) {                               // a lit storey band per tier
+          faceWindows(ctx, cam, lo[3], lo[2], h / n, 1, i, seed, glow, tint);
+          faceWindows(ctx, cam, lo[2], lo[1], h / n, 1, i + n, seed, glow, tint);
+        }
+      }
+      const tc = base.map(p => lift(toward(p, c, 1 - .55 * ((n - 1) / n)), h));   // accent cornice on the crown
+      ctx.strokeStyle = accentOf(b); ctx.lineWidth = Math.max(1, 1.5 * cam.s);
+      ctx.beginPath(); ctx.moveTo(tc[3].sx, tc[3].sy); ctx.lineTo(tc[2].sx, tc[2].sy); ctx.lineTo(tc[1].sx, tc[1].sy); ctx.stroke();
+    },
+    cylinder(ctx, cam, b, base, top, h, t) {                // web (js/ts): rounded drum/tower
+      const c = cen(base), tcy = c.sy - h;
+      const rx = Math.abs(base[1].sx - base[3].sx) / 2, ry = Math.abs(base[2].sy - base[0].sy) / 2;
+      ctx.fillStyle = shade(b.color, .72);
+      ctx.fillRect(c.sx - rx, tcy, rx * 2, h);              // body
+      ctx.beginPath(); ctx.ellipse(c.sx, c.sy, rx, ry, 0, 0, Math.PI); ctx.fill();   // bottom bulge
+      ctx.fillStyle = shade(b.color, .52);
+      ctx.fillRect(c.sx - rx, tcy, rx * .55, h);            // shaded flank → roundness
+      if (h > 10 * cam.s) {                                 // lit ribbon windows up the glass tower
+        const seed = hash(b.path), glow = litGlow(b, seed, t), rows = Math.max(2, Math.min(5, b.floors));
+        for (let k = 0; k < rows; k++) {
+          const yy = tcy + ((k + .6) / rows) * h, lit = glow > 0 && (seed >> k) % 3 !== 0;
+          ctx.fillStyle = lit ? `rgba(126,222,255,${Math.min(1, .3 + glow)})` : 'rgba(20,12,24,.4)';
+          for (const u of [.28, .5, .72]) ctx.fillRect(c.sx - rx + u * 2 * rx - 1.4 * cam.s, yy, 2.8 * cam.s, 3 * cam.s);
+        }
+      }
+      ctx.fillStyle = accentOf(b);
+      ctx.fillRect(c.sx - rx, tcy + ry + 2 * cam.s, rx * 2, Math.max(1.5, 2 * cam.s));   // language band
+      ctx.fillStyle = shade(b.color, 1.08);
+      ctx.beginPath(); ctx.ellipse(c.sx, tcy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();   // top cap
+    },
+    obelisk(ctx, cam, b, base, top, h, t) {                 // rare/monument: tapered shaft + lit pyramidion
+      const c = cen(base), tp = base.map(p => lift(toward(p, c, .65), h));
+      quad(ctx, base[3], base[2], tp[2], tp[3], shade(b.color, .55));
+      quad(ctx, base[2], base[1], tp[1], tp[2], shade(b.color, .75));
+      if (h > 10 * cam.s) {
+        const seed = hash(b.path), glow = litGlow(b, seed, t), tint = winTint(b), rows = Math.max(2, Math.min(5, b.floors));
+        faceWindows(ctx, cam, base[3], base[2], h, rows, 0, seed, glow, tint);
+        faceWindows(ctx, cam, base[2], base[1], h, rows, rows, seed, glow, tint);
+      }
+      const apex = lift(c, h + Math.min(12 * cam.s, h * .45));
+      tri(ctx, tp[3], tp[2], apex, shade(b.color, .7));
+      tri(ctx, tp[2], tp[1], apex, shade(b.color, .92));
+      ctx.fillStyle = accentOf(b);
+      ctx.beginPath(); ctx.arc(apex.sx, apex.sy, Math.max(1.5, 2 * cam.s), 0, Math.PI * 2); ctx.fill();
+    },
+  };
 
   function drawPenthouse(ctx, cam, b, h) {                  // class-heavy: setback tier
     const f = b.foot * .3, hp = (8 + 3 * Math.min(3, b.classes)) * cam.s;
@@ -1279,7 +1416,7 @@ const City = (() => {
   function draw(ctx, cam, state, t, opts = {}) {
     const R = cam.rot || 0, k = dkey(R);
     let moved = false;                                      // cars carry a live position; keep their depth honest
-    for (const it of state.items) if (it.path) { const c = CityScape.carPos(it, t); it.x = c.x; it.y = c.y; moved = true; }
+    for (const it of state.items) if (it.kind === 'traffic') { const c = CityScape.carPos(it, t); it.x = c.x; it.y = c.y; moved = true; }
     if (moved || state.sortedRot !== R) {                   // painter's order follows the camera and the traffic
       state.items.sort((a, b) => k(a) - k(b));
       state.sortedRot = R;
@@ -1362,7 +1499,10 @@ const City = (() => {
   }
 
   return { layout, fit, draw, applyEvent, pick, roster,
-           proj, hash, shade, mix, near, chooseFormation, statsOf, FORMATIONS, FORM_CUT, FATES, clearPocket };
+           proj, hash, shade, mix, near, chooseFormation, statsOf, FORMATIONS, FORM_CUT, FATES, clearPocket,
+           SHAPE_MODES, applyShapes: assignMasses,
+           get shapeMode() { return shapeMode; },
+           setShapeMode(m) { if (SHAPE_MODES.includes(m)) shapeMode = m; } };
 })();
 
 // Huge repos are sampled server-side; tell the viewer the city is a representative slice, not the whole repo.

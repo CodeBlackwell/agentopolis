@@ -36,6 +36,17 @@ fetch(window.CITY_SRC || 'city-data.json').then(r => r.json()).then(data => {
     for (const c of cityState.clouds)
       add('row', `<span class="chip" style="background:#f9efe3"></span>${c.name.toLowerCase()} · ${c.tether}`);
   }
+  add('plaque', 'building shapes');                         // same paradigm engine as the movie, on the live city
+  const shapeRow = document.createElement('div');
+  shapeRow.className = 'row';
+  shapeRow.innerHTML = `<select id="city-shape" title="how building shapes are chosen">` +
+    City.SHAPE_MODES.map(m => `<option value="${m}"${m === City.shapeMode ? ' selected' : ''}>${m}</option>`).join('') +
+    `</select>`;
+  legend.insertBefore(shapeRow, controls);
+  shapeRow.querySelector('#city-shape').onchange = e => {   // re-shape; the frame loop repaints
+    City.setShapeMode(e.target.value);
+    City.applyShapes(cityState);
+  };
   citySampleNote(data);
   City.fit(cityCam, cityCanvas, cityState, 115, 30, 1.18);
   try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');   // keep the frame carried from the movie

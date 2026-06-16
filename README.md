@@ -8,7 +8,9 @@ the archive shelf for `Read`/`Grep`, the workshop for `Edit`/`Write`, the
 telephone booth for web tools. **The skyline above**: the city is the codebase
 itself, seeded from git history and zoned by architecture (a zoning manifest
 maps globs to components and layers; floors = cross-component centrality,
-footprint = lines of code, window glow = recency; managed services float as
+footprint = lines of code, window glow = recency, building shape = language
+family — pyramids for scripting, glass drums for web, ziggurats for compiled,
+toggleable to key off rarity/size/age instead; managed services float as
 tethered clouds). As agents work, the city builds itself out — edits wrap
 buildings in scaffolding, a `git commit` drops the scaffolds and adds floors,
 new files pop up new buildings. `/city.html` is a full-screen explorer with
