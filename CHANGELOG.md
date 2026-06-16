@@ -4,9 +4,21 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.14.0] - 2026-06-16
 
 ### Added
+- Share-loop growth features turning the share mechanics into a measurable loop:
+  - Clean canonical `/c/owner/repo` URLs that shared links unfurl and read as.
+  - Repo-specific social card (`/og-card`) so a forge link unfurls named even before
+    its skyline is captured; enriches with file/district/line stats once built
+    (optional Pillow via `.[card]`; the CLI install stays at two deps).
+  - A branded end-card baked into the shared time-lapse clip, so the canonical link
+    rides in the pixels and survives platforms that strip outbound URLs.
+  - Curiosity-gap share caption naming the repo and its headline stat.
+  - Forge funnel now nudges the visitor's own repo; desktop share offers a prefilled
+    X compose + asset download; a "this is what you'll post" preview before posting.
+  - Optional Twitter player card (`AGENTOPOLIS_PLAYER_CARD`) plus a chromeless
+    `/player/owner/repo` embed of the live build movie.
 - Viral-loop funnel counters now persist across restarts (`AGENTOPOLIS_STATS_FILE`)
   instead of resetting on every redeploy, and `/stats` can be locked behind
   `AGENTOPOLIS_STATS_TOKEN` on the public demo. Copying an install command now
@@ -16,6 +28,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CI release pipeline: pushing a `v*` tag (via `just release X.Y.Z`) publishes to PyPI
   (Trusted Publishing), syncs the Homebrew tap, and redeploys the demo. `just pypi-stats`
   reports recent download counts.
+- Test suite (`just test`): functional backend tests + Playwright UI tests covering
+  the share-loop features.
 
 ## [0.13.0] - 2026-06-16
 
