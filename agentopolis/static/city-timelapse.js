@@ -933,3 +933,9 @@ tlCanvas.addEventListener('mouseleave', () => {
   mapHit = null;                                            // drop the reverse-link highlight when the mouse leaves
   document.getElementById('tooltip').style.display = 'none'; City.roster('');
 });
+attachTouch(tlCanvas, {                                     // the movie was mouse-only; give it touch on phones
+  pan: (dx, dy) => { cam.ox += dx; cam.oy += dy; document.getElementById('tooltip').style.display = 'none'; },
+  pinch: (k, mx, my) => zoom(k, mx, my),
+  twist: rotate,
+  hold: tipAt,
+});

@@ -118,5 +118,6 @@ attachTouch(cityCanvas, {
   pan: (dx, dy) => { cityCam.ox += dx; cityCam.oy += dy;
                      document.getElementById('tooltip').style.display = 'none'; City.roster(''); },
   pinch: (k, mx, my) => cityZoom(k, mx, my),
+  twist: cityRotate,
   hold: tipAt,
 });

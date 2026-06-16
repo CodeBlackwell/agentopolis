@@ -756,6 +756,7 @@ attachTouch(canvas, {
   pan: (dx, dy) => { moved = true; mapTween = null; tooltip.style.display = 'none';
                      const cam = mode === 'city' ? cityCam : mapCam; cam.ox += dx; cam.oy += dy; },
   pinch: (k, mx, my) => zoom(k, mx, my),
+  twist: d => CTL[d > 0 ? 'rot+' : 'rot-'](),     // CTL guards to city mode — the world map doesn't rotate
   tap: tapAt,
   hold: tipAt,
 });

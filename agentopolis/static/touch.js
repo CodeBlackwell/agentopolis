@@ -2,16 +2,18 @@
 // quick tap (drill), long-press (tooltip). Touches are translated to canvas space
 // with the same ratio the mouse handlers use, so each engine reuses its own camera
 // and hit-test math. Additive — the desktop mouse/wheel handlers stay untouched.
-function attachTouch(canvas, { pan, pinch, tap, hold }) {
-  const TAP_MS = 300, HOLD_MS = 500, MOVE = 6;
+function attachTouch(canvas, { pan, pinch, twist, tap, hold }) {
+  const TAP_MS = 300, HOLD_MS = 500, MOVE = 6, TWIST_STEP = Math.PI / 4;   // 45° = one of the 8 city rotations
   const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-  let last = null, holdTimer = null, moved = false, startT = 0, pinchDist = 0;
+  const angle = (a, b) => Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
+  let last = null, holdTimer = null, moved = false, startT = 0, pinchDist = 0, lastAngle = 0, twistAcc = 0;
   const clearHold = () => { clearTimeout(holdTimer); holdTimer = null; };
 
   canvas.addEventListener('touchstart', e => {
     e.preventDefault();
     moved = false; startT = e.timeStamp; clearHold();
-    if (e.touches.length === 2) { pinchDist = dist(e.touches[0], e.touches[1]); last = null; return; }
+    if (e.touches.length === 2) { pinchDist = dist(e.touches[0], e.touches[1]);
+      lastAngle = angle(e.touches[0], e.touches[1]); twistAcc = 0; last = null; return; }
     const t = e.touches[0], r = canvas.getBoundingClientRect();
     last = { x: t.clientX, y: t.clientY };
     const mx = (t.clientX - r.left) * (canvas.width / r.width), my = (t.clientY - r.top) * (canvas.height / r.height);
@@ -26,7 +28,15 @@ function attachTouch(canvas, { pan, pinch, tap, hold }) {
       if (pinchDist && pinch) pinch(d / pinchDist,
         ((e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left) * kx,
         ((e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top) * ky);
-      pinchDist = d; moved = true; return;
+      pinchDist = d;
+      if (twist) {                                  // accumulate finger rotation; snap to discrete city steps
+        const a = angle(e.touches[0], e.touches[1]);
+        let da = a - lastAngle; lastAngle = a;
+        if (da > Math.PI) da -= 2 * Math.PI; else if (da < -Math.PI) da += 2 * Math.PI;
+        twistAcc += da;
+        while (Math.abs(twistAcc) >= TWIST_STEP) { const dir = twistAcc > 0 ? 1 : -1; twist(dir); twistAcc -= dir * TWIST_STEP; }
+      }
+      moved = true; return;
     }
     const t = e.touches[0];
     if (!last) return;
