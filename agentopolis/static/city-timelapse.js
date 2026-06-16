@@ -10,6 +10,7 @@ let groundFinal = null, groundBirth = null, decaySpan = 0;
 let layouts = [], epochIndex = -1;                        // one fixed layout per formation epoch
 let transition = null;                                    // active demolish-and-rebuild between two epochs
 let ptr = -1, playing = false, speed = 12, acc = 0, last = 0, slider = null, label = null;
+let megaCommit = 15;                                      // commit-size gate for coupling; set relatively in index()
 
 const citySrc = window.CITY_SRC || 'city-data.json';
 const isForge = citySrc.includes('forge-timelapse');
@@ -30,7 +31,7 @@ const loading = showLoading();
   else { data = resp; tl = await fetch(window.TIMELINE_SRC || 'timeline.json').then(r => r.ok ? r.json() : Promise.reject(r.status)); }
   commits = tl.commits;
   const dead = reconstructDead(commits, data.buildings, data.zone)   // lifetime estate: files that died before HEAD
-    .sort((a, b) => b.commits - a.commits).slice(0, 80);             // cap to bound sprawl from churn
+    .sort((a, b) => b.commits - a.commits).slice(0, 80);             // tuned: ruins feed formation detection, keep flat
   if (dead.length) data.buildings = data.buildings.concat(dead);
   index(data);                                           // per-building b.birth + b._touchAt (rename-folded)
   buildSchedule(data.buildings);                         // births[] / mods[] / deaths[] / bornAt from each lifecycle
@@ -108,21 +109,33 @@ const renameAlias = () => {                              // old path -> new path
 
 // Tag each building with the commit indices that touched it (b._touchAt) + its birth, following
 // renames so a file's whole history under former names folds onto the one building it became at HEAD.
+// Also derives b.commits + b.centrality from the timeline (the movie's single history source) so the
+// server can ship a history-free seed (seed walk_history=False) — these overwrite any server values.
 function index(data) {
   const resolve = renameAlias();
   const exact = new Map(data.buildings.map(b => [b.path, b]));
   const find = p => { const r = resolve(p);
     return exact.get(r) || data.buildings.find(b => r === b.path || r.startsWith(b.path + '/')) || null; };
   for (const b of data.buildings) b._touchAt = [];
-  commits.forEach((c, i) => {
-    const hit = new Set();                               // dedupe files that fold into one building this commit
-    for (const f of c.files) {
-      const b = find(f.p);
-      if (!b || hit.has(b)) continue;
-      hit.add(b); b._touchAt.push(i);
-    }
+  const hits = commits.map((c, i) => {                   // buildings each commit touches (renames folded)
+    const hit = new Set();
+    for (const f of c.files) { const b = find(f.p); if (b && !hit.has(b)) { hit.add(b); b._touchAt.push(i); } }
+    return hit;
   });
-  for (const b of data.buildings) if (b._touchAt.length) b.birth = b._touchAt[0];
+  // sweeping-commit gate: ≥15 files is broad in human terms (a floor reflecting commit habits, not
+  // repo size) and scales up for very large repos. Mirrors seed.py's server-side gate.
+  megaCommit = Math.max(15, Math.round(data.buildings.length / 50));
+  const coupled = new Map(data.buildings.map(b => [b, new Set()]));   // building -> co-committed component ids
+  for (const hit of hits) {
+    if (hit.size > megaCommit) continue;
+    const comps = new Set([...hit].map(b => b.component));
+    for (const b of hit) for (const cm of comps) if (cm !== b.component) coupled.get(b).add(cm);
+  }
+  for (const b of data.buildings) {
+    if (b._touchAt.length) b.birth = b._touchAt[0];
+    b.commits = b._touchAt.length;
+    b.centrality = coupled.get(b).size;
+  }
 }
 
 // Build the playback schedule (births / mods / deaths per commit + bornAt) from each lifecycle.
@@ -509,6 +522,10 @@ function loop(t) {
     tween(t);
     tlCtx.clearRect(0, 0, tlCanvas.width, tlCanvas.height);
     City.draw(tlCtx, cam, state, t);
+    const af = activeFocus();                              // hover link, both ways: card⇄map
+    drawFocus(t, af.ping);                                 // ping the map items the focus describes
+    applyCardHighlight(af.cards);                          // raise the cards a hovered building belongs to
+    syncScroll(af.ping);                                   // reveal that card if the map hover scrolled it off
   }
   requestAnimationFrame(loop);
 }
@@ -584,7 +601,7 @@ const KIND_ROLE = { civic: 'the town center & shared root files', frontend: 'UI,
   docs: 'documentation & examples', service: 'application modules', auto: 'loose root files' };
 const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
-const card = (title, html, chip) => `<div class="xcard"><h5>${chip
+const card = (title, html, chip, focus) => `<div class="xcard"${focus ? ` data-focus="${focus}"` : ''}><h5>${chip
   ? `<span class="chip" style="background:${chip}"></span>` : ''}${esc(title)}</h5><p>${html}</p></div>`;
 
 function buildExplain() {
@@ -595,7 +612,11 @@ function buildExplain() {
   const css = `#explain{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start;
     overflow-y:auto;padding:2px}
     .xcard{flex:1 1 150px;min-width:140px;max-width:230px;background:rgba(42,16,36,.96);
-    border:2px solid var(--gold);box-shadow:4px 4px 0 var(--plum-soft);display:flex;flex-direction:column}
+    border:2px solid var(--gold);box-shadow:4px 4px 0 var(--plum-soft);display:flex;flex-direction:column;
+    transition:transform .12s ease,box-shadow .12s ease,outline-color .12s ease;outline:2px solid transparent;outline-offset:1px}
+    .xcard[data-focus]{cursor:pointer}
+    .xcard[data-focus]:hover,.xcard.xfocus{transform:translateY(-4px);outline-color:#f2b5c9;
+    box-shadow:5px 9px 0 var(--plum-soft),0 0 12px rgba(232,168,189,.55)}
     .xcard.live{flex:1 1 230px;max-width:320px}
     .xcard h5{background:var(--gold);color:var(--plum);font:700 10px 'Silkscreen',monospace;
     letter-spacing:.1em;text-transform:uppercase;padding:5px 8px;display:flex;align-items:center;gap:6px}
@@ -624,7 +645,7 @@ function formationCard(id, s) {                            // the secret sauce, 
     grid: `<span class="em">${pl(s.n, 'peer district')}</span> with no dominant coupling hub
       (dominance ${d} < ${k.dominance}) and no balanced layer stack — a downtown grid of equals.`,
   };
-  return card('Shape · ' + (FORM_TITLE[id] || id), why[id] || '');
+  return card('Shape · ' + (FORM_TITLE[id] || id), why[id] || '', null, 'shape:' + (s.hub || ''));
 }
 
 function reformCard(from, to) {                            // the headline beat: the city crossed a threshold
@@ -659,16 +680,110 @@ function renderExplain(shown, i, opts = {}) {
   cards.push(formationCard(id, s));
   for (const d of districts)
     cards.push(card(d.name, `<span class="em">${pl(perDist[d.id], 'file')}</span> · ${KIND_ROLE[d.kind] || d.kind}`
-      + (d.id === s.hub ? ' · <span class="em">★ coupling hub</span>' : ''), d.color));
-  if (hubs) cards.push(card('Import Hubs', `Antennas mark ${pl(hubs, 'file')} in the repo's top 10% by imports — the wiring others lean on.`));
-  if (debts) cards.push(card('TODO Debt', `Cranes hang over ${pl(debts, 'file')} in the top 10% by TODO / FIXME count.`));
-  if (state.deps.length) cards.push(card('Freight Rail', `${state.deps.length} package deps ride the freight line — read from the manifest.`));
-  if (state.docker.length) cards.push(card('Docker Harbor', `${pl(state.docker.length, 'container service')} moored at the harbor — from compose / Dockerfiles.`));
-  if (graves) cards.push(card('Graveyard', `${pl(graves, 'file')} deleted across history so far — headstones below the city.`));
-  if (relics) cards.push(card('Village Relics', `The old well became a fountain and the herd + windmill migrated to a city farm on the outskirts — ${pl(relics, 'relic')} the hamlet left behind.`));
+      + (d.id === s.hub ? ' · <span class="em">★ coupling hub</span>' : ''), d.color, 'district:' + d.id));
+  if (hubs) cards.push(card('Import Hubs', `Antennas mark ${pl(hubs, 'file')} in the repo's top 10% by imports — the wiring others lean on.`, null, 'hub'));
+  if (debts) cards.push(card('TODO Debt', `Cranes hang over ${pl(debts, 'file')} in the top 10% by TODO / FIXME count.`, null, 'debt'));
+  if (state.deps.length) cards.push(card('Freight Rail', `${state.deps.length} package deps ride the freight line — read from the manifest.`, null, 'deps'));
+  if (state.docker.length) cards.push(card('Docker Harbor', `${pl(state.docker.length, 'container service')} moored at the harbor — from compose / Dockerfiles.`, null, 'docker'));
+  if (graves) cards.push(card('Graveyard', `${pl(graves, 'file')} deleted across history so far — headstones below the city.`, null, 'graves'));
+  if (relics) cards.push(card('Village Relics', `The old well became a fountain and the herd + windmill migrated to a city farm on the outskirts — ${pl(relics, 'relic')} the hamlet left behind.`, null, 'relics'));
   if (c) cards.push(card('Now Playing', `<span class="em">${esc(new Date(c.ts * 1000).toLocaleDateString())}</span> · ${esc(c.author)}`
     + ` · ${pl(c.files.length, 'file')} changed<br>"${esc(c.subject)}"`));
   box.innerHTML = cards.join('');
+}
+
+// ---- card → map ping: hovering a card pulses the items it names, in a colour that CONTRASTS each
+// item (the complement of its own colour) so a gold district never gets a gold ping. Driven off the
+// live :hover state each frame, so it survives the per-commit card rebuild with no listeners. ----
+function complement(hex) {                                  // hue-rotate 180° + lift toward a vivid glow
+  if (!hex || hex[0] !== '#') return '#7edeff';
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  let h = 0, s = mx === mn ? 0 : l > .5 ? (mx - mn) / (2 - mx - mn) : (mx - mn) / (mx + mn);
+  if (mx !== mn) h = mx === r ? ((g - b) / (mx - mn) + (g < b ? 6 : 0)) / 6
+    : mx === g ? ((b - r) / (mx - mn) + 2) / 6 : ((r - g) / (mx - mn) + 4) / 6;
+  h = (h + .5) % 1; s = Math.max(.65, s);
+  const q = l < .5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+  const hue = u => { u = (u + 1) % 1; return u < 1 / 6 ? p + (q - p) * 6 * u : u < .5 ? q
+    : u < 2 / 3 ? p + (q - p) * (2 / 3 - u) * 6 : p; };
+  const to = u => Math.round(Math.min(1, hue(u) * 1.25) * 255);
+  return `rgb(${to(h + 1 / 3)},${to(h)},${to(h - 1 / 3)})`;
+}
+const hitCenter = h => h.ax !== undefined
+  ? { sx: (h.ax + h.bx) / 2, sy: (h.ay + h.by) / 2 } : { sx: (h.x0 + h.x1) / 2, sy: (h.y0 + h.y1) / 2 };
+
+function focusPoints(focus) {                              // screen points (with each item's own colour) to ping
+  const [type, arg] = focus.split(':');
+  const drawn = (state.items || []).filter(b => b.screen && !b.kind);
+  const base = b => ({ sx: b.screen.sx, sy: b.screen.y1 ?? b.screen.top, color: b.color || '#d4a953' });
+  if (type === 'district') return drawn.filter(b => b.component === arg).map(base);
+  if (type === 'hub') return drawn.filter(b => b.hub).map(base);
+  if (type === 'debt') return drawn.filter(b => b.debt).map(base);
+  if (type === 'graves') return drawn.filter(b => b.ruined).map(b => ({ ...base(b), color: '#6e7178' }));
+  if (type === 'relics') return (state.items || []).filter(p => RELIC_KIND[p.kind])
+    .map(p => ({ ...City.proj(cam, p.x, p.y), color: '#8fb9a8' }));
+  if (type === 'deps') return (state.hits || []).filter(h => /freight|package/i.test(h.tip || ''))
+    .map(h => ({ ...hitCenter(h), color: '#2b2230' }));
+  if (type === 'docker') return (state.hits || []).filter(h => /service|image/i.test(h.tip || ''))
+    .map(h => ({ ...hitCenter(h), color: '#2b2230' }));
+  return [];
+}
+
+function drawFocus(t, focus) {
+  if (!focus || !state) return;
+  const ctx = tlCtx, k = (Math.sin(t / 260) + 1) / 2;   // 0..1 breathe
+  ctx.save();
+  if (focus.startsWith('shape')) {                         // the whole footprint: one breathing diamond
+    const c = [[0, 0], [state.W, 0], [state.W, state.H], [0, state.H]].map(([x, y]) => City.proj(cam, x, y));
+    ctx.strokeStyle = '#7edeff'; ctx.shadowColor = '#7edeff'; ctx.shadowBlur = 8 + 12 * k;
+    ctx.globalAlpha = .3 + .5 * k; ctx.lineWidth = Math.max(2, 2.5 * cam.s);
+    ctx.beginPath(); ctx.moveTo(c[0].sx, c[0].sy);
+    for (let i = 1; i < 4; i++) ctx.lineTo(c[i].sx, c[i].sy);
+    ctx.closePath(); ctx.stroke(); ctx.restore(); return;
+  }
+  ctx.lineWidth = Math.max(1.5, 1.6 * cam.s);
+  for (const p of focusPoints(focus)) {
+    const col = complement(p.color), rx = (6 + 9 * k) * cam.s;
+    ctx.strokeStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 6 + 10 * k;
+    ctx.globalAlpha = .35 + .55 * k;
+    ctx.beginPath(); ctx.ellipse(p.sx, p.sy, rx, rx * .55, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// The hover link runs both ways: a hovered card OR a hovered building/fixture resolves to one focus.
+// `ping` is what pulses on the map; `cards` is the set of data-focus keys whose legend cards raise.
+let mapHit = null;                                         // building / fixture under the mouse on the map
+function activeFocus() {
+  const hov = document.querySelector('#explain .xcard[data-focus]:hover');
+  if (hov) return { ping: hov.dataset.focus, cards: new Set([hov.dataset.focus]) };
+  if (mapHit && mapHit.component) {                        // a building → its district (+ any feature it is)
+    const cards = new Set(['district:' + mapHit.component]);
+    if (mapHit.hub) cards.add('hub');
+    if (mapHit.debt) cards.add('debt');
+    if (mapHit.ruined) cards.add('graves');
+    return { ping: 'district:' + mapHit.component, cards };
+  }
+  if (mapHit) {                                            // a fixture: freight car / ship / headstone
+    const tip = mapHit.tip || '';
+    if (/freight|package/i.test(tip)) return { ping: 'deps', cards: new Set(['deps']) };
+    if (/service|image/i.test(tip)) return { ping: 'docker', cards: new Set(['docker']) };
+    if (mapHit.scroll) return { ping: 'graves', cards: new Set(['graves']) };
+  }
+  return { ping: null, cards: new Set() };
+}
+function applyCardHighlight(keys) {                         // raise + outline the cards matching the active focus
+  for (const el of document.querySelectorAll('#explain .xcard[data-focus]'))
+    el.classList.toggle('xfocus', keys.has(el.dataset.focus));
+}
+let lastMapKey = null;
+function syncScroll(ping) {                                 // map→card: reveal an off-screen card when the focus changes
+  const key = mapHit ? ping : null;                        // only auto-scroll when the map drives the focus
+  if (key === lastMapKey) { lastMapKey = key; return; }
+  lastMapKey = key;
+  if (key) document.querySelector('#explain .xcard[data-focus="' + key + '"]')
+    ?.scrollIntoView({ block: 'nearest' });
 }
 
 // ---- interaction (compact: pan / zoom / rotate) ----
@@ -713,6 +828,7 @@ function buildingTags(b) {                                 // decode the pixels 
 }
 function tipAt(mx, my, cx, cy) {
   const hit = state && City.pick(state, mx, my);
+  mapHit = hit || null;                                     // drives the reverse link: building → its card
   const tip = document.getElementById('tooltip');
   if (hit && hit.scroll) { City.roster(hit.tip, cx, cy); tip.style.display = 'none'; }
   else if (hit) {
@@ -730,5 +846,6 @@ tlCanvas.addEventListener('mousemove', m => {
         (m.clientY - r.top) * (tlCanvas.height / r.height), m.clientX, m.clientY);
 });
 tlCanvas.addEventListener('mouseleave', () => {
+  mapHit = null;                                            // drop the reverse-link highlight when the mouse leaves
   document.getElementById('tooltip').style.display = 'none'; City.roster('');
 });
