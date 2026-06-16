@@ -30,6 +30,7 @@
   // arrows, click, hover) into the phone gestures the canvases actually listen for (pinch, two-finger
   // twist, tap, tap & hold). Applied to every step's prose + "try" hint at render time.
   const TOUCH = matchMedia('(pointer: coarse)').matches;
+  const PHONE = matchMedia('(max-width: 720px)');         // the layout breakpoint where the rail + forge fold into sheets
   const touchify = s => !TOUCH || !s ? s : s
     .replaceAll('scroll to zoom upon the rooftops', 'pinch to zoom on the rooftops')
     .replaceAll('scroll to zoom', 'pinch to zoom').replaceAll(', scroll,', ', pinch,').replaceAll('scroll', 'pinch')
@@ -276,16 +277,37 @@
            tryEl: card.querySelector('.try'), skip: card.querySelector('.skip') };
   }
 
+  // Put the spotlit element where the spotlight can frame it. On phones the rail/log and forge live in
+  // closed bottom sheets, and the step's target may also sit scrolled out of view inside one — so open the
+  // sheet that holds it (re-render once it has slid up), tuck away a stale sheet that would cover an
+  // elsewhere target, then snap the target to the centre of its scroll container. Returns false when it had
+  // to defer for a sheet transition (it re-calls show(i)); true when the target is ready to measure.
+  function reveal(target, i) {
+    if (PHONE.matches) {
+      const sheet = target.closest('#forge-sheet, #side');
+      if (sheet) {
+        if (!sheet.classList.contains('open')) {
+          (sheet.id === 'forge-sheet' ? window.openForgeSheet : window.openStatsSheet)?.();
+          setTimeout(() => show(i), 340);                  // wait out the .3s slide-up before measuring
+          return false;
+        }
+      } else if (document.querySelector('#forge-sheet.open, #side.open')) {
+        window.closeSheets?.();                            // leaving the sheets: tuck them away so they can't cover the spotlight
+        setTimeout(() => show(i), 340);
+        return false;
+      }
+    }
+    target.scrollIntoView({ block: 'center' });             // snap into the centre of whatever scroll container holds it
+    return true;
+  }
+
   function show(i) {
     at = i;
     if (i >= 2) prefetchForge();                             // a few steps in = intent to finish → start the clone NOW
     const step = steps[i];
     const fw = !!step.farewell, cel = !!step.celebrate;
     const target = step.center ? null : document.querySelector(step.sel);
-    // on phones the forge input lives in a closed bottom sheet (off-screen) — open it, then re-render once
-    // it has slid up, so the spotlight frames the real input and the typed URL is visible.
-    const sheet = target?.closest('#forge-sheet');
-    if (sheet && !sheet.classList.contains('open')) { window.openForgeSheet?.(); return setTimeout(() => show(i), 340); }
+    if (target && !reveal(target, i)) return;               // open/close the right sheet + snap into view, then re-render
     const forced = !!step.force && !!target;
     if (target) {
       const r = target.getBoundingClientRect();

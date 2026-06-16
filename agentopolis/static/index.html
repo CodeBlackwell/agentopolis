@@ -265,7 +265,8 @@
     #side { display: block; position: fixed; left: 0; right: 0; bottom: 0; top: auto;
             width: auto; height: auto; max-height: 82vh;
             transform: translateY(100%); transition: transform .3s ease;
-            z-index: 20; overflow-y: auto; border-radius: 16px 16px 0 0; }
+            z-index: 20; overflow-y: auto; overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch; border-radius: 16px 16px 0 0; }
     #side.open { transform: none; }
     #sheet-handle { display: block; position: sticky; top: 0; z-index: 2;
                     padding: 9px 0 7px; background: var(--plum); cursor: grab; touch-action: none;
@@ -432,10 +433,13 @@
       const forgeSlot = document.getElementById('forge-slot');
 
       const closeAll = () => { side.classList.remove('open'); forgeSheet.classList.remove('open'); scrim.classList.remove('open'); };
-      const openSheet = s => { closeAll(); s.classList.add('open'); scrim.classList.add('open'); };
+      const openSheet = s => { closeAll(); s.scrollTop = 0; s.classList.add('open'); scrim.classList.add('open'); };  // always open at the top
       statsBtn.addEventListener('click', () => side.classList.contains('open') ? closeAll() : openSheet(side));
       buildBtn.addEventListener('click', () => { openSheet(forgeSheet); detectClipboard(); });
-      window.openForgeSheet = () => { if (mq.matches) { openSheet(forgeSheet); detectClipboard(); } };  // the tour opens it to spotlight the forge input on phones
+      // the tour drives the sheets to spotlight elements that fold into them on phones
+      window.openForgeSheet = () => { if (mq.matches) { openSheet(forgeSheet); detectClipboard(); } };
+      window.openStatsSheet = () => { if (mq.matches) openSheet(side); };
+      window.closeSheets = closeAll;
       scrim.addEventListener('click', closeAll);
 
       // example + clipboard chips forge on tap
