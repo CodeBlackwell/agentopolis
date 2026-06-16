@@ -55,13 +55,12 @@ the city renders) but is missing **both ends** — the parts that make it spread
 | 1 | Responsive canvas + gestures (foundation) | **done** (`autosizeCanvas`) |
 | 2 | Forge-and-share funnel UI | **done** — 2a–2e shipped 2026-06-16 |
 | 3a | Share loop — snapshot + `navigator.share` + OG warm | **done** — `static/share.js` (parallel session) |
-| 3b | Share loop — looping **video** clip (`MediaRecorder`) | open (optional) — `share.js` does a still, not a clip |
+| 3b | Share loop — looping **video** clip (`MediaRecorder`) | **done** — `window.recordTimelapseClip` + share.js movie branch |
 | 4 | OG-image unfurling per forged repo | **done** — server `root()` dynamic OG + `/og/<hash>.png` |
 | 5 | Autoplay-the-wow on cold load | **done** — forge defaults to the movie; reduced-motion guard added |
 
-Only **3b** (the looping video-clip share) remains, and it is optional — a
-working share artifact (branded still + unfurling link) already ships via
-`share.js`. The build track from this plan is otherwise complete.
+**The build track from this plan is complete.** Every step (1, 2a–2e, 3a, 3b,
+4, 5) has shipped and been verified on real phone viewports.
 
 ### What landed (commits, 2026-06-16)
 
