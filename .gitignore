@@ -1,8 +1,9 @@
 .venv/
 __pycache__/
 .playwright-mcp/
-__pycache__/
 dist/
+.coverage
+.pytest_cache/
 # baked demo fixtures carry private project names/architecture — keep them out of the public repo;
 # `just deploy` rsyncs them straight to the host instead
 agentopolis/showcase/

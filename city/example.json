@@ -1,0 +1,25 @@
+{
+  "repo": "example-app",
+  "layers": ["back", "mid", "front", "under"],
+  "components": [
+    { "id": "tests", "name": "Test Yards", "layer": "under", "kind": "tests", "color": "#5c6b73",
+      "globs": ["tests/*", "backend/tests/*", "frontend/tests/*"], "group": 3 },
+    { "id": "infra", "name": "Infraworks", "layer": "under", "kind": "infra", "color": "#3a3f4a",
+      "globs": ["infra/*", "scripts/*", ".github/*", "justfile", "pyproject.toml", ".gitignore"] },
+    { "id": "storage", "name": "Storage Vaults", "layer": "back", "kind": "storage", "color": "#4a6b5c",
+      "globs": ["backend/storage/*", "backend/db/*"] },
+    { "id": "services", "name": "Services Exchange", "layer": "mid", "kind": "service", "color": "#8e5d9f",
+      "globs": ["backend/services/*", "backend/jobs/*"] },
+    { "id": "api", "name": "API Row", "layer": "mid", "kind": "api", "color": "#d4a953",
+      "globs": ["backend/*"] },
+    { "id": "web", "name": "Web District", "layer": "front", "kind": "frontend", "color": "#5b8dd9",
+      "globs": ["frontend/*", "web/*"] },
+    { "id": "docs", "name": "Docs Quarter", "layer": "front", "kind": "docs", "color": "#c9b78a",
+      "globs": ["docs/*", "*.md"] }
+  ],
+  "clouds": [
+    { "name": "Postgres", "tether": "storage" },
+    { "name": "Caddy", "tether": "api" },
+    { "name": "GitHub Actions", "tether": "infra" }
+  ]
+}

@@ -57,9 +57,8 @@ auto-advancing reel with a selection bar to jump around — all local and offlin
 and cached per repo+HEAD so the next run is instant. `--top N` caps the playlist.
 
 **Zoning:** if the repo has a `.agentopolis.json` manifest it defines the city's
-components, layers, and clouds (see `city/maisight.json` for a full example);
-otherwise agentopolis auto-zones from the repo's top-level directories. For repo
-hackers: `just dev` serves ../maisight with its manifest.
+components, layers, and clouds (see `city/example.json` for a full example);
+otherwise agentopolis auto-zones from the repo's top-level directories.
 
 ## How it works
 

@@ -32,13 +32,15 @@ test *args:
 bake demo="SPICE":
     AGENTOPOLIS_DEMO_CITY={{demo}} .venv/bin/python -m agentopolis.bake
 
-# Deploy the hosted demo to Hetzner. Fixtures (private project data) never touch
-# public git — they rsync straight to the host between the pull and the rebuild.
+# Deploy the hosted demo. Fixtures (private project data) never touch public git —
+# they rsync straight to the host between the pull and the rebuild.
+# Set the host out-of-band: `export AGENTOPOLIS_DEPLOY_HOST=user@host`.
 deploy:
+    @test -n "${AGENTOPOLIS_DEPLOY_HOST:-}" || { echo "set AGENTOPOLIS_DEPLOY_HOST=user@host first"; exit 1; }
     git push origin master
-    ssh root@5.78.198.79 'cd /opt/agentopolis && git pull'
-    rsync -az --delete agentopolis/showcase/ root@5.78.198.79:/opt/agentopolis/agentopolis/showcase/
-    ssh root@5.78.198.79 'cd /opt/agentopolis && docker compose up -d --build'
+    ssh "$AGENTOPOLIS_DEPLOY_HOST" 'cd /opt/agentopolis && git pull'
+    rsync -az --delete agentopolis/showcase/ "$AGENTOPOLIS_DEPLOY_HOST":/opt/agentopolis/agentopolis/showcase/
+    ssh "$AGENTOPOLIS_DEPLOY_HOST" 'cd /opt/agentopolis && docker compose up -d --build'
 
 # Install hooks into ~/.claude/settings.json (new sessions report in)
 attach:

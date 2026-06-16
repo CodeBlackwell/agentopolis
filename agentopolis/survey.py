@@ -245,7 +245,7 @@ def _metrics(zone: dict, head: list, commits: list) -> dict | None:
 
 
 def find_repos(root: str) -> list[str]:
-    """Git repos directly under `root`, plus one level of nested repos (mother repos like methodproof)."""
+    """Git repos directly under `root`, plus one level of nested repos (a "mother" repo that nests others)."""
     root = os.path.abspath(root)
     out = []
     if os.path.isdir(os.path.join(root, ".git")):
