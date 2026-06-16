@@ -636,12 +636,16 @@ function loop(t) {
   if (!transition) {
     if (intro) stepIntro(t);
     tween(t);
+    const lit = focusBuildings(focusPing);                // last frame's focus → buildings to light up white
+    for (const b of lit) { b._c0 = b.color; b.color = '#ffffff'; }
     tlCtx.clearRect(0, 0, tlCanvas.width, tlCanvas.height);
-    City.draw(tlCtx, cam, state, t);
+    City.draw(tlCtx, cam, state, t);                       // focused buildings render white; mapHit recomputed here
+    for (const b of lit) b.color = b._c0;                  // restore before the next frame
     const af = activeFocus();                              // hover link, both ways: card⇄map
-    drawFocus(af.ping);                                    // gold-outline the map items the focus describes
+    drawFocus(af.ping);                                    // white overlay for fixtures / rails / whole-city shape
     applyCardHighlight(af.cards);                          // raise the cards a hovered building belongs to
     syncScroll(af.ping);                                   // reveal that card if the map hover scrolled it off
+    focusPing = af.ping;                                   // recolour on the next frame (mapHit isn't known until draw)
     if (endCardAt) drawEndCard(t);                         // branded outro, only while recording a clip
   }
   requestAnimationFrame(loop);
@@ -1165,49 +1169,41 @@ function focusShapes(focus) {                              // hit-rects (buildin
   return (state.items || []).filter(p => kinds.includes(p.kind)).map(propBox);
 }
 
+// Focused BUILDINGS light up by recolouring to white in the draw loop (no overlay). Here we only handle
+// the elements that aren't b.color-driven: a white outline for the whole-city shape focus, a white fill for
+// fixtures (freight / relics / props), and a white stroke for rail segments.
+let focusPing = null;                                      // last frame's focus; recolour defers a frame (mapHit needs the draw)
 function drawFocus(focus) {
   if (!focus || !state) return;
   const ctx = tlCtx, s = cam.s;
   ctx.save();
-  ctx.strokeStyle = '#ffd678'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#fff'; ctx.lineJoin = 'round';
   ctx.lineWidth = Math.max(2.5, 3 * s);
-  if (focus.startsWith('shape')) {                         // the whole footprint: one gold diamond
+  if (focus.startsWith('shape')) {                         // the whole footprint: one white diamond
     const c = [[0, 0], [state.W, 0], [state.W, state.H], [0, state.H]].map(([x, y]) => City.proj(cam, x, y));
     ctx.beginPath(); ctx.moveTo(c[0].sx, c[0].sy);
     for (let i = 1; i < 4; i++) ctx.lineTo(c[i].sx, c[i].sy);
     ctx.closePath(); ctx.stroke(); ctx.restore(); return;
   }
-  const foots = [];                                        // every item → an iso diamond, unioned into one silhouette
+  const diamonds = [];
   for (const sh of focusShapes(focus)) {
-    if (sh.foot !== undefined) foots.push(footPoly(sh));   // a real building: its projected footprint
-    else if (sh.ax !== undefined) {                        // rail segment: re-stroke the line thick
+    if (sh.foot !== undefined) continue;                   // a building: lit white via recolour, no overlay
+    if (sh.ax !== undefined) {                             // rail segment: re-stroke the line thick
       ctx.beginPath(); ctx.moveTo(sh.ax, sh.ay); ctx.lineTo(sh.bx, sh.by); ctx.stroke();
-    } else foots.push(diamondFromBox(sh));                 // fixture hit-rect: inscribed diamond, same silhouette look
+    } else diamonds.push(diamondFromBox(sh));              // fixture hit-rect → white diamond
   }
-  if (foots.length) drawSilhouette(ctx, foots);
+  if (diamonds.length) { ctx.fillStyle = 'rgba(255,255,255,.8)'; fillPolys(ctx, diamonds); }
   ctx.restore();
 }
-
-// A building's iso footprint: four base corners projected to screen (same square drawBuilding stands on).
-function footPoly(b) {
-  const f = (b.foot || 1) / 2;
-  return [[b.x - f, b.y - f], [b.x + f, b.y - f], [b.x + f, b.y + f], [b.x - f, b.y + f]]
-    .map(([x, y]) => City.proj(cam, x, y));
+// The buildings a focus names, recoloured white before the city draws so they light up at the source.
+function focusBuildings(focus) {
+  if (!focus || !state || focus.startsWith('shape')) return [];
+  return focusShapes(focus).filter(o => o.foot !== undefined);
 }
-// A fixture has only a screen-space hit-rect (no world footprint) — inscribe a diamond so it joins the silhouette.
+// A fixture has only a screen-space hit-rect (no world footprint) — inscribe a diamond so it joins the highlight.
 function diamondFromBox(b) {
   const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
   return [{ sx: cx, sy: b.y0 }, { sx: b.x1, sy: cy }, { sx: cx, sy: b.y1 }, { sx: b.x0, sy: cy }];
-}
-
-// Silhouette = one translucent gold fill of the footprints, straight on the canvas. Nonzero winding unions
-// overlapping diamonds in a single fill(), so there's no double-darkening and no internal seams to stripe —
-// and no per-frame offscreen masks. Dispersed items light up individually; adjacent ones merge.
-function drawSilhouette(ctx, polys) {
-  ctx.save();
-  ctx.fillStyle = 'rgba(255,214,120,.28)';
-  fillPolys(ctx, polys);
-  ctx.restore();
 }
 function fillPolys(c, polys) {                             // one path, nonzero winding → overlaps union, not cancel
   c.beginPath();
