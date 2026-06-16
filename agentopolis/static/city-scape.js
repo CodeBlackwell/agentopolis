@@ -289,6 +289,19 @@ const CityScape = (() => {
 
   function drawStation(ctx, cam, state, t) {                // package deps arrive by freight train
     const s = cam.s, x = -1.8;                              // open left edge: nothing occludes it
+    const bx0 = x - .35, bx1 = x + .65, by0 = .2, by1 = state.H - .2;   // gravel ballast: rails sit on ground, not sky
+    const bed = [proj(cam, bx0, by0), proj(cam, bx1, by0), proj(cam, bx1, by1), proj(cam, bx0, by1)];
+    ctx.fillStyle = '#473a2c';                             // brown dirt
+    ctx.beginPath(); ctx.moveTo(bed[0].sx, bed[0].sy);
+    for (let i = 1; i < 4; i++) ctx.lineTo(bed[i].sx, bed[i].sy);
+    ctx.closePath(); ctx.fill();
+    for (let gy = by0 + .15; gy < by1; gy += .3) {          // scattered gray gravel rocks (deterministic)
+      const r = hash('rock' + Math.round(gy * 9));
+      const gx = bx0 + .1 + (r % 9) / 9 * (bx1 - bx0 - .2);
+      const p = proj(cam, gx, gy);
+      ctx.fillStyle = (r & 1) ? '#857f78' : '#615c55';
+      ctx.fillRect(p.sx - 1.2 * s, p.sy - 1 * s, 2.4 * s, 1.8 * s);
+    }
     ctx.strokeStyle = '#564a58';
     ctx.lineWidth = Math.max(1, 1.2 * s);
     for (const dx of [0, .3]) {                             // rails

@@ -8,13 +8,12 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .seed import git, seed
+from .seed import seed
 from .timeline import build_timeline
 from .zone import load_zone
 
 forged: dict[str, dict] = {}        # normalized url -> city data, cached for process lifetime
 forged_tl: dict[str, dict] = {}     # normalized url -> {data, timeline}, for the history time-lapse
-MAX_FILES = 5000
 
 # disk cache so a shared demo link survives restarts: first visitor pays, the rest are instant
 CACHE_DIR = Path(os.environ.get("AGENTOPOLIS_FORGE_CACHE",
@@ -73,8 +72,6 @@ def forge(url: str) -> dict:
         subprocess.run(["git", "clone", "--depth", "1", "--single-branch",
                         "--filter=blob:none", src, tmp],
                        capture_output=True, timeout=30, check=True)
-        if len(git(tmp, "ls-files").splitlines()) > MAX_FILES:
-            raise ValueError("repo too large")
         return _save(url, "city", forged, seed(tmp, load_zone(tmp, None)))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -91,9 +88,10 @@ def forge_timelapse(url: str) -> dict:
     try:
         subprocess.run(["git", "clone", "--single-branch", "--filter=blob:none", src, tmp],
                        capture_output=True, timeout=120, check=True)
-        if len(git(tmp, "ls-files").splitlines()) > MAX_FILES:
-            raise ValueError("repo too large")
-        bundle = {"data": seed(tmp, load_zone(tmp, None)), "timeline": build_timeline(tmp)}
+        # walk_history=False: the movie derives commits/centrality/dead from the timeline below,
+        # so the one git-history walk is build_timeline's — not four.
+        bundle = {"data": seed(tmp, load_zone(tmp, None), walk_history=False),
+                  "timeline": build_timeline(tmp)}
         return _save(url, "tl", forged_tl, bundle)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

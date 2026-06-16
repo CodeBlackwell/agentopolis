@@ -47,6 +47,13 @@ FILE_CLOUDS = [
 ]
 
 
+# Sampling caps so a huge repo degrades gracefully instead of being rejected. scan() reads every line of
+# every file, so cap files BEFORE scanning (ranked by commits, then bytes); render cost scales with the
+# building count, so cap that too (ranked by mass). These bound CPU/draw cost, not repo shape.
+FILE_CAP = 6000
+BUILDING_CAP = 1500
+
+
 def git(repo: str, *args: str) -> str:
     # quotepath=false: emit unicode/spaced paths literally, not C-escaped octal (\342\200\224)
     return subprocess.run(["git", "-C", repo, "-c", "core.quotepath=false", *args],
@@ -65,6 +72,13 @@ def component_of(path: str, components: list) -> str | None:
         if any(fnmatch(path, g) for g in c["globs"]):
             return c["id"]
     return None
+
+
+def filesize(path: Path) -> int:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
 
 
 def scan(path: Path) -> tuple[int, int, int, int]:
@@ -109,7 +123,8 @@ def parse_deps(repo: str, files: list[str]) -> list[str]:
 
 def detect_clouds(repo: str, comp: dict[str, str | None]) -> list[dict]:
     """Fingerprint cloud providers from deps + config files; tether each to its district."""
-    real = lambda c: c and c not in ("civic", "commons")
+    def real(c):                                          # a real district, not civic/shared scaffolding
+        return c and c not in ("civic", "commons")
     files = Counter(c for c in comp.values() if c)
     default = next((c for c, _ in files.most_common() if real(c)),
                    files.most_common(1)[0][0] if files else None)
@@ -190,6 +205,7 @@ def docker_manifest(repo: str, files) -> list[dict]:
 
 
 def dead_files(repo: str, alive: set[str]) -> list[dict]:
+    cemetery = max(1, len(alive) // 2)          # graves scale with the living city, not a flat cap
     died: dict[str, int] = {}                   # path -> deletion commit time (newest deletion wins)
     ts = 0
     for line in git(repo, "log", "-M", "--diff-filter=D", "--name-only", "--pretty=%ct").splitlines():
@@ -197,7 +213,7 @@ def dead_files(repo: str, alive: set[str]) -> list[dict]:
             ts = int(line)
         elif line and line not in alive and line not in died:
             died[line] = ts
-            if len(died) == 24:                 # cemetery plot capacity
+            if len(died) >= cemetery:           # cemetery plot capacity (relative to living buildings)
                 break
     born: dict[str, int] = {}                   # earliest add: newest-first log, last write is oldest
     ts = 0
@@ -209,9 +225,13 @@ def dead_files(repo: str, alive: set[str]) -> list[dict]:
     return [{"path": p, "born": born.get(p), "died": d} for p, d in died.items()]
 
 
-def seed(repo: str, zone: dict, exclude: set | None = None) -> dict:
+def seed(repo: str, zone: dict, exclude: set | None = None, walk_history: bool = True) -> dict:
+    # walk_history=False skips the per-file git-log walk + dead_files (the expensive part). The movie path
+    # passes False: it derives commits/centrality/dead client-side from the timeline it already builds.
     comp = {f: component_of(f, zone["components"]) for f in tracked(repo, exclude)}
     files = [f for f, c in comp.items() if c]
+    n_files = len(files)
+    mega = max(15, n_files // 50)                    # "sweeping commit" scales with repo size (≥15 floor)
     group = {c["id"]: c.get("group") for c in zone["components"]}
 
     commits = dict.fromkeys(files, 0)
@@ -219,19 +239,25 @@ def seed(repo: str, zone: dict, exclude: set | None = None) -> dict:
     cocomp = {f: set() for f in files}
     timestamp = 0
     touched: list[str] = []
-    for line in git(repo, "log", "--name-only", "--pretty=%ct").splitlines() + [""]:
+    for line in (git(repo, "log", "--name-only", "--pretty=%ct").splitlines() + [""]) if walk_history else []:
         if line.isdigit() or not line:                  # commit boundary: flush previous
             comps = {comp[f] for f in touched}
             for f in touched:
                 commits[f] += 1
                 last[f] = max(last[f], timestamp)
-                if len(touched) <= 15:                  # mega-commits aren't coupling signal
+                if len(touched) <= mega:                # mega-commits aren't coupling signal
                     cocomp[f] |= comps - {comp[f]}
             touched = []
             if line.isdigit():
                 timestamp = int(line)
         elif line in commits:
             touched.append(line)
+
+    dropped_files = 0
+    if n_files > FILE_CAP:                               # too big to scan whole: keep the living core
+        size = {f: filesize(Path(repo, f)) for f in files}   # attention first, mass (bytes) as the cheap fallback
+        files = sorted(files, key=lambda f: (commits[f], size[f]), reverse=True)[:FILE_CAP]
+        dropped_files = n_files - FILE_CAP
 
     buildings: dict[str, dict] = {}
     exts: dict[str, Counter] = {}
@@ -256,10 +282,24 @@ def seed(repo: str, zone: dict, exclude: set | None = None) -> dict:
     for key, b in buildings.items():
         b["ext"] = exts[key].most_common(1)[0][0]
 
+    dropped_buildings = 0
+    if len(buildings) > BUILDING_CAP:                    # too many to render: keep the tallest skyline
+        kept = sorted(buildings.values(), key=lambda b: b["loc"], reverse=True)[:BUILDING_CAP]
+        dropped_buildings = len(buildings) - BUILDING_CAP
+        buildings = {b["path"]: b for b in kept}
+
     docker = docker_manifest(repo, comp)
     named = {c["name"].lower() for c in zone.get("clouds", [])}    # manual clouds win
     zone["clouds"] = zone.get("clouds", []) + \
         [c for c in detect_clouds(repo, comp) if c["name"].lower() not in named]
-    return {"zone": zone, "buildings": list(buildings.values()),
-            "deps": parse_deps(repo, list(comp)), "docker": docker,
-            "dead": dead_files(repo, set(comp))}
+    result = {"zone": zone, "buildings": list(buildings.values()),
+              "deps": parse_deps(repo, list(comp)), "docker": docker,
+              "dead": dead_files(repo, set(comp)) if walk_history else []}
+    sample = {}
+    if dropped_files:
+        sample["files"] = {"shown": FILE_CAP, "dropped": dropped_files}
+    if dropped_buildings:
+        sample["buildings"] = {"shown": BUILDING_CAP, "dropped": dropped_buildings}
+    if sample:
+        result["sample"] = sample
+    return result

@@ -6,6 +6,28 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Gravel ballast bed beneath the freight rail line — brown dirt with scattered
+  gray rocks — so the track sits on the ground instead of floating over the sky
+  (both the static city and the time-lapse).
+
+### Changed
+- Forged repos load their time-lapse much faster: the server now does a single
+  git-history walk (the timeline) instead of four. The movie derives each
+  building's commit count, coupling/centrality, and dead-file ruins client-side
+  from the timeline it already loads, so the HEAD seed skips the per-file history
+  walk entirely.
+- Commit history is log-scale decimated for large repos: dense modify-only runs
+  are thinned by a factor that grows with the order of magnitude of the commit
+  count, while every birth/death/rename and the HEAD state are kept. Small repos
+  are untouched; huge repos get a lighter payload with no fixed cap.
+- Huge repos degrade gracefully instead of returning a blank page — files and
+  buildings are sampled to a budget (ranked by activity and mass) and the trimmed
+  count is surfaced in the field guide.
+- Cemetery headstones are heavily log-scaled on the canvas so a churny repo's
+  graveyard no longer dwarfs the city; the headstone tooltip still lists every
+  deleted file accurately.
+
 ### Fixed
 - The city hall no longer paints over the buildings standing in front of it. It
   was always drawn last, on top of every building; it now takes its place in the

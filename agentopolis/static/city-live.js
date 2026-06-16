@@ -24,6 +24,7 @@ fetch(window.CITY_SRC || 'city-data.json').then(r => r.json()).then(data => {
     for (const c of cityState.clouds)
       add('row', `<span class="chip" style="background:#f9efe3"></span>${c.name.toLowerCase()} · ${c.tether}`);
   }
+  citySampleNote(data);
   City.fit(cityCam, cityCanvas, cityState, 115, 30, 1.18);
   requestAnimationFrame(function frame(t) {
     cityCtx.clearRect(0, 0, cityCanvas.width, cityCanvas.height);

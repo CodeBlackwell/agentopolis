@@ -375,16 +375,22 @@ const City = (() => {
   };
 
   function addCemetery(state, data) {                       // dead files: graveyard rows below the city
-    if (!(data.dead || []).length) return;
+    const allDead = data.dead || [];
+    if (!allDead.length) return;
     const y0 = state.H;
-    state.graves = data.dead.map((d, i) =>
+    // Heavily log-scale the rendered headstones so a big graveyard never dwarfs the city; the tooltip
+    // still names every deleted file. Newest deletions get the visible stones (data.dead is died-desc).
+    const shown = Math.min(allDead.length, Math.ceil(6 * Math.log10(allDead.length + 1)));
+    state.graves = allDead.slice(0, shown).map((d, i) =>
       ({ kind: 'grave', path: d.path, born: d.born, died: d.died,
          x: 2.5 + (i % 8) * 1.2, y: y0 + .7 + Math.floor(i / 8), seed: hash(d.path) }));
     const fmt = ts => ts ? new Date(ts * 1000).toLocaleDateString() : '?';
     const age = (a, b) => !a || !b ? '?'
       : (b - a) >= 31536000 ? `${((b - a) / 31536000).toFixed(1)}y` : `${Math.round((b - a) / 86400)}d`;
-    state.graveTip = state.graves
-      .map(g => `🪦 ${g.path} · born ${fmt(g.born)} · died ${fmt(g.died)} · ${age(g.born, g.died)}`)
+    const header = allDead.length > shown                  // the stones are a sample; the list is complete
+      ? `🪦 ${allDead.length} deleted files (${shown} headstones shown)\n` : '';
+    state.graveTip = header + allDead
+      .map(d => `🪦 ${d.path} · born ${fmt(d.born)} · died ${fmt(d.died)} · ${age(d.born, d.died)}`)
       .join('\n');
     const rows = Math.ceil(state.graves.length / 8);
     state.cemetery = { y0, rows, x1: Math.min(state.W - 1, 13) };
