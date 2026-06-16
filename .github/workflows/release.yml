@@ -49,7 +49,8 @@ jobs:
       - name: Redeploy the hosted demo (fixtures persist on the host)
         env:
           SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}   # host kept out of this public file
         run: |
           mkdir -p ~/.ssh && echo "$SSH_KEY" > ~/.ssh/id && chmod 600 ~/.ssh/id
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id root@5.78.198.79 \
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id "root@$DEPLOY_HOST" \
             'cd /opt/agentopolis && git pull && docker compose up -d --build'
