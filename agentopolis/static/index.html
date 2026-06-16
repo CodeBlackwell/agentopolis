@@ -203,14 +203,22 @@
                 font-family: 'Silkscreen', monospace; font-size: 12px; padding: 10px 13px; }
   #scrim { display: none; position: fixed; inset: 0; z-index: 19; background: rgba(26,10,20,.55); }
   #scrim.open { display: block; }
+  #sheet-handle { display: none; }   /* the bottom-sheet grab bar — only shown on phones */
   @media (max-width: 720px) {
     body { grid-template-columns: 1fr; grid-template-rows: 1fr 40vh;
            grid-template-areas: "map" "dock"; padding: 8px; gap: 8px; }
     header p:not(.demo-only) { display: none; }   /* mouse/wheel/Q-E hints don't apply on touch */
-    #side { display: block; position: fixed; top: 0; right: 0; height: 100%;
-            width: min(86vw, 320px); transform: translateX(100%);
-            transition: transform .3s ease; z-index: 20; overflow-y: auto; }
+    /* bottom sheet: thumb-reachable, swipe the handle down to dismiss (the native phone idiom) */
+    #side { display: block; position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+            width: auto; height: auto; max-height: 82vh;
+            transform: translateY(100%); transition: transform .3s ease;
+            z-index: 20; overflow-y: auto; border-radius: 16px 16px 0 0; }
     #side.open { transform: none; }
+    #sheet-handle { display: block; position: sticky; top: 0; z-index: 2;
+                    padding: 9px 0 7px; background: var(--plum); cursor: grab; touch-action: none;
+                    border-radius: 12px 12px 0 0; }
+    #sheet-handle::before { content: ''; display: block; width: 42px; height: 5px; margin: 0 auto;
+                            background: var(--gold); border-radius: 3px; }
     #side > #ticker { max-height: 38vh; margin-top: 8px; border: 1px solid var(--plum-soft); }
     #drawer-btn { display: block; }
     #dock { gap: 0; }
@@ -258,6 +266,7 @@
   </div>
 
   <div id="side">
+    <div id="sheet-handle"></div>
     <div id="panel-wrap" class="m-nation">
       <div id="panel-guide">
         <div class="plaque">Field Guide</div>
@@ -306,15 +315,20 @@
   <script src="marathon.js"></script>
   <script src="share.js"></script>
   <script>
-    // phones: a tap-toggle drawer holds the rail + event log; relocate #ticker into it on mobile
+    // phones: a bottom sheet holds the rail + event log; relocate #ticker into it on mobile
     (() => {
       const mq = matchMedia('(max-width: 720px)');
       const side = document.getElementById('side'), dock = document.getElementById('dock');
       const ticker = document.getElementById('ticker'), scrim = document.getElementById('scrim');
-      const btn = document.getElementById('drawer-btn');
+      const btn = document.getElementById('drawer-btn'), handle = document.getElementById('sheet-handle');
       const setOpen = o => { side.classList.toggle('open', o); scrim.classList.toggle('open', o); };
       btn.addEventListener('click', () => setOpen(!side.classList.contains('open')));
       scrim.addEventListener('click', () => setOpen(false));
+      // drag the handle down to dismiss; release under the threshold snaps it back open
+      let startY = 0, dy = 0;
+      handle.addEventListener('touchstart', e => { startY = e.touches[0].clientY; dy = 0; side.style.transition = 'none'; }, { passive: true });
+      handle.addEventListener('touchmove', e => { dy = Math.max(0, e.touches[0].clientY - startY); side.style.transform = `translateY(${dy}px)`; }, { passive: true });
+      handle.addEventListener('touchend', () => { side.style.transition = ''; side.style.transform = ''; if (dy > 80) setOpen(false); });
       const apply = () => { (mq.matches ? side : dock).appendChild(ticker); if (!mq.matches) setOpen(false); };
       mq.addEventListener('change', apply); apply();
     })();
