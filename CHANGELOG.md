@@ -7,6 +7,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- Share button now opens a destination menu (native share sheet where supported, plus
+  X / LinkedIn / Reddit / Hacker News web-intents, copy link, download image, and — in a
+  movie — download clip) instead of immediately recording a clip. Clip recording is now
+  an explicit, opt-in menu choice; opening the menu only warms the unfurl card.
 - Onboarding tour on the hosted demo: the screening-room (auto-playing movie) context
   now applies a soft dim + spotlight instead of running fully undimmed, restoring the
   dim-and-focus effect; the farewell beat keeps its full dim.

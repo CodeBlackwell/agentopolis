@@ -1,6 +1,7 @@
-// Share a city to social media. The browser already rendered the skyline, so on Share we capture the
-// #map canvas into a 1200x630 OG image, upload it (keyed by repo so the link unfurls with that skyline),
-// then hand off to the native share sheet or copy the canonical link.
+// Share a city. Clicking Share opens a small destination menu (the industry-standard share dropdown):
+// the native OS sheet where supported, X / LinkedIn / Reddit / Hacker News web-intents, copy link, and
+// download the image — or, in a movie, the build clip (recorded only when that item is chosen, never on open).
+// Opening the menu warms the per-repo OG card so the shared link unfurls with this city's skyline.
 (() => {
 const params = new URLSearchParams(location.search);
 const forge = params.get('forge');
@@ -43,7 +44,7 @@ function toast(msg) {
   const t = document.createElement('div');
   t.textContent = msg;
   Object.assign(t.style, { position: 'fixed', bottom: '22px', left: '50%', transform: 'translateX(-50%)',
-    zIndex: 20, padding: '9px 14px', background: 'rgba(42,16,36,.95)', border: '2px solid #d4a953',
+    zIndex: 26, padding: '9px 14px', background: 'rgba(42,16,36,.95)', border: '2px solid #d4a953',
     color: '#f9efe3', font: "11px 'Silkscreen', monospace", boxShadow: '3px 3px 0 #5a2c4d' });
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2600);
@@ -51,66 +52,87 @@ function toast(msg) {
 
 const beacon = (edge) => { try { navigator.sendBeacon('/e/' + edge); } catch {} };
 
-function downloadBlob(file) {                            // hand the asset to a desktop poster to attach
+function downloadBlob(file) {                            // hand the asset to a poster to attach
   const a = document.createElement('a');
   a.href = URL.createObjectURL(file); a.download = file.name; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
-// show the captured frame before posting: approve it, or back out to reframe (pan/zoom) and tap share again
-function previewFrame(blob) {
-  return new Promise(res => {
-    const url = URL.createObjectURL(blob), wrap = document.createElement('div');
-    Object.assign(wrap.style, { position: 'fixed', inset: 0, zIndex: 30, display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', gap: '14px', background: 'rgba(36,16,32,.93)', padding: '20px' });
-    const cap = document.createElement('div');
-    cap.textContent = "this is what you'll post";
-    cap.style.cssText = "color:#f9efe3;font:12px 'Silkscreen',monospace;letter-spacing:.12em";
-    const img = document.createElement('img');
-    img.src = url;
-    img.style.cssText = 'max-width:min(90vw,640px);width:100%;border:3px solid #d4a953;box-shadow:4px 4px 0 #5a2c4d';
-    const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:10px';
-    const mk = (label, primary) => {
-      const b = document.createElement('button'); b.textContent = label;
-      b.style.cssText = `cursor:pointer;padding:10px 16px;font:12px 'Silkscreen',monospace;border:2px solid #d4a953;`
-        + (primary ? 'background:#d4a953;color:#2a1024' : 'background:#5a2c4d;color:#f9efe3');
-      return b;
-    };
-    const ok = mk('post this', true), no = mk('reframe', false);
-    const done = v => { URL.revokeObjectURL(url); wrap.remove(); res(v); };
-    ok.onclick = () => done(true); no.onclick = () => done(false);
-    row.append(no, ok); wrap.append(cap, img, row); document.body.appendChild(wrap);
-  });
+let still = null, menuEl = null;
+
+async function warm() {                                  // capture the still (for image-download / native attach) + upload so the link unfurls
+  const blob = await captureOG();
+  if (!blob) return;
+  still = new File([blob], 'city.png', { type: 'image/png' });
+  try { await fetch('/og?key=' + encodeURIComponent(shareKey()),
+    { method: 'POST', headers: { 'Content-Type': 'image/png' }, body: blob }); } catch {}
 }
 
-async function onShare(btn) {
-  btn.disabled = true;
-  beacon('share_tapped');
+async function recordClip(btn) {                         // movie only — render the build to a short video on demand
+  if (!(window.MOVIE && window.recordTimelapseClip)) return null;
+  const label = btn.innerHTML; btn.innerHTML = '&#9679; rendering&hellip;'; toast('rendering your clip… (~12s)');
+  const clip = await window.recordTimelapseClip();
+  btn.innerHTML = label;
+  return clip && new File([clip], 'city.' + (clip.type.includes('mp4') ? 'mp4' : 'webm'), { type: clip.type });
+}
+
+function closeMenu() {
+  if (menuEl) { menuEl.remove(); menuEl = null; }
+  removeEventListener('keydown', onKey);
+  removeEventListener('pointerdown', onOutside, true);
+}
+function onKey(e) { if (e.key === 'Escape') closeMenu(); }
+function onOutside(e) { if (menuEl && !menuEl.contains(e.target) && e.target.id !== 'share') closeMenu(); }
+
+async function nativeShare(btn, url, text) {             // the OS share sheet — the only path that attaches the real media
   try {
-    const blob = await captureOG();
-    if (!window.MOVIE && blob && !(await previewFrame(blob))) return;   // live city: approve the frame, or back out to reframe
-    if (blob) await fetch('/og?key=' + encodeURIComponent(shareKey()),
-      { method: 'POST', headers: { 'Content-Type': 'image/png' }, body: blob });
-    const url = shareUrl(), data = { title: 'Agentopolis', text: shareText(), url };
-    let file = blob && new File([blob], 'city.png', { type: 'image/png' });
-    if (window.MOVIE && window.recordTimelapseClip) {        // in a movie, share the build itself — a short clip
-      const label = btn.innerHTML; btn.innerHTML = '&#9679; rendering&hellip;';
-      toast('rendering your clip… (~12s)');
-      const clip = await window.recordTimelapseClip();        // ~12s pass; the still above still warms the unfurl card
-      btn.innerHTML = label;
-      if (clip) file = new File([clip], 'city.' + (clip.type.includes('mp4') ? 'mp4' : 'webm'), { type: clip.type });
-    }
-    if (navigator.share && file && navigator.canShare?.({ files: [file] })) await navigator.share({ ...data, files: [file] });
-    else if (navigator.share) await navigator.share(data);
-    else {                                                // desktop: download the asset + open a prefilled X compose
-      if (file) downloadBlob(file);
-      const intent = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(data.text) + '&url=' + encodeURIComponent(url);
-      if (window.open(intent, '_blank', 'noopener')) toast('city saved — attach it to your post');
-      else { await navigator.clipboard.writeText(data.text + ' ' + url); toast('city saved + caption copied — paste into a post'); }
-    }
+    let file = still;
+    if (window.MOVIE) file = await recordClip(btn) || still;
+    const data = { title: 'Agentopolis', text, url };
+    if (file && navigator.canShare?.({ files: [file] })) await navigator.share({ ...data, files: [file] });
+    else await navigator.share(data);
     beacon('share_completed');
-  } catch (e) { if (e?.name !== 'AbortError') console.warn('share failed', e); }   // AbortError = user closed the sheet
-  finally { btn.disabled = false; }
+  } catch (e) { if (e?.name !== 'AbortError') console.warn('share failed', e); }
+}
+
+function openMenu(btn) {
+  if (menuEl) return closeMenu();
+  beacon('share_tapped');
+  warm();                                                // background: warm the unfurl card + ready the image
+  const url = shareUrl(), text = shareText();
+  const done = () => { beacon('share_completed'); closeMenu(); };
+  const intent = (href) => () => { window.open(href, '_blank', 'noopener'); done(); };
+  const rows = [];
+  if (navigator.share)                                   // mobile: OS sheet, attaches the actual image/clip
+    rows.push(['share sheet…', () => { closeMenu(); nativeShare(btn, url, text); }]);
+  rows.push(['post to X', intent(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`)]);
+  rows.push(['share on linkedin', intent(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`)]);
+  rows.push(['post to reddit', intent(`https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(text)}`)]);
+  rows.push(['post to hacker news', intent(`https://news.ycombinator.com/submitlink?u=${encodeURIComponent(url)}&t=${encodeURIComponent(text)}`)]);
+  rows.push(['copy link', async () => { try { await navigator.clipboard.writeText(text + ' ' + url); toast('link copied'); } catch {} done(); }]);
+  rows.push(['download image', async () => { if (!still) await warm(); if (still) downloadBlob(still); done(); }]);
+  if (window.MOVIE) rows.push(['download clip', async () => { const f = await recordClip(btn); if (f) downloadBlob(f); done(); }]);
+
+  const m = menuEl = document.createElement('div');
+  m.id = 'share-menu';
+  m.style.cssText = 'position:fixed;z-index:25;background:rgba(42,16,36,.97);border:2px solid #d4a953;'
+    + 'box-shadow:4px 4px 0 #5a2c4d;display:flex;flex-direction:column;min-width:172px';
+  rows.forEach(([label, fn], i) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.dataset.act = label;
+    b.style.cssText = "cursor:pointer;text-align:left;padding:9px 13px;background:none;border:0;color:#f9efe3;"
+      + "font:11px 'Silkscreen',monospace;white-space:nowrap" + (i < rows.length - 1 ? ';border-bottom:1px solid #5a2c4d' : '');
+    b.onmouseenter = () => { b.style.background = '#d4a953'; b.style.color = '#2a1024'; };
+    b.onmouseleave = () => { b.style.background = 'none'; b.style.color = '#f9efe3'; };
+    b.onclick = fn;
+    m.appendChild(b);
+  });
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect();                 // open to the LEFT of the button (it sits near the right edge)
+  m.style.right = (window.innerWidth - r.left + 8) + 'px';
+  m.style.top = Math.max(8, Math.min(r.top, window.innerHeight - m.offsetHeight - 8)) + 'px';
+  setTimeout(() => { addEventListener('keydown', onKey); addEventListener('pointerdown', onOutside, true); }, 0);
 }
 
 // one Share button in #mapctl — present over the map in both the live city and the movie
@@ -121,9 +143,9 @@ function mount() {
   const btn = document.createElement('button');
   btn.id = 'share'; btn.className = 'wide'; btn.title = 'share this city';
   btn.innerHTML = '&#8682; share';
-  btn.onclick = () => onShare(btn);
+  btn.onclick = () => openMenu(btn);
   ctl.appendChild(btn);
 }
 if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mount); else mount();
-window.__share = { text: shareText, url: shareUrl, preview: previewFrame };   // exposed for share self-tests (cf. window.__tl)
+window.__share = { text: shareText, url: shareUrl, open: openMenu };   // exposed for share self-tests (cf. window.__tl)
 })();

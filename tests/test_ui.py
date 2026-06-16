@@ -91,43 +91,59 @@ def test_caption_names_the_repo_and_carries_a_stat(page, base_url):
     assert any(ch.isdigit() for ch in text)                # a headline number, not the old static line
 
 
-# ---- #9 preview + #8 desktop X-intent (one real end-to-end flow) -------------
+# ---- Share button opens a destination menu (not auto-record), #8 X-intent + #7 caption -----
 
-def test_share_shows_preview_then_opens_x_intent(page, base_url):
-    # desktop with no native share sheet -> the preview gate, then a prefilled X compose
+def test_share_button_opens_a_destination_menu(page, base_url):
+    # clicking Share must open a menu of destinations — NOT immediately record/share
+    page.add_init_script("Object.defineProperty(navigator,'share',{value:undefined,configurable:true});")
+    _open_city(page, base_url)
+    page.wait_for_selector("#share")
+    page.click("#share")
+    page.wait_for_selector("#share-menu", timeout=10000)
+    labels = page.eval_on_selector_all("#share-menu button", "els => els.map(e => e.textContent)")
+    for expected in ["post to X", "share on linkedin", "post to reddit", "copy link", "download image"]:
+        assert expected in labels, f"missing menu item: {expected}"
+
+
+def test_menu_post_to_x_opens_prefilled_intent(page, base_url):
     page.add_init_script("""
         Object.defineProperty(navigator, 'share', {value: undefined, configurable: true});
-        Object.defineProperty(navigator, 'canShare', {value: undefined, configurable: true});
         window.__opened = [];
         window.open = (...a) => { window.__opened.push(a); return {closed: false}; };
     """)
     _open_city(page, base_url)
     page.wait_for_selector("#share")
     page.click("#share")
-    # #9: the composition preview appears before anything is posted
-    page.wait_for_selector("text=this is what you'll post", timeout=10000)
-    page.click("text=post this")
+    page.wait_for_selector("#share-menu")
+    page.click("#share-menu >> text=post to X")
     # #8 + #7: a twitter intent opens, prefilled with the caption + the canonical link
     page.wait_for_function("window.__opened.length > 0", timeout=10000)
     intent = page.evaluate("window.__opened[0][0]")
     assert intent.startswith("https://twitter.com/intent/tweet")
     assert "isometric%20city" in intent or "isometric+city" in intent
     assert "text=" in intent and "url=" in intent
+    page.wait_for_selector("#share-menu", state="detached")   # menu closes after choosing
 
 
-def test_reframe_cancels_the_post(page, base_url):
+def test_share_does_not_record_on_open(page, base_url):
+    # regression for the reported bug: in a movie, opening the menu must NOT kick off clip recording.
+    # Spy by wrapping the recorder as the page assigns it (getter/setter), so the test never calls it itself.
     page.add_init_script("""
+        window.__recorded = 0;
+        let _rec;
+        Object.defineProperty(window, 'recordTimelapseClip', { configurable: true,
+            get() { return _rec; },
+            set(fn) { _rec = (...a) => { window.__recorded++; return fn(...a); }; } });
         Object.defineProperty(navigator, 'share', {value: undefined, configurable: true});
-        window.__opened = [];
-        window.open = (...a) => { window.__opened.push(a); return {closed: false}; };
     """)
-    _open_city(page, base_url)
+    page.goto(base_url + "/?timelapse")                       # movie context, where the old bug auto-recorded
+    page.wait_for_function("typeof window.recordTimelapseClip === 'function'", timeout=15000)
     page.wait_for_selector("#share")
     page.click("#share")
-    page.wait_for_selector("text=this is what you'll post")
-    page.click("text=reframe")                             # back out
-    page.wait_for_selector("text=this is what you'll post", state="detached")
-    assert page.evaluate("window.__opened.length") == 0    # nothing posted on cancel
+    page.wait_for_selector("#share-menu")
+    assert page.evaluate("window.__recorded") == 0            # opening the menu records nothing
+    labels = page.eval_on_selector_all("#share-menu button", "els => els.map(e => e.textContent)")
+    assert "download clip" in labels                          # the clip is an explicit, opt-in menu choice
 
 
 # ---- #3 video end-card -------------------------------------------------------
