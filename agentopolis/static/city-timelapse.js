@@ -1131,27 +1131,13 @@ function diamondFromBox(b) {
   return [{ sx: cx, sy: b.y0 }, { sx: b.x1, sy: cy }, { sx: cx, sy: b.y1 }, { sx: b.x0, sy: cy }];
 }
 
-// True silhouette: fill the union of all footprints on an offscreen mask, then erode THE UNION (not each
-// shape) by a band and subtract it — leaving only the outer rim. Eroding the union, rather than insetting
-// each diamond, is what kills the internal seams between adjacent buildings. The glow is the gold highlighter.
-let maskCv, erodeCv;
+// Silhouette = one translucent gold fill of the footprints, straight on the canvas. Nonzero winding unions
+// overlapping diamonds in a single fill(), so there's no double-darkening and no internal seams to stripe —
+// and no per-frame offscreen masks. Dispersed items light up individually; adjacent ones merge.
 function drawSilhouette(ctx, polys) {
-  const W = tlCanvas.width, H = tlCanvas.height, band = Math.max(2, 2.2 * cam.s);
-  if (!maskCv) { maskCv = document.createElement('canvas'); erodeCv = document.createElement('canvas'); }
-  for (const cv of [maskCv, erodeCv]) if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
-  const m = maskCv.getContext('2d'), e = erodeCv.getContext('2d');
-  m.clearRect(0, 0, W, H); m.fillStyle = '#fff'; fillPolys(m, polys);   // solid union
-  e.clearRect(0, 0, W, H); e.globalCompositeOperation = 'source-over'; e.drawImage(maskCv, 0, 0);
-  e.globalCompositeOperation = 'destination-in';                        // erode = intersection of ring-offset copies
-  for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) e.drawImage(maskCv, Math.cos(a) * band, Math.sin(a) * band);
-  e.globalCompositeOperation = 'source-over';
-  m.globalCompositeOperation = 'destination-out'; m.drawImage(erodeCv, 0, 0);   // union − eroded = rim only
-  m.globalCompositeOperation = 'source-in';
-  m.fillStyle = '#ffd678'; m.fillRect(0, 0, W, H);                      // tint the rim gold
-  m.globalCompositeOperation = 'source-over';
   ctx.save();
-  ctx.shadowColor = 'rgba(255,214,120,.7)'; ctx.shadowBlur = 8 * cam.s;
-  ctx.drawImage(maskCv, 0, 0);
+  ctx.fillStyle = 'rgba(255,214,120,.28)';
+  fillPolys(ctx, polys);
   ctx.restore();
 }
 function fillPolys(c, polys) {                             // one path, nonzero winding → overlaps union, not cancel
