@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-06-16
+
 ### Added
 - Gravel ballast bed beneath the freight rail line — brown dirt with scattered
   gray rocks — so the track sits on the ground instead of floating over the sky
