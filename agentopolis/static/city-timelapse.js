@@ -580,6 +580,27 @@ function setPlay(p) {
   if (!p && window.DEMO_MOVIE && ptr >= commits.length - 1) showFinishCTA();   // the demo holds on the finished city
 }
 
+// record one fast replay pass of the movie as a short video to share — the build itself is the payload.
+// Resolves a Blob, or null if MediaRecorder/codecs are unavailable; share.js drives this in movie mode.
+window.recordTimelapseClip = () => new Promise(resolve => {
+  if (!window.MediaRecorder || !tlCanvas.captureStream) return resolve(null);
+  // mp4/h264 where the browser records it (iOS Safari wants mp4 for the share sheet), else webm
+  const TYPES = ['video/mp4;codecs=h264', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+  const mimeType = TYPES.find(t => MediaRecorder.isTypeSupported(t));
+  let rec;
+  try { rec = new MediaRecorder(tlCanvas.captureStream(30), mimeType ? { mimeType } : undefined); }
+  catch (e) { return resolve(null); }
+  const chunks = [];
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  rec.onstop = () => resolve(new Blob(chunks, { type: rec.mimeType || 'video/webm' }));
+  const prevSpeed = speed;
+  const finish = () => { clearTimeout(cap); clearInterval(poll); speed = prevSpeed; if (rec.state !== 'inactive') rec.stop(); };
+  const cap = setTimeout(finish, 20000);                                 // hard cap so a huge repo can't run away
+  const poll = setInterval(() => { if (!playing && ptr >= commits.length - 1) finish(); }, 150);
+  seek(-1); speed = Math.max(3, Math.min(120, commits.length / 11));     // pace the pass to land near ~12s
+  rec.start(); setPlay(true);
+});
+
 // the demo movie ends → hold on the finished city and point the viewer at the forge box to build their own
 function showFinishCTA() {
   if (document.getElementById('tl-cta')) return;

@@ -44,7 +44,13 @@ async function onShare(btn) {
     if (blob) await fetch('/og?key=' + encodeURIComponent(shareKey()),
       { method: 'POST', headers: { 'Content-Type': 'image/png' }, body: blob });
     const url = shareUrl(), data = { title: 'Agentopolis', text: 'my codebase as a living isometric city', url };
-    const file = blob && new File([blob], 'city.png', { type: 'image/png' });
+    let file = blob && new File([blob], 'city.png', { type: 'image/png' });
+    if (window.MOVIE && window.recordTimelapseClip) {        // in a movie, share the build itself — a short clip
+      const label = btn.innerHTML; btn.innerHTML = '&#9679; rec';
+      const clip = await window.recordTimelapseClip();        // ~12s pass; the still above still warms the unfurl card
+      btn.innerHTML = label;
+      if (clip) file = new File([clip], 'city.' + (clip.type.includes('mp4') ? 'mp4' : 'webm'), { type: clip.type });
+    }
     if (navigator.share && file && navigator.canShare?.({ files: [file] })) await navigator.share({ ...data, files: [file] });
     else if (navigator.share) await navigator.share(data);
     else { await navigator.clipboard.writeText(url); toast('link copied — paste anywhere to share your city'); }
