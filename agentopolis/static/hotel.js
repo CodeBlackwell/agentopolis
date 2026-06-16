@@ -12,7 +12,8 @@ const TOOL_STATION = {
   WebSearch: 'telephone', WebFetch: 'telephone', Task: 'reception', TodoWrite: 'reception',
 };
 const HAIR = ['#2d1b12', '#6b3e1e', '#c9a227', '#3a3a3a'];
-const SPEED = window.DEMO_MOVIE ? 7 : 3.2;        // the demo movie cranks agent speed for the meme
+const SPEED = window.DEMO_MOVIE ? 8 : 3.2;        // the demo movie cranks agent speed for the meme
+const BUBBLE_MS = window.DEMO_MOVIE ? 1600 : 4700;   // rapid demo: bubbles flash, not pile up
 const SEATS = [[0, 0], [.55, 0], [0, .55], [.55, .55], [-.5, .3], [.3, -.5], [-.5, -.5], [.7, .35]];
 
 const ctx = document.getElementById('hotel').getContext('2d');
@@ -128,7 +129,8 @@ function logLine(e) {                       // plain-language action, or null fo
   if (e.event === 'Stop') return 'finished — at your leisure';
   if (e.event === 'PreToolUse') {
     if (e.tool === 'Task' || e.tool === 'Agent') return `dispatched ${e.agent_name || 'an agent'}`;
-    return e.detail ? `${e.tool}: ${e.detail}` : e.tool;
+    const line = e.detail ? `${e.tool}: ${e.detail}` : e.tool;
+    return e.agent_type ? `${e.agent_type} · ${line}` : line;   // attribute subagent actions to the worker
   }
   return null;                              // PostToolUse, SessionStart/End, SubagentStop, etc.
 }
@@ -162,7 +164,7 @@ function frame(t) {
       if (av.leaving) { avatars.delete(av.id); continue; }
       av.state = av.pending;
     }
-    if (av.bubble && t - av.bubble.t > 4700) av.bubble = null;
+    if (av.bubble && t - av.bubble.t > BUBBLE_MS) av.bubble = null;
   }
   render(ctx, [...avatars.values()], t);
   requestAnimationFrame(frame);
@@ -214,35 +216,46 @@ source.onopen = () => lamp.classList.add('on');
 source.onerror = () => lamp.classList.remove('on');
 source.onmessage = m => handle(JSON.parse(m.data));
 
-// Seeded loop: agents build the real city on a timer (no live Claude session needed).
-// Reads the loaded city's hottest buildings so the skyline that lights up is the actual one.
+// Seeded loop: a busy crew works the real city on a timer (no live Claude session needed).
+// Generates an interleaved multi-agent stream — 4-5 subagents alive at once, cycling in and
+// out the door — so the floor scurries and the ticker streams. Reads the city's hottest buildings.
 function buildScript(buildings) {
   const s = 'demo';
   const base = p => (p || '').split('/').pop();
-  const top = [...buildings].sort((a, b) => (b.commits || 0) - (a.commits || 0)).slice(0, 8);
-  const fallback = [{ path: 'app', component: 'core' }, { path: 'lib', component: 'core' }];
-  const pool = top.length ? top : fallback;
-  const at = n => pool[n % pool.length];
-  const read = b => [{ event: 'PreToolUse', session: s, tool: 'Read', detail: base(b.path), path: b.path },
-                     { event: 'PostToolUse', session: s, tool: 'Read' }];
-  const edit = (b, tool) => ({ event: 'PreToolUse', session: s, tool, detail: base(b.path), path: b.path });
-  return [
-    { event: 'SessionStart', session: s },
-    { event: 'UserPromptSubmit', session: s, detail: `ship the ${at(0).component} feature` },
-    ...read(at(0)), ...read(at(1)),
-    { event: 'PreToolUse', session: s, tool: 'Agent', agent_type: 'Explore', agent_name: `survey ${at(2).component}` },
-    { event: 'PreToolUse', session: s, agent_id: 'scout01', agent_type: 'Explore', tool: 'Grep', detail: at(2).component },
-    { event: 'PreToolUse', session: s, agent_id: 'scout01', agent_type: 'Explore', tool: 'Read', detail: base(at(3).path), path: at(3).path },
-    { event: 'PostToolUse', session: s, agent_id: 'scout01', agent_type: 'Explore', tool: 'Read' },
-    edit(at(0), 'Edit'), { event: 'PostToolUse', session: s, tool: 'Edit' },
-    { event: 'Notification', session: s, detail: 'permission needed: Bash' },
-    { event: 'PreToolUse', session: s, tool: 'Bash', detail: 'just test' },
-    { event: 'PostToolUse', session: s, tool: 'Bash' },
-    edit(at(4), 'Write'), { event: 'SubagentStop', session: s, agent_id: 'scout01' },
-    edit(at(5), 'Edit'),
-    { event: 'PreToolUse', session: s, tool: 'Bash', detail: 'git commit -m ship', commit: true },
-    { event: 'Stop', session: s },
-  ];
+  const top = [...buildings].sort((a, b) => (b.commits || 0) - (a.commits || 0)).slice(0, 12);
+  const pool = top.length ? top : [{ path: 'app', component: 'core' }, { path: 'lib', component: 'core' }];
+  const pick = n => pool[n % pool.length];
+  const TYPES = ['Explore', 'general-purpose', 'Plan', 'code-reviewer', 'Task'];
+  const TOOLS = ['Read', 'Grep', 'Edit', 'Bash', 'Write', 'Glob', 'WebFetch'];
+
+  const ev = [{ event: 'SessionStart', session: s },
+              { event: 'UserPromptSubmit', session: s, detail: `ship the ${pick(0).component} feature` }];
+  const live = [];                                  // agents currently in the room: {id, type, work}
+  let nextId = 0, k = 0;                             // k rotates tools + buildings so nothing repeats
+  const dispatch = () => {
+    const type = TYPES[nextId % TYPES.length];
+    ev.push({ event: 'PreToolUse', session: s, tool: 'Agent', agent_type: type, agent_name: `survey ${pick(nextId).component}` });
+    live.push({ id: `a${nextId}`, type, work: 5 + (nextId % 4) });   // each runs 5-8 tools, then leaves
+    nextId++;
+  };
+  const act = a => {                                // one tool call → the agent scurries to its station + logs
+    const b = pick(k), tool = TOOLS[k++ % TOOLS.length];
+    ev.push({ event: 'PreToolUse', session: s, agent_id: a.id, agent_type: a.type, tool, detail: base(b.path), path: b.path });
+  };
+  for (let round = 0; round < 60; round++) {
+    while (live.length < 4) dispatch();             // keep the room full...
+    if (live.length < 5 && round % 4 === 0) dispatch();   // ...drifting up to five
+    for (const a of live) { act(a); a.work--; }
+    const b = pick(k);                              // the main agent works alongside the crew, committing now and then
+    ev.push(round % 8 === 7
+      ? { event: 'PreToolUse', session: s, tool: 'Bash', detail: 'git commit -m ship', commit: true }
+      : { event: 'PreToolUse', session: s, tool: TOOLS[k++ % TOOLS.length], detail: base(b.path), path: b.path });
+    for (let i = live.length - 1; i >= 0; i--)      // finished agents walk back out the door
+      if (live[i].work <= 0) ev.push({ event: 'SubagentStop', session: s, agent_id: live.splice(i, 1)[0].id });
+  }
+  while (live.length) ev.push({ event: 'SubagentStop', session: s, agent_id: live.pop().id });   // drain before the loop repeats
+  ev.push({ event: 'Stop', session: s });
+  return ev;
 }
 
 let demoTimer = null;

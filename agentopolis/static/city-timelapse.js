@@ -740,7 +740,7 @@ function buildExplain() {
   const dock = document.getElementById('dock');
   if (!dock) return;
   if (window.DEMO_MOVIE) {                          // the agent-speed meme: keep the live dispatch hall, no explain cards
-    startDemoLoop?.(state.buildings, { interval: 900 });
+    startDemoLoop?.(state.buildings, { interval: 300 });
     return;
   }
   document.querySelector('#dock .dispatch')?.style.setProperty('display', 'none');   // retire the agent floor

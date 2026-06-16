@@ -176,16 +176,15 @@
             padding: 8px 10px; max-width: 380px; max-height: 50vh; overflow-y: auto;
             white-space: pre-line; cursor: default; }
 
-  #forge { display: none; position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 9; }
+  /* the build box flows under the title stack in the left column — same place in every mode (nation,
+     city, movie), so the layout is owned here, not patched per-mode. pointer-events re-enabled because
+     the header turns them off for the canvas behind it. */
+  #forge { display: none; margin-top: 14px; pointer-events: auto; text-shadow: none; }
   body[data-mode="nation"] #forge, body[data-demo="1"] #forge { display: block; }
   /* movie mode (.tl-mode set by the timelapse engine): the transport bar owns the bottom strip, so the
-     shell re-lays the map frame here. One place owns movie-mode overlay layout — add overlays here, not
-     as per-collision CSS patches injected from JS. */
+     shell re-lays the map frame here. */
   .mapwrap.tl-mode { flex-direction: column; gap: 8px; }
   .mapwrap.tl-mode #map { height: auto; flex: 1; min-height: 0; }
-  /* the github build box rides the left rail under the title stack — left-justified, clear of the
-     city it's pointing at (not centered over the visualization) */
-  .mapwrap.tl-mode #forge { top: 150px; bottom: auto; left: 14px; transform: none; }
   /* the transport bar owns the bottom strip in a movie; the stats button (mobile) would overlap it,
      and the movie's dock already shows this repo's legend — so drop it here */
   .mapwrap.tl-mode #drawer-btn { display: none; }
@@ -201,6 +200,29 @@
   .forge-hint { font-family: 'Silkscreen', monospace; font-size: 11px; letter-spacing: .16em;
                 text-transform: uppercase; color: var(--gold); margin-bottom: 6px;
                 text-shadow: 0 2px 7px rgba(0,0,0,.75); }
+  /* demo-only forces display:block; re-assert flex here (after that rule) so the badges stack as a column */
+  .install-row { flex-direction: column; align-items: flex-start; gap: 8px; margin: 12px 0 10px; }
+  body[data-demo="1"] .install-row { display: flex; }
+  .install-badge { cursor: pointer; font-family: 'Silkscreen', monospace; font-size: 10px;
+                   color: var(--cream); background: rgba(42,16,36,.88); border: 2px solid var(--gold);
+                   box-shadow: 3px 3px 0 var(--plum); padding: 6px 10px; }
+  .install-badge:hover { background: var(--plum-soft); }
+  .install-badge.copied { border-color: var(--cream); color: var(--gold); }
+  .cli-accordion { font-family: 'Silkscreen', monospace; width: fit-content; max-width: 100%; margin-bottom: 10px; text-align: left;
+                   background: rgba(42,16,36,.88); border: 2px solid var(--gold); box-shadow: 3px 3px 0 var(--plum); }
+  .cli-accordion summary { cursor: pointer; list-style: none; padding: 7px 11px; font-size: 10px;
+                           letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+  .cli-accordion summary::-webkit-details-marker { display: none; }
+  .cli-accordion summary::before { content: '\25B8\00a0'; }
+  .cli-accordion[open] summary::before { content: '\25BE\00a0'; }
+  .cli-accordion ol { margin: 0; padding: 2px 11px 9px 27px; color: var(--cream); font-size: 10px; }
+  .cli-accordion li { margin: 6px 0; }
+  .cli-accordion .step-do { display: block; color: var(--pink-deep); font-size: 8px; letter-spacing: .12em;
+                            text-transform: uppercase; margin-bottom: 3px; }
+  .cli-accordion code { cursor: pointer; display: inline-block; color: var(--cream);
+                        background: var(--plum); padding: 3px 6px; }
+  .cli-accordion code:hover { color: var(--gold); }
+  .cli-accordion code.copied { color: var(--gold); }
   #forge input { width: 420px; max-width: 64vw; padding: 7px 11px;
                  font-family: 'Silkscreen', monospace; font-size: 10px; color: var(--cream);
                  background: rgba(42,16,36,.88); border: 2px solid var(--gold);
@@ -244,7 +266,6 @@
     #mapctl button { width: 42px; height: 42px; font-size: 18px; }
     #mapctl [data-act="rot-"], #mapctl [data-act="rot+"] { display: none; }  /* two-finger twist rotates instead */
     #back { padding: 9px 14px; }
-    #forge { bottom: 64px; }
     #forge input { max-width: 86vw; }
 
     /* forge funnel — the CTA + sheet appear only where the server enables forging (toggle via body attrs) */
@@ -283,6 +304,24 @@
       <button id="replay" class="m-city" title="replay this repo's git history as a time-lapse"
               onclick="location.search='?timelapse'">&#9654; replay history</button>
       <p class="m-city demo-only"><a href="/?nation">&#9656; explore the whole BLACKBOX nation</a></p>
+      <form id="forge"
+            onsubmit="location.href='/?forge='+encodeURIComponent(this.url.value.trim());return false">
+        <div class="forge-hint demo-only">try it yourself!</div>
+        <input name="url" autocomplete="off" spellcheck="false"
+               placeholder="paste a public github url &rarr; build it as a city">
+        <div class="install-row demo-only">
+          <button type="button" class="install-badge" data-copy="brew install codeblackwell/tap/agentopolis">&#127866; brew install agentopolis</button>
+          <button type="button" class="install-badge" data-copy="pip install agentopolis">&#128013; pip install agentopolis</button>
+        </div>
+        <details class="cli-accordion demo-only">
+          <summary>run it locally &mdash; 1 &middot; 2 &middot; 3</summary>
+          <ol>
+            <li><span class="step-do">1 &middot; install</span><code data-copy="uv tool install agentopolis">uv tool install agentopolis</code></li>
+            <li><span class="step-do">2 &middot; hook into claude code</span><code data-copy="agentopolis attach">agentopolis attach</code></li>
+            <li><span class="step-do">3 &middot; open any repo&rsquo;s city</span><code data-copy="cd ~/your-repo &amp;&amp; agentopolis">cd ~/your-repo &amp;&amp; agentopolis</code></li>
+          </ol>
+        </details>
+      </form>
     </header>
     <div id="tiers" class="m-nation">
       <button data-tier="world">WORLD</button><span class="sep">&#9656;</span>
@@ -296,12 +335,6 @@
       <button data-act="zoom-" title="zoom out">&minus;</button>
       <button data-act="reset" class="wide" title="reset view">reset</button>
     </div>
-    <form id="forge"
-          onsubmit="location.href='/?forge='+encodeURIComponent(this.url.value.trim());return false">
-      <div class="forge-hint demo-only">try it yourself!</div>
-      <input name="url" autocomplete="off" spellcheck="false"
-             placeholder="paste a public github url &rarr; build it as a city">
-    </form>
     <button id="drawer-btn" title="stats &amp; event log">&#9432; stats</button>
     <button id="build-btn" title="build a city from a github repo">&#43; build a city</button>
   </div>
@@ -365,13 +398,14 @@
   <script src="hotel.js"></script>
   <script src="marathon.js"></script>
   <script src="share.js"></script>
+  <script src="tour.js"></script>
   <script>
     // phones: bottom sheets hold the rail/log and the forge funnel; relocate #ticker + #forge into them
     (() => {
       const mq = matchMedia('(max-width: 720px)');
       const side = document.getElementById('side'), dock = document.getElementById('dock');
       const ticker = document.getElementById('ticker'), scrim = document.getElementById('scrim');
-      const handle = document.getElementById('sheet-handle'), mapwrap = document.querySelector('.mapwrap');
+      const handle = document.getElementById('sheet-handle'), header = document.querySelector('header');
       const statsBtn = document.getElementById('drawer-btn'), buildBtn = document.getElementById('build-btn');
       const forge = document.getElementById('forge'), forgeSheet = document.getElementById('forge-sheet');
       const forgeSlot = document.getElementById('forge-slot');
@@ -403,10 +437,20 @@
 
       const apply = () => {
         if (mq.matches) { side.appendChild(ticker); forgeSlot.appendChild(forge); }
-        else { dock.appendChild(ticker); mapwrap.appendChild(forge); closeAll(); }
+        else { dock.appendChild(ticker); header.appendChild(forge); closeAll(); }
       };
       mq.addEventListener('change', apply); apply();
     })();
+  </script>
+  <script>
+    // click-to-copy: install badges + the CLI step commands
+    document.querySelectorAll('[data-copy]').forEach(el => el.addEventListener('click', async () => {
+      const original = el.textContent;
+      try { await navigator.clipboard.writeText(el.dataset.copy); }
+      catch (e) { return; }                                // no clipboard (insecure context) → leave it unchanged
+      el.textContent = '✓ copied!'; el.classList.add('copied');
+      setTimeout(() => { el.textContent = original; el.classList.remove('copied'); }, 1400);
+    }));
   </script>
   <script>
     if (location.hostname === 'localhost') {
