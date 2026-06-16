@@ -28,9 +28,14 @@ addEventListener('pagehide', () => { try {
 let savedCam = null;
 try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');
   if (c && c.k === camKey && c.src === 'live') savedCam = c; } catch (e) {}
-const loading = showLoading();
-
 (async () => {
+  // honor prefers-reduced-motion: a forge link auto-plays this build movie, but these users opt out of
+  // motion — send them to the static finished city instead (an explicit ?timelapse replay still plays)
+  if (isForge && matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const m = citySrc.match(/url=(.+)$/);
+    if (m) return location.replace('/?forge=' + m[1] + '&static');
+  }
+  const loading = showLoading();
   let resp;
   try { const r = await fetch(citySrc); if (!r.ok) throw r.status; resp = await r.json(); }
   catch (e) {                                             // forge clone failed / too large / gate busy → quick city
