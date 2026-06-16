@@ -29,7 +29,7 @@ test *args:
 
 # Re-bake the BLACKBOX showcase fixtures (run before deploy when repos change).
 # DEMO_CITY matches the Dockerfile so the landing city also gets its grow-from-start movie timeline.
-bake demo="SPICE":
+bake demo="methodproof":
     AGENTOPOLIS_DEMO_CITY={{demo}} .venv/bin/python -m agentopolis.bake
 
 # Deploy the hosted demo. Fixtures (private project data) never touch public git —

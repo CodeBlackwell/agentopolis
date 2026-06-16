@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir ".[card]"
 # showcase mode: serve the baked BLACKBOX fixtures, no live git on this repo.
 # the demo lands on one impressive city; ?nation still opens the full map.
 ENV AGENTOPOLIS_SHOWCASE=/app/agentopolis/showcase
-ENV AGENTOPOLIS_DEMO_CITY=SPICE
+ENV AGENTOPOLIS_DEMO_CITY=methodproof
 # absolute base for og:image so shared links unfurl with the captured skyline
 ENV AGENTOPOLIS_PUBLIC_URL=https://agentopolis.codeblackwell.ai
 # funnel counters persist here across rebuilds (compose mounts /data as a volume)

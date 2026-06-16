@@ -46,11 +46,24 @@ const ctx = demo && isMovie ? (window.DEMO_MOVIE ? 'demo-land' : 'demo-cards')
 | `nation` | local multi-repo / `?nation` | `nation.js` | world→state→city tiers, field guide, forge |
 | `city` | a single live repo | `city-live.js` | legend, dispatch floor, live event log |
 | `movie` | `?timelapse` / a forge / replay | `city-timelapse.js` | the git-history time-lapse + transport bar |
-| `demo-land` | hosted demo landing (`DEMO_MOVIE=1`) | `city-timelapse.js` | the auto-playing hero movie |
+| `demo-land` | hosted demo landing (`DEMO_MOVIE=1`) | `city-timelapse.js` | the hero movie (opens finished + paused) |
 | `demo-cards` | a demo forge result (`DEMO_MOVIE=""`) | `city-timelapse.js` | where the explanation cards render |
 
 `screeningRoom = ctx ∈ {movie, demo-land, demo-cards}` — the three movie-based
 contexts where the visualization is the content (see *Undimmed screening room*).
+
+> **Movie opens paused when the tour will run.** A frantic auto-playing reel on
+> arrival felt broken, so `city-timelapse.js` checks the same flags the tour does
+> (`RESUME` set, or `DONE` unset — and never in an embed) and, when the tour is
+> pending, calls `rewindForTour()` instead of `setPlay(true)`: it jumps to HEAD
+> (the **complete** city, not a blank lot) and holds, paused and quiet. The tour's
+> first movie step is then a **forced `proceed`** `#tl-play` — pressing ▶ replays
+> from the first commit (`setPlay(true)` rewinds at HEAD) and advances the tour.
+> On a tour *replay* (the "?" handle, movie already loaded), `start()` calls
+> `window.movieRewindForTour?.()` to re-pause on the finished city. Returning
+> visitors (tour seen) and embeds still autoplay from the empty lot as before.
+> Because the dispatch-floor meme reads `MOVIE_PLAYING`, pausing the reel also
+> calms the frantic floor — one lever quiets both.
 
 > **Note:** in movie mode the body's `data-mode` is still `"city"`; the engine
 > (`city-timelapse.js`) is what distinguishes a movie, hence the script-tag check.
@@ -127,7 +140,7 @@ e.g. mobile-hidden transport selectors simply don't appear.
 
 ### `movie` (9 steps) — resumes after the forced `#replay`
 1. *(center)* — ⭐ The Founding, Replayed ⭐
-2. `#tl-play` — Play & pause the chronicle — *try: press ▶*
+2. `#tl-play` — **forced + `proceed`** — "press ▶ to roll the reel yourself" → replays from the start, advances the tour
 3. `#tl-seek` — Scrub through the ages — *try: drag the scrubber*
 4. `#tl-speed` — The pace of progress — *try: try 10×*
 5. `#tl-trans` — Urban renewal, by decree (transition mode) — *try: pick a mode*
@@ -136,20 +149,20 @@ e.g. mobile-hidden transport selectors simply don't appear.
 8. `#tl-exit` — Return to the present (■ live)
 9. *(center)* — ⭐ Long Live the President ⭐ — close
 
-### `demo-land` (6 steps) — the hosted demo's auto-playing hero movie
+### `demo-land` (5 steps) — the hosted demo's hero movie (opens finished + paused)
 1. *(center)* — ⭐ Welcome to the Republic ⭐
-2. `#map` — The founding, replayed — *try: drag, scroll, spin while it builds*
-3. `#transport` — Your screening controls — *try: press play / drag the scrubber*
+2. `#tl-play` — **forced + `proceed`** — "press ▶ to begin" → raises the city from the first commit, advances the tour
+3. `#map` — The founding, replayed — *try: drag, scroll, spin while it builds*
 4. `#tl-shape` — Shape the skyline — *try: pick a mode*
-5. `#hotel` — The tireless citizenry (agent-meme floor) — *try: hover a citizen*
-6. `#forge` — A leader BUILDS — **driven**: types a URL into the forge, then navigates (see below)
+5. `#forge` — A leader BUILDS — **driven**: types a URL into the forge, then navigates (see below)
 
-### `demo-cards` (5 steps) — resumes on the demo forge result, where cards render
+### `demo-cards` (6 steps) — resumes on the demo forge result, where cards render
 1. *(center)* — ⭐ Grand Opening ⭐
-2. `#explain` — Your living war-room dossier — *try: read the cards, they refresh per commit*
-3. `#explain` — The map answers to you (bi-directional hover) — *try: hover a card, watch the city pulse*
-4. `#tl-exit` — Return to the present
-5. *(center)* — ⭐ Now Go Build, President ⭐ — close
+2. `#tl-play` — **forced + `proceed`** — "press ▶ to raise your new town" → plays from the first commit, advances the tour
+3. `#explain` — Your living war-room dossier — *try: read the cards, they refresh per commit*
+4. `#explain` — The map answers to you (bi-directional hover) — *try: hover a card, watch the city pulse*
+5. `#tl-exit` — Return to the present
+6. *(center)* — ⭐ Now Go Build, President ⭐ — close
 
 ---
 
@@ -168,6 +181,10 @@ e.g. mobile-hidden transport selectors simply don't appear.
 
   // ---- forced step: the user must click the real element to proceed ----
   force: 1,                 // hides Next, shows the "press it ↑" nudge, arms a click listener
+  proceed: 1,               // forced IN-PAGE control (e.g. ▶ play): clicking it advances the tour
+                            //   (go(at+1)) instead of writing RESUME/DONE for a navigation hand-off
+
+  // (without `proceed`, a forced click writes RESUME + DONE — for controls that navigate, like #replay)
 
   // ---- driven step: the Next button performs a navigation ----
   nav:       '/?forge=…',          // where to go

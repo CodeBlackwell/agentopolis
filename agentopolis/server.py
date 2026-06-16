@@ -394,7 +394,9 @@ def _page(request: Request, forge: str | None, embed: bool = False) -> HTMLRespo
         movie = "static" not in qp           # a forged repo plays its history by default; ?static = the quick city
         src = ("/forge-timelapse?url=" if movie else "/forge?url=") + quote(forge, safe="")
     elif auto_city:                          # showcase demo: land on a grow-from-start movie of the pinned city
-        mode, name, movie, demo_movie = "city", showcase["city"], True, True
+        # brand the landing "Agentopolis" (title + social card), not the repo it's built from; the repo id
+        # still keys the data sources and OG cache (og_key below), so warming + serving stay in sync.
+        mode, name, movie, demo_movie = "city", "Agentopolis", True, True
         src = "/city-data.json?repo=" + quote(showcase["city"], safe="")
         timeline_src = "/timeline.json?repo=" + quote(showcase["city"], safe="")
     elif nation["root"]:

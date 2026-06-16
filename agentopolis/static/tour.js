@@ -41,6 +41,7 @@
     .replaceAll('← → to step a commit, or ', '')
     .replaceAll('Press play', 'Tap play').replaceAll('Press the controls', 'Tap the controls')
     .replaceAll('Press ■ live', 'Tap ■ live').replaceAll('Press ▶ Replay', 'Tap ▶ Replay')
+    .replaceAll('Press ▶', 'Tap ▶')
     .replaceAll('Click', 'Tap').replaceAll('click', 'tap')
     .replaceAll('Hover one', 'Tap & hold one').replaceAll('Hover a worker', 'Tap & hold a worker')
     .replaceAll('Hover an agent', 'Tap & hold an agent').replaceAll('Hover a citizen', 'Tap & hold a citizen')
@@ -98,10 +99,10 @@
   ];
   const MOVIE = [
     { center: 1, title: '⭐ THE FOUNDING, REPLAYED ⭐',
-      text: `Roll the reel, ${pres} — the official history of ${city}, rising commit by commit. This is your royal screening room; every lever of the chronicle obeys you here.` },
-    { sel: '#tl-play', title: 'Play & pause the chronicle',
-      text: '▶ Begin or halt the documentary at your pleasure — the ⏮ ⏭ flank it to leap between chapters. History waits for you.',
-      try: 'Press ▶ or tap spacebar — start the reel.' },
+      text: `Behold ${city}, ${pres} — complete, and held in your private screening room. Every lever of the chronicle obeys you here. Permit me to roll its history from the very beginning.` },
+    { sel: '#tl-play', force: 1, proceed: 1, title: 'Roll the reel yourself',
+      text: `The reel waits, paused, on the finished city. Press ▶ and watch ${city} rise again from a single commit — the ⏮ ⏭ flank it to leap between chapters, and you may halt anytime.`,
+      try: 'Press ▶ — start the replay.' },
     { sel: '#tl-seek', title: 'Scrub through the ages',
       text: 'Drag to leap to any era of your reign. The lit tick-marks are chapters — each the moment the city RE-FORMED into a grander shape.',
       try: 'Drag it, ← → to step a commit, or ⏮ ⏭ / , . to hop chapters.' },
@@ -126,13 +127,13 @@
   //      navigation itself (no clone to type), carrying the tour onward to where the explanation cards live. ----
   const DEMO_LAND = [
     { center: 1, title: '⭐ WELCOME TO THE REPUBLIC ⭐',
-      text: `${leader}! Your capital is rebuilding its entire glorious history before your very eyes. Permit your Chief of Staff to narrate the spectacle.` },
+      text: `${leader}! Your capital stands complete before you, ready to rebuild its entire glorious history at your command. Permit your Chief of Staff to narrate the spectacle.` },
+    { sel: '#tl-play', force: 1, proceed: 1, title: 'Press ▶ to begin',
+      text: 'Behold your capital, complete and waiting. Press ▶ and watch it raise itself from a single humble commit into the metropolis it was always destined to become.',
+      try: 'Press ▶ — start the founding.' },
     { sel: '#map', title: 'The founding, replayed',
-      text: 'Watch the city raise itself from a single humble commit into the metropolis it was always destined to become. It plays itself — as all things do, for you.',
+      text: 'There it rises — from a single humble commit toward the metropolis it was always destined to become. It builds itself, as all things do, for you.',
       try: 'Drag, scroll, and spin while it builds.' },
-    { sel: '#transport', title: 'Your screening controls',
-      text: '▶ Play or pause (spacebar), drag to scrub, hop chapters with ⏮ ⏭, set the pace of progress. The chronicle obeys your hand.',
-      try: 'Press play, drag the scrubber, or ⏮ ⏭ to hop chapters.' },
     { sel: '#tl-shape', title: 'Shape the skyline',
       text: 'A grant of taste, Excellency: reshape every building by file family, rarity, size, age — or a tasteful uniform decree. The look of the Republic bends to your whim.',
       try: 'Reshape the skyline — pick a mode.' },
@@ -144,7 +145,10 @@
   ];
   const DEMO_CARDS = [
     { center: 1, title: '⭐ GRAND OPENING ⭐',
-      text: `Behold, ${pres} — ribbon freshly cut, a brand-new town flinging its doors open and raising itself commit by commit in your honor. And now, the briefing you were denied back home...` },
+      text: `Behold, ${pres} — ribbon freshly cut, a brand-new town standing complete with its doors flung open, ready to raise itself commit by commit in your honor. And now, the briefing you were denied back home...` },
+    { sel: '#tl-play', force: 1, proceed: 1, title: 'Raise your new town',
+      text: 'Your freshly-opened town stands complete. Press ▶ to watch it rise from nothing — and the dossier beside it will narrate every district as it appears.',
+      try: 'Press ▶ — raise the city.' },
     { sel: '#explain', title: 'Your living war-room dossier',
       text: 'The dispatch floor yields to your briefing — and it rewrites ITSELF every commit. "Now Playing" names the commit at hand; the ledger counts your holdings; the Formation card reveals the very metrics that CHOSE this city’s shape; and each district reports its strength.',
       try: 'Read the cards — they refresh with every commit.' },
@@ -355,12 +359,13 @@
   }
 
   function arm(target, step) {                                 // pressing the real control carries the tour onward
-    if (target.dataset.tourArmed) return;
-    target.dataset.tourArmed = '1';
-    target.addEventListener('click', () => {                   // capture: runs before the control's own navigation
+    target.removeEventListener('click', target._tourArm, { capture: true });   // re-armable: back-nav / resize re-show
+    target._tourArm = () => {                                  // capture: runs before the control's own handler
+      if (step.proceed) return go(at + 1);                     // an in-page control (▶ play): pressing it advances the tour
       if (step.resume !== false) { localStorage.setItem(RESUME, ctx === 'city' ? 'movie' : '1'); }
-      localStorage.setItem(DONE, '1');                         // the live-city portion is seen; don't re-auto-run it
-    }, { capture: true, once: true });
+      localStorage.setItem(DONE, '1');                         // a hand-off control: it navigates; resume on the next page
+    };
+    target.addEventListener('click', target._tourArm, { capture: true, once: true });
   }
 
   function place(r) {                                          // park the card clear of the spotlit element
@@ -431,6 +436,7 @@
 
   function start() {                                          // dim the screen INSTANTLY, then bring the card in when ready
     if (!ui) build();
+    if (screeningRoom) window.movieRewindForTour?.();          // replay: pause on the finished city so the forced ▶ step replays it
     farewellShown = false;                                     // each run earns its own closing pointer
     ui.block.classList.remove('farewell-dim');
     ui.block.style.display = 'block';

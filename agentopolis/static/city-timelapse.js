@@ -83,9 +83,16 @@ try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');
   buildExplain();                                        // the dispatch floor becomes a live, repo-specific legend
   seek(-1);
   loading.remove();
-  startIntro();                                           // open on the live view's frame, then ease to the village
   speed = autoSpeed();                                    // size the walk to ~45s regardless of repo size (calm, not chaotic)
-  setPlay(true);                                          // a movie plays itself
+  // First-time visitors get the onboarding tour, which opens the city already FINISHED and paused, then
+  // walks the President to ▶ Replay it himself — calmer than a frantic auto-playing reel. Returning
+  // visitors (tour seen) and embeds still autoplay from the empty lot.
+  const embed = document.body.dataset.embed === '1';
+  const tourPending = !embed &&
+    (!!localStorage.getItem('agentopolis-tour-resume') || !localStorage.getItem('agentopolis-tour-done'));
+  if (tourPending) rewindForTour();                       // hold on the finished city, paused & quiet — ▶ replays it
+  else setPlay(true);                                     // a movie plays itself from the empty lot
+  startIntro();                                           // ease the camera in from the live view's frame (no-op without one)
   requestAnimationFrame(loop);
 })().catch(e => { loading.remove(); console.error('timelapse load failed', e); });
 
@@ -620,7 +627,8 @@ function loop(t) {
     if (drawTransition(t)) seek(transition.at);             // settle at full height (seek snaps floors; tween won't regrow)
     last = 0; requestAnimationFrame(loop); return;
   }
-  if (playing && ptr < commits.length - 1) {
+  const cardHeld = pinnedFocus || document.querySelector('#explain .xcard[data-focus]:hover');
+  if (playing && !cardHeld && ptr < commits.length - 1) {  // a hovered / tapped legend card holds the reel for inspection
     if (!last) last = t;
     acc += (t - last) / 1000 * speed;
     last = t;
@@ -676,12 +684,22 @@ function stepIntro(t) {
 }
 
 function setPlay(p) {
-  playing = p; last = 0;
+  playing = p; last = 0; pinnedFocus = null;               // hitting play/pause releases a pinned card
+
   window.MOVIE_PLAYING = p;                                 // hotel.js reads this: agents only go frantic while the reel rolls
   if (p && ptr >= commits.length - 1) seek(-1);          // replay from the start
   document.getElementById('tl-play').innerHTML = playing ? ICONS.pause : ICONS.play;
   if (!p && window.DEMO_MOVIE && ptr >= commits.length - 1) showFinishCTA();   // the demo holds on the finished city
 }
+
+// The onboarding tour opens on the COMPLETE city, paused, then forces the President to press ▶ Replay.
+// Jump to HEAD and pause directly (not via setPlay(false), which at HEAD would pop the demo's finish-CTA).
+function rewindForTour() {
+  seek(commits.length - 1);                                // the finished skyline
+  playing = false; window.MOVIE_PLAYING = false;           // paused → the dispatch floor stays calm
+  document.getElementById('tl-play').innerHTML = ICONS.play;
+}
+window.movieRewindForTour = rewindForTour;                 // tour.js calls this on replay (movie already loaded)
 
 function jumpChapter(dir) {                               // ⏮ / ⏭ and , / . hop between formation transitions
   setPlay(false);
@@ -1043,6 +1061,10 @@ function buildExplain() {
   tipEl = document.createElement('div'); tipEl.id = 'xtip'; document.body.appendChild(tipEl);
   box.addEventListener('mouseover', e => { const c = e.target.closest('.xcard[data-tip]'); if (c) showTip(c); });
   box.addEventListener('mouseout', e => { const c = e.target.closest('.xcard[data-tip]'); if (c && !c.contains(e.relatedTarget)) hideTip(); });
+  box.addEventListener('click', e => {                     // tap a legend card to pin it (mobile select); tap again to release
+    const c = e.target.closest('.xcard[data-focus]');
+    pinnedFocus = c && c.dataset.focus !== pinnedFocus ? c.dataset.focus : null;
+  });
 }
 
 const FORM_TITLE = { village: 'Small Town', acropolis: 'Acropolis', radial: 'Radial', spine: 'Spine',
@@ -1214,9 +1236,11 @@ function fillPolys(c, polys) {                             // one path, nonzero 
 // The hover link runs both ways: a hovered card OR a hovered building/fixture resolves to one focus.
 // `ping` is what pulses on the map; `cards` is the set of data-focus keys whose legend cards raise.
 let mapHit = null;                                         // building / fixture under the mouse on the map
+let pinnedFocus = null;                                    // a tapped legend card (mobile select): holds the reel + highlight
 function activeFocus() {
   const hov = document.querySelector('#explain .xcard[data-focus]:hover');
-  if (hov) return { ping: hov.dataset.focus, cards: new Set([hov.dataset.focus]) };
+  const ping = hov ? hov.dataset.focus : pinnedFocus;     // pinned card drives the highlight on touch (no hover)
+  if (ping) return { ping, cards: new Set([ping]) };
   if (mapHit && mapHit.component) {                        // a building → its district (+ any feature it is)
     const cards = new Set(['district:' + mapHit.component]);
     if (mapHit.hub) cards.add('hub');
@@ -1278,6 +1302,7 @@ tlCanvas.addEventListener('wheel', m => {
     (m.clientX - r.left) * (tlCanvas.width / r.width), (m.clientY - r.top) * (tlCanvas.height / r.height));
 }, { passive: false });
 let drag = null;
+tlCanvas.addEventListener('pointerdown', () => pinnedFocus = null);   // touching the map releases a pinned card
 tlCanvas.addEventListener('mousedown', m => drag = { x: m.clientX, y: m.clientY });
 window.addEventListener('mouseup', () => drag = null);
 window.addEventListener('mousemove', m => {

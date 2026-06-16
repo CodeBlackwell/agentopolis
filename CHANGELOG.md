@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Mobile: tap a dossier legend card in the movie to pin its highlight (and hold the reel
+  for inspection); tap it again, press play/pause, or touch the map to release.
+
+### Changed
+- Onboarding tour now opens the movie/landing on the **finished** city, paused, instead of
+  a frantic auto-playing reel. The first movie step forces a "press ▶" control that replays
+  the history from the first commit. Pausing the reel also calms the dispatch-floor meme.
+  Returning visitors and embeds still autoplay.
+- Showcase demo is rebranded **"Agentopolis"** in the page title and social card (it was
+  named after the repo it's built from), and the demo capital is now **MethodProof**.
+- Social share image (`og-image.png`) refreshed to the current branded landing.
+
 ## [0.17.0] - 2026-06-16
 
 ### Changed

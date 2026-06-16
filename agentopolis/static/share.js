@@ -5,7 +5,7 @@
 (() => {
 const params = new URLSearchParams(location.search);
 const forge = params.get('forge');
-// must match server root()'s og_key: the forge url, else the demo city (SPICE)
+// must match server root()'s og_key: the forge url, else the demo city repo id (window.DEMO_CITY)
 const shareKey = () => forge || window.DEMO_CITY || document.body.dataset.hallName || 'city';
 // /c/owner/repo canonical when this is a github forge, else the plain origin
 const shareUrl = () => {
