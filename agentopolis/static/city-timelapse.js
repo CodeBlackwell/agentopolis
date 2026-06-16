@@ -16,6 +16,16 @@ const citySrc = window.CITY_SRC || 'city-data.json';
 const isForge = citySrc.includes('forge-timelapse');
 window.MOVIE = true;                                      // tell hotel.js to stand down: no dispatch floor in a movie
 document.getElementById('replay')?.remove();             // already in the movie; drop the entry button
+
+// hand the current frame to the live view on exit, so flipping back to live doesn't jump the camera
+const camKey = citySrc.replace(/.*url=([^&]+).*/, 'forge:$1');
+addEventListener('pagehide', () => { try {
+  sessionStorage.setItem('apx-cam', JSON.stringify({ k: camKey, src: 'movie', ox: cam.ox, oy: cam.oy, s: cam.s, rot: cam.rot || 0 }));
+} catch (e) {} });
+// the frame the live view left, if we arrived here from it — drives the opening settle (startIntro)
+let savedCam = null;
+try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');
+  if (c && c.k === camKey && c.src === 'live') savedCam = c; } catch (e) {}
 const loading = showLoading();
 
 (async () => {
@@ -46,6 +56,7 @@ const loading = showLoading();
   buildExplain();                                        // the dispatch floor becomes a live, repo-specific legend
   seek(-1);
   loading.remove();
+  startIntro();                                           // open on the live view's frame, then ease to the village
   speed = autoSpeed();                                    // size playback to ~finish in 20s regardless of repo size
   setPlay(true);                                          // a movie plays itself
   requestAnimationFrame(loop);
@@ -320,6 +331,7 @@ function centerOn(c, gx, gy, bias = 30) {                 // keep grid point (gx
 // schedule each building's collapse/rise wave with planWaves, and zoom the camera from the old
 // formation's scale to the new one. Only buildings alive at the boundary take part.
 function beginTransition(fromE, toE, at) {
+  intro = null;                                            // a formation re-form owns the camera; drop any opening settle
   const fs = layouts[fromE].state, ts = layouts[toE].state;
   const dx = ts.origin.x - fs.origin.x, dy = ts.origin.y - fs.origin.y;     // old coords → new frame
   const fromAlive = new Set(layouts[fromE].ep.buildingsAlive);
@@ -518,6 +530,7 @@ function loop(t) {
     if (ptr >= commits.length - 1) setPlay(false);
   } else { last = 0; }
   if (!transition) {
+    if (intro) stepIntro(t);
     tween(t);
     tlCtx.clearRect(0, 0, tlCanvas.width, tlCanvas.height);
     City.draw(tlCtx, cam, state, t);
@@ -527,6 +540,30 @@ function loop(t) {
     syncScroll(af.ping);                                   // reveal that card if the map hover scrolled it off
   }
   requestAnimationFrame(loop);
+}
+
+// ---- live→movie opening settle: one continuous camera across the reload, not a hard cut ----
+// Open on the frame the live view left, then ease pan+zoom to the movie's natural village fit. Rotation
+// is a discrete viewing orientation, so it's adopted outright (the movie just plays at that angle) — only
+// pan and zoom glide. A formation crossing supersedes the settle (beginTransition clears it).
+let intro = null, introLast = 0;
+function startIntro() {
+  if (!savedCam) return;
+  cam.rot = savedCam.rot;
+  City.fit(cam, tlCanvas, state, 150, 30, 1.18);          // recentre the village for the adopted orientation = target
+  intro = { fx: savedCam.ox, fy: savedCam.oy, fs: savedCam.s, tx: cam.ox, ty: cam.oy, ts: cam.s, t: 0 };
+  cam.ox = savedCam.ox; cam.oy = savedCam.oy; cam.s = savedCam.s;   // ...but start where the live view left off
+  introLast = 0;
+}
+function stepIntro(t) {
+  if (!introLast) introLast = t;
+  intro.t = Math.min(1, intro.t + (t - introLast) / 700);
+  introLast = t;
+  const u = ease(intro.t);
+  cam.ox = intro.fx + (intro.tx - intro.fx) * u;
+  cam.oy = intro.fy + (intro.ty - intro.fy) * u;
+  cam.s = intro.fs + (intro.ts - intro.fs) * u;
+  if (intro.t >= 1) intro = null;
 }
 
 function setPlay(p) {
@@ -539,10 +576,12 @@ function setPlay(p) {
 function buildTransport() {
   // the bar lives in the map frame's flow, just below the canvas; the canvas yields a fixed strip for it
   // so the single view never scrolls. Fixed outer width + ellipsis label keep it from jittering per frame.
-  const css = `.mapwrap.tl-mode{flex-direction:column;gap:8px}
-    .mapwrap.tl-mode #map{max-height:calc(100% - 56px)}
-    .mapwrap.tl-mode #forge{top:12px;bottom:auto}   /* the transport owns the bottom strip — float the forge box up top */
-    #transport{flex:0 0 auto;align-self:center;width:min(680px,100%);box-sizing:border-box;
+  // exit mirrors the entry: a local repo's movie returns to its live city, a forge returns to its quick
+  // static city. A marathon is a curated playlist with no single live counterpart, so it gets no exit.
+  const fm = citySrc.match(/url=([^&]+)/);
+  const liveHref = fm ? '/?forge=' + fm[1] + '&static'
+    : new URLSearchParams(location.search).has('marathon') ? null : '/';
+  const css = `#transport{flex:0 0 auto;align-self:center;width:min(680px,100%);box-sizing:border-box;
     display:flex;align-items:center;gap:10px;padding:7px 12px;background:rgba(42,16,36,.9);
     border:2px solid var(--gold);box-shadow:3px 3px 0 var(--plum);font-family:'Silkscreen',monospace;
     color:var(--cream);font-size:10px}
@@ -551,7 +590,8 @@ function buildTransport() {
     #tl-seek{flex:3 1 auto;min-width:120px;accent-color:var(--gold)}
     #transport input[type=range]{accent-color:var(--gold)}
     #transport select{flex:0 0 auto;background:var(--plum-soft);color:var(--cream);border:1px solid var(--gold);font:inherit}
-    #tl-label{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}`;
+    #tl-label{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}
+    #tl-exit{width:auto;padding:0 9px}`;
   document.head.appendChild(document.createElement('style')).textContent = css;
   const bar = document.createElement('div');
   bar.id = 'transport';
@@ -565,7 +605,8 @@ function buildTransport() {
     `<select id="tl-trans" title="how the city re-forms between formations">` +
        TRANSITION_MODES.map(m => `<option value="${m}"${m === transMode ? ' selected' : ''}>${m}</option>`).join('') +
     `</select>` +
-    `<span id="tl-label"></span>`;
+    `<span id="tl-label"></span>` +
+    (liveHref ? `<button id="tl-exit" title="back to the live city">&#9632; live</button>` : '');
   const wrap = document.querySelector('.mapwrap');
   wrap.classList.add('tl-mode');                          // column layout: canvas on top, bar in the strip below
   wrap.appendChild(bar);
@@ -576,6 +617,7 @@ function buildTransport() {
   slider.oninput = () => { setPlay(false); seek(+slider.value); };
   bar.querySelector('#tl-speed').onchange = e => speed = e.target.value === 'auto' ? autoSpeed() : +e.target.value;
   bar.querySelector('#tl-trans').onchange = e => transMode = e.target.value;
+  if (liveHref) bar.querySelector('#tl-exit').onclick = () => location.href = liveHref;
 }
 
 function buildLegend(data) {

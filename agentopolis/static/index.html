@@ -183,6 +183,12 @@
 
   #forge { display: none; position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 9; }
   body[data-mode="nation"] #forge, body[data-demo="1"] #forge { display: block; }
+  /* movie mode (.tl-mode set by the timelapse engine): the transport bar owns the bottom strip, so the
+     shell re-lays the map frame here. One place owns movie-mode overlay layout — add overlays here, not
+     as per-collision CSS patches injected from JS. */
+  .mapwrap.tl-mode { flex-direction: column; gap: 8px; }
+  .mapwrap.tl-mode #map { max-height: calc(100% - 56px); }
+  .mapwrap.tl-mode #forge { top: 12px; bottom: auto; }
   .demo-only { display: none; }
   body[data-demo="1"] .demo-only { display: block; }
   .demo-only a { color: var(--gold); text-decoration: none; }

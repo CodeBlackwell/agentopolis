@@ -4,6 +4,14 @@ const cityCtx = cityCanvas.getContext('2d');
 const cityCam = { ox: 0, oy: 0, s: 1 };
 let cityState = null;
 
+// carry the camera across the live↔movie reload so flipping modes doesn't jump the view. Keyed by city
+// (the forge url, else the data source) so a different city never inherits the wrong frame. The movie
+// reframes itself each formation, so only the live view — which fits once then holds — restores.
+const camKey = (window.CITY_SRC || 'city-data.json').replace(/.*url=([^&]+).*/, 'forge:$1');
+addEventListener('pagehide', () => { try {
+  sessionStorage.setItem('apx-cam', JSON.stringify({ k: camKey, src: 'live', ox: cityCam.ox, oy: cityCam.oy, s: cityCam.s, rot: cityCam.rot || 0 }));
+} catch (e) {} });
+
 fetch(window.CITY_SRC || 'city-data.json').then(r => r.json()).then(data => {
   cityState = City.layout(data);
   if (typeof startDemoLoop === 'function') startDemoLoop(data.buildings);
@@ -26,6 +34,8 @@ fetch(window.CITY_SRC || 'city-data.json').then(r => r.json()).then(data => {
   }
   citySampleNote(data);
   City.fit(cityCam, cityCanvas, cityState, 115, 30, 1.18);
+  try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');   // keep the frame carried from the movie
+    if (c && c.k === camKey) { cityCam.ox = c.ox; cityCam.oy = c.oy; cityCam.s = c.s; cityCam.rot = c.rot; } } catch (e) {}
   requestAnimationFrame(function frame(t) {
     cityCtx.clearRect(0, 0, cityCanvas.width, cityCanvas.height);
     City.draw(cityCtx, cityCam, cityState, t);
