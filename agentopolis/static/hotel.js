@@ -267,8 +267,8 @@ function* buildScript(buildings) {
 let demoTimer = null;
 window.startDemoLoop = startDemoLoop;            // city-live.js / nation.js (separate scopes) trigger it
 function startDemoLoop(buildings, opts = {}) {
-  const forced = new URLSearchParams(location.search).has('demo');
-  if (location.hostname === 'localhost' && !forced) return;   // local real-hook use: stay quiet
+  const forced = new URLSearchParams(location.search).has('demo') || window.DEMO_MOVIE;
+  if (location.hostname === 'localhost' && !forced) return;   // local real-hook use: stay quiet (but the showcase meme floor animates)
   if (demoTimer) clearTimeout(demoTimer);        // restart on the newly-focused city's buildings
   const script = buildScript(buildings || []);
   const fast = opts.interval || 2600;

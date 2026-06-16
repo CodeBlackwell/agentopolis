@@ -149,12 +149,14 @@ e.g. mobile-hidden transport selectors simply don't appear.
 8. `#tl-exit` — Return to the present (■ live)
 9. *(center)* — ⭐ Long Live the President ⭐ — close
 
-### `demo-land` (5 steps) — the hosted demo's hero movie (opens finished + paused)
+### `demo-land` (7 steps) — the hosted demo's hero movie (opens finished + paused)
 1. *(center)* — ⭐ Welcome to the Republic ⭐
 2. `#tl-play` — **forced + `proceed`** — "press ▶ to begin" → raises the city from the first commit, advances the tour
 3. `#map` — The founding, replayed — *try: drag, scroll, spin while it builds*
-4. `#tl-shape` — Shape the skyline — *try: pick a mode*
-5. `#forge` — A leader BUILDS — **driven**: types a URL into the forge, then navigates (see below)
+4. `#hotel` — The tireless workforce (dispatch floor; agents speed up while the reel rolls) — *try: hover a worker*
+5. `#ticker` — The State Record (the agent actions log)
+6. `#tl-shape` — Shape the skyline — *try: pick a mode*
+7. `#forge` — A leader BUILDS — **driven**: types a URL into the forge, then navigates (see below)
 
 ### `demo-cards` (6 steps) — resumes on the demo forge result, where cards render
 1. *(center)* — ⭐ Grand Opening ⭐

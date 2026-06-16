@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Tour no longer crashes on a first visit to the movie/landing: `movieRewindForTour()` is
+  now a no-op until the reel has loaded, so the auto-run tour shows instead of aborting.
+- The showcase agent-meme dispatch floor (and its action log) now animates on localhost
+  (`just landing`), matching the hosted demo, instead of staying frozen.
+
+### Added
+- Demo-land tour gained steps for the dispatch floor (the speedy agents) and the agent
+  actions log (the State Record).
+
 ## [0.18.0] - 2026-06-16
 
 ### Added

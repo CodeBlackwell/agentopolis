@@ -695,6 +695,7 @@ function setPlay(p) {
 // The onboarding tour opens on the COMPLETE city, paused, then forces the President to press ▶ Replay.
 // Jump to HEAD and pause directly (not via setPlay(false), which at HEAD would pop the demo's finish-CTA).
 function rewindForTour() {
+  if (!commits.length || !layouts.length) return;          // loader not done yet — the load-gate handles the first-visit pause
   seek(commits.length - 1);                                // the finished skyline
   playing = false; window.MOVIE_PLAYING = false;           // paused → the dispatch floor stays calm
   document.getElementById('tl-play').innerHTML = ICONS.play;
