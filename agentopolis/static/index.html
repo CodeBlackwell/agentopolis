@@ -178,6 +178,9 @@
   .mapwrap.tl-mode { flex-direction: column; gap: 8px; }
   .mapwrap.tl-mode #map { height: auto; flex: 1; min-height: 0; }
   .mapwrap.tl-mode #forge { top: 12px; bottom: auto; }
+  /* the transport bar owns the bottom strip in a movie; the stats button (mobile) would overlap it,
+     and the movie's dock already shows this repo's legend — so drop it here */
+  .mapwrap.tl-mode #drawer-btn { display: none; }
   /* demo movie's end card: a headline above the forge box (which drops to make room) so "↓" points at it */
   #tl-cta { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 9;
             text-align: center; font-family: 'Silkscreen', monospace; color: var(--cream);

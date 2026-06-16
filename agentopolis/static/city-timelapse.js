@@ -607,7 +607,11 @@ function buildTransport() {
     #transport input[type=range]{accent-color:var(--gold)}
     #transport select{flex:0 0 auto;background:var(--plum-soft);color:var(--cream);border:1px solid var(--gold);font:inherit}
     #tl-label{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}
-    #tl-exit{width:auto;padding:0 9px}`;
+    #tl-exit{width:auto;padding:0 9px}
+    /* phones: trim to the video-player essentials (play / scrub / speed / exit), bigger touch targets */
+    @media (max-width:720px){#transport{gap:7px;padding:8px 10px;font-size:11px}
+      #transport button{width:40px;height:36px}#tl-trans,#tl-label{display:none}
+      #tl-seek{min-width:90px}#tl-exit{padding:0 12px}}`;
   document.head.appendChild(document.createElement('style')).textContent = css;
   const bar = document.createElement('div');
   bar.id = 'transport';
@@ -759,6 +763,8 @@ function renderExplain(shown, i) {
   const onFoot = amb('walker'), cars = amb('traffic'), boats = amb('boat'), stalls = amb('stall'), crows = amb('crow');
   const stat = (l, v) => `<div class="stat-cell"><span class="stat-label">${l}</span><span class="stat-value">${v}</span></div>`;
   const cards = [];
+  if (c) cards.push(card('Now Playing', `<span class="em">${esc(new Date(c.ts * 1000).toLocaleDateString())}</span> · ${esc(c.author)}`
+    + ` · ${pl(c.files.length, 'file')} changed<br>"${esc(c.subject)}"`));   // always first: the commit driving this frame
   cards.push(`<div class="xcard live"><h5>${esc(state.zone.repo || 'city')} · live</h5><div class="stat-grid">`
     + stat('commit', `${i + 1}/${commits.length}`) + stat('date', c ? new Date(c.ts * 1000).toLocaleDateString() : '—')
     + stat('buildings', shown.length) + stat('lines', loc.toLocaleString())
@@ -777,8 +783,6 @@ function renderExplain(shown, i) {
   if (onFoot || cars) cards.push(card('Street Life', `<span class="em">${pl(onFoot, 'resident')}</span> out on foot and <span class="em">${pl(cars, 'car')}</span> on the roads — both thicken in the districts touched most recently.`, null, 'street'));
   if (stalls) cards.push(card('Market', `${pl(stalls, 'stall')} ring the plaza — one per district still seeing active commits.`, null, 'stall'));
   if (boats) cards.push(card('Canal Traffic', `${pl(boats, 'boat')} work the canals that divide the data-flow layers.`, null, 'boat'));
-  if (c) cards.push(card('Now Playing', `<span class="em">${esc(new Date(c.ts * 1000).toLocaleDateString())}</span> · ${esc(c.author)}`
-    + ` · ${pl(c.files.length, 'file')} changed<br>"${esc(c.subject)}"`));
   box.innerHTML = cards.join('');
 }
 
