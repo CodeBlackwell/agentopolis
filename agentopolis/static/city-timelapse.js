@@ -541,6 +541,7 @@ function buildTransport() {
   // so the single view never scrolls. Fixed outer width + ellipsis label keep it from jittering per frame.
   const css = `.mapwrap.tl-mode{flex-direction:column;gap:8px}
     .mapwrap.tl-mode #map{max-height:calc(100% - 56px)}
+    .mapwrap.tl-mode #forge{top:12px;bottom:auto}   /* the transport owns the bottom strip — float the forge box up top */
     #transport{flex:0 0 auto;align-self:center;width:min(680px,100%);box-sizing:border-box;
     display:flex;align-items:center;gap:10px;padding:7px 12px;background:rgba(42,16,36,.9);
     border:2px solid var(--gold);box-shadow:3px 3px 0 var(--plum);font-family:'Silkscreen',monospace;

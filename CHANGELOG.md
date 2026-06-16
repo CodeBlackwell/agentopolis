@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] - 2026-06-16
+
+### Fixed
+- On the hosted demo, the "paste a github url" forge box and the movie transport
+  bar both sat at the bottom-center and overlapped. The forge box now floats to
+  the top while a movie plays, so the transport owns the bottom strip cleanly.
+
 ## [0.11.0] - 2026-06-16
 
 ### Added
