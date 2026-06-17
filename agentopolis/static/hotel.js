@@ -219,6 +219,7 @@ attachTouch(canvas, {
   pan: (dx, dy) => { hallCam.ox += dx; hallCam.oy += dy; tooltip.style.display = 'none'; },
   pinch: (k, mx, my) => hallZoom(k, mx, my),
   hold: tipAt,
+  onePan: false,                                  // 1-finger scrolls the page; pinch still zooms the floor
 });
 
 const lamp = document.getElementById('lamp');

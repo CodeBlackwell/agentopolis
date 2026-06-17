@@ -1,10 +1,11 @@
 """agentopolis — see any repo as a living isometric city: watch Claude Code agents build it live,
-replay its git history as a time-lapse movie, or crawl a folder of repos to find the best movies."""
+or replay its git history as a time-lapse movie (one repo, or a marathon of a whole folder)."""
 import argparse
 import subprocess
 import threading
 import time
 import webbrowser
+from importlib.metadata import version
 from pathlib import Path
 
 import uvicorn
@@ -28,7 +29,7 @@ def repo_problem(repo: str) -> str | None:
                 f"\n        {path}\n"
                 f"\n     Try one of these:\n"
                 f"       • cd into a git repo, then run:  agentopolis\n"
-                f"       • point at a repo:               agentopolis --repo /path/to/repo\n"
+                f"       • point at a repo:               agentopolis /path/to/repo\n"
                 f"       • map a folder of repos:         agentopolis --root /path/to/projects\n"
                 f"       • play any github repo's movie:  agentopolis movie https://github.com/owner/repo\n"
                 f"\n     Starting fresh? Run `git init` and make a commit first.\n")
@@ -82,32 +83,36 @@ def serve(port: int) -> None:
         pass
 
 
+COMMANDS = ("serve", "movie", "marathon", "attach", "detach")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="agentopolis",
         description="See any repo as a living isometric city — watch Claude Code agents build it live, "
-                    "replay its git history as a time-lapse movie, or crawl a folder of repos for the "
-                    "best movies.")
+                    "or replay its git history as a time-lapse movie.")
     parser.add_argument("command", nargs="?", default="serve",
-                        choices=["serve", "movie", "marathon", "crawl", "attach", "detach", "."],
-                        help="serve the live city (default), `.` to serve with hooks auto-attached + removed "
-                             "on exit, play one repo's movie, run a marathon of every repo's movie, crawl a "
-                             "folder for the best movies, or attach/detach hooks")
+                        help="serve the live city (default — also auto-reports Claude Code sessions), "
+                             "play one repo's movie, run a marathon of every repo's movie, or attach/detach "
+                             "hooks for good. A bare path serves that repo: `agentopolis /path/to/repo`")
     parser.add_argument("target", nargs="?",
-                        help="for `movie`: a local repo dir or a github url; for `marathon`/`crawl`: a "
-                             "folder of repos to scan (default: current dir)")
-    parser.add_argument("--json", action="store_true", help="for `crawl`: emit results as JSON")
+                        help="for `movie`: a local repo dir or a github url; for `marathon`: a folder of "
+                             "repos to scan (default: current dir)")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {version('agentopolis')}")
+    parser.add_argument("--list", action="store_true", help="for `marathon`: rank the repos as a table instead of playing them")
+    parser.add_argument("--json", action="store_true", help="for `marathon --list`: emit the ranking as JSON")
     parser.add_argument("--top", type=int, help="for `marathon`: cap the playlist to the top N movies")
-    parser.add_argument("--repo", default=".", help="git repo to map as the city (default: cwd)")
+    parser.add_argument("--repo", default=".", help="git repo to map (default: cwd; or pass it as a bare path)")
     parser.add_argument("--zone", help="zoning manifest (default: <repo>/.agentopolis.json, else auto-zoned)")
     parser.add_argument("--root", help="map every git repo under this dir as a nation of cities")
     parser.add_argument("--showcase", help="serve a baked showcase dir (nation fixtures, no live git)")
     parser.add_argument("--port", type=int, default=4242)
     parser.add_argument("--no-open", action="store_true", help="don't open the city in a browser")
     args = parser.parse_args()
-    auto_hooks = args.command == "."     # `agentopolis .` — attach on start, serve, detach on exit (zero setup)
-    if auto_hooks:
-        args.command = "serve"
+    if args.command not in COMMANDS:                     # a bare path → serve that repo (`agentopolis ~/code/x`)
+        args.repo, args.command = args.command, "serve"
+    elif args.command == "serve" and args.target:        # explicit `agentopolis serve ~/code/x`
+        args.repo = args.target
 
     if args.command == "attach":
         hooks.attach(args.port)
@@ -115,23 +120,23 @@ def main() -> None:
     if args.command == "detach":
         hooks.detach()
         return
-    if args.command == "crawl":
-        run_crawl(args.target or ".", args.json)
-        return
     if args.command == "marathon":
-        run_marathon(args.target or ".", args.port, args.no_open, args.top)
+        if args.list:
+            run_crawl(args.target or ".", args.json)
+        else:
+            run_marathon(args.target or ".", args.port, args.no_open, args.top)
         return
 
-    open_path, label = "", "City"                        # open_path is appended to the base url in the browser
+    open_path, label, live = "", "City", False          # open_path is appended to the base url; live → auto-hooks
     if args.command == "movie":
         if not configure_movie(args):                    # prints a friendly note + returns False on bad target
             return
         target = args.target or args.repo
         open_path = ("/?forge=" + quote(target, safe="")) if is_url(target) else "/?timelapse"
-        where, root, label = f"movie: {target}", False, "Movie"
+        where, label = f"movie: {target}", "Movie"
     elif args.showcase:
         server.configure_showcase(args.showcase)
-        where, root = f"showcase: {args.showcase}", True
+        where = f"showcase: {args.showcase}"
     elif not valid_target(args):                         # nothing to map → friendly note, no blank city
         return
     else:
@@ -139,17 +144,17 @@ def main() -> None:
         root = args.root or (nation.is_mother(args.repo) and args.repo)   # a mother repo is a nation
         if root:
             server.configure_nation(root, None)
-        where, label = (f"nation: {root}", "Nation") if root else (f"repo: {args.repo}", "City")
+        where, label, live = (f"nation: {root}", "Nation", True) if root else (f"repo: {args.repo}", "City", True)
 
-    auto_attached = auto_hooks and not hooks.is_attached()   # only detach hooks WE added, not a manual attach
+    # the live city auto-attaches hooks for this run only, detaching on exit — unless they're already
+    # attached for good (`agentopolis attach`), in which case we leave the user's config untouched
+    auto_attached = live and not hooks.is_attached()
     if auto_attached:
         hooks.attach(args.port)
 
     free_port(args.port)
     url = f"http://localhost:{args.port}"
     print(f"Agentopolis {label} on {url} ({where})")
-    if args.command != "movie" and not hooks.is_attached():
-        print("tip: run `agentopolis attach` (or `agentopolis .`) so Claude Code sessions report to the city")
     if not args.no_open:
         opener = threading.Timer(1, lambda: webbrowser.open(url + open_path))
         opener.daemon = True

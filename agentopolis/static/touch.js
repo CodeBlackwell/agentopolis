@@ -2,7 +2,9 @@
 // quick tap (drill), long-press (tooltip). Touches are translated to canvas space
 // with the same ratio the mouse handlers use, so each engine reuses its own camera
 // and hit-test math. Additive — the desktop mouse/wheel handlers stay untouched.
-function attachTouch(canvas, { pan, pinch, twist, tap, hold }) {
+// onePan=false leaves single-finger drags to the browser (so the page can scroll over the canvas) while
+// still handling two-finger pinch/twist and long-press — used by the dispatch floor on phones.
+function attachTouch(canvas, { pan, pinch, twist, tap, hold, onePan = true }) {
   const TAP_MS = 300, HOLD_MS = 500, MOVE = 6, TWIST_STEP = Math.PI / 4;   // 45° = one of the 8 city rotations
   const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
   const angle = (a, b) => Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
@@ -10,7 +12,7 @@ function attachTouch(canvas, { pan, pinch, twist, tap, hold }) {
   const clearHold = () => { clearTimeout(holdTimer); holdTimer = null; };
 
   canvas.addEventListener('touchstart', e => {
-    e.preventDefault();
+    if (e.touches.length === 2 || onePan) e.preventDefault();   // 1-finger left to the browser when !onePan
     moved = false; startT = e.timeStamp; clearHold();
     if (e.touches.length === 2) { pinchDist = dist(e.touches[0], e.touches[1]);
       lastAngle = angle(e.touches[0], e.touches[1]); twistAcc = 0; last = null; return; }
@@ -21,7 +23,7 @@ function attachTouch(canvas, { pan, pinch, twist, tap, hold }) {
   }, { passive: false });
 
   canvas.addEventListener('touchmove', e => {
-    e.preventDefault();
+    if (e.touches.length === 2 || onePan) e.preventDefault();   // a 1-finger drag scrolls the page when !onePan
     const r = canvas.getBoundingClientRect(), kx = canvas.width / r.width, ky = canvas.height / r.height;
     if (e.touches.length === 2) {
       const d = dist(e.touches[0], e.touches[1]);
@@ -41,7 +43,7 @@ function attachTouch(canvas, { pan, pinch, twist, tap, hold }) {
     const t = e.touches[0];
     if (!last) return;
     if (Math.hypot(t.clientX - last.x, t.clientY - last.y) > MOVE) { moved = true; clearHold(); }
-    if (moved && pan) pan((t.clientX - last.x) * kx, (t.clientY - last.y) * ky);
+    if (onePan && moved && pan) pan((t.clientX - last.x) * kx, (t.clientY - last.y) * ky);
     last = { x: t.clientX, y: t.clientY };
   }, { passive: false });
 

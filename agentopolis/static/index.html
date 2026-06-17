@@ -264,6 +264,8 @@
     /* keep the stats button pinned while the page scrolls (the build CTA is pinned in its own rule below,
        which sets its offsets) */
     #drawer-btn { position: fixed; }
+    /* the dispatch floor lets a 1-finger drag scroll the page (pinch still zooms it via JS) */
+    #hotel { touch-action: pan-y; }
     header p:not(.demo-only) { display: none; }   /* mouse/wheel/Q-E hints don't apply on touch */
     /* keep the "explore the nation" banner to one tidy line so it clears the city's canvas labels */
     header p.demo-only { font-size: 10px; letter-spacing: .08em; white-space: nowrap; }

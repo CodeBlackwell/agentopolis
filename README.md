@@ -34,7 +34,7 @@ zero-config, and the live view never so much as taps Claude Code on the shoulder
 
 ### Two ways to use it
 
-- **🖥️ A live "screensaver" for your coding sessions.** Park `agentopolis .` on
+- **🖥️ A live "screensaver" for your coding sessions.** Park `agentopolis` on
   a spare monitor and your codebase turns into a city you watch get built in real
   time — workers scurry between stations as agents run tools, scaffolding snaps
   around the file you're editing, and every `git commit` cuts the scaffold loose
@@ -60,7 +60,7 @@ zero-config, and the live view never so much as taps Claude Code on the shoulder
 - [Modes](#modes)
   - [Live hooks](#live-hooks)
   - [Movie mode](#movie-mode)
-  - [Crawl & marathon](#crawl--marathon)
+  - [Marathon](#marathon)
 - [Sharing & embedding](#sharing--embedding)
 - [Onboarding tour](#onboarding-tour)
 - [Zoning](#zoning)
@@ -84,12 +84,13 @@ dependencies.
 ```bash
 cd ~/code/any-repo
 
-agentopolis .                      # live: hooks attached, city on :4242, hooks removed on exit
+agentopolis                        # live: city on :4242, Claude Code sessions auto-report (this run only)
+agentopolis ~/code/other-repo      # …or point at any repo
 agentopolis movie                  # replay this repo's git history as a growing city
 agentopolis movie ../other-repo    # …or any local repo
 agentopolis movie https://github.com/owner/repo   # …or any public github repo
-agentopolis crawl ~/code           # rank a folder of repos by movie potential
 agentopolis marathon ~/code        # play every repo's movie back-to-back
+agentopolis marathon ~/code --list # …or just rank them by movie potential
 ```
 
 Open <http://localhost:4242>, fire up any Claude Code session, and watch it stroll
@@ -102,13 +103,13 @@ whole show.
 
 ### 🖥️ As a live screensaver of your agents
 
-Run it right in the repo you're hacking on. The one-shot form clips the hooks on
+Run it right in the repo you're hacking on. By default it clips the hooks on
 when it starts and tidies them away when you quit — fire-and-forget, nothing to
 clean up:
 
 ```bash
 cd ~/code/my-project
-agentopolis .                  # serve on :4242, hooks attached for this run only
+agentopolis                    # serve on :4242, hooks attached for this run only
 ```
 
 Pin <http://localhost:4242> on a second monitor and code with Claude Code like
@@ -162,9 +163,9 @@ Can't decide which repo is the blockbuster? Let Agentopolis scout the talent,
 then screen the whole lineup back-to-back:
 
 ```bash
-agentopolis crawl ~/code           # score every repo by movie potential
 agentopolis marathon ~/code        # auto-advancing reel, best first
 agentopolis marathon ~/code --top 5
+agentopolis marathon ~/code --list # score every repo by movie potential, no playback
 ```
 
 ## The two views
@@ -211,21 +212,22 @@ they're busy with.
 
 | Command | What it does |
 |---|---|
-| `agentopolis` / `agentopolis attach` | Serve the live city; attach hooks once so every new Claude Code session reports in |
-| `agentopolis .` | Zero-setup one-shot — attach hooks on start, serve, remove them on exit (Ctrl+C) |
+| `agentopolis` | Serve the live city; attach hooks for this run only, removed on exit (zero setup) |
+| `agentopolis <repo>` | Same, but map a repo other than the current dir |
 | `agentopolis movie [target]` | Replay a repo's git history as a city that grows and re-forms commit by commit |
-| `agentopolis crawl <folder>` | Rank every repo in a folder by movie potential (formation ladder, history length, deletions) |
 | `agentopolis marathon <folder>` | Grab every repo's movie and play them best-first in one auto-advancing reel |
+| `agentopolis marathon <folder> --list` | Rank the repos by movie potential (formation ladder, history length, deletions) without playing them |
 | `agentopolis --root <folder>` | Map every git repo under a folder as a **nation** of cities on a world map |
+| `agentopolis attach` / `detach` | Wire the hooks into `settings.json` for good (across every session), or pull them back out |
 
 ### Live hooks
 
-`agentopolis .` is the lazy genius path — it clips the Claude
+By default `agentopolis` is the lazy genius path — it clips the Claude
 Code hooks on at startup and whisks them away when you quit, and it's polite
 enough to leave a prior manual `agentopolis attach` alone. Want the hooks to
-stick around? `agentopolis attach` wires them once (and stashes a backup of
-`settings.json` first), `agentopolis` then just serves, and `agentopolis detach`
-pulls them back out.
+stick around across every session, even when the city isn't running?
+`agentopolis attach` wires them once (and stashes a backup of `settings.json`
+first), and `agentopolis detach` pulls them back out.
 
 ### Movie mode
 
@@ -235,11 +237,12 @@ shredded the instant seeding is done) and the city lives entirely in memory. Run
 it outside a git repo and Agentopolis won't sulk with a blank map — it'll kindly
 point you at one instead.
 
-### Crawl & marathon
+### Marathon
 
-Both run fully local and offline, and cache per repo+HEAD so the
-encore is instant. `--top N` trims a marathon playlist to the headliners; `--json`
-spits crawl results out as JSON.
+Runs fully local and offline, and caches per repo+HEAD so the encore is instant.
+`--top N` trims the playlist to the headliners. `--list` skips playback and just
+ranks the repos by movie potential as a table, and `--list --json` emits that
+ranking as JSON.
 
 ## Sharing & embedding
 
@@ -272,7 +275,7 @@ the components, layers, and floating clouds (see
 Agentopolis happily zones the place itself from your top-level directories. Point
 at a custom manifest with `--zone`.
 
-The rest of the knobs: `--repo` (which repo to map, default cwd), `--port`
+The rest of the knobs: a bare path or `--repo` (which repo to map, default cwd), `--port`
 (default 4242), `--no-open` (skip the browser pop), `--showcase` (serve baked
 nation fixtures with no live git).
 

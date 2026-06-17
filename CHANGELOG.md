@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-06-16
+
+### Added
+- `agentopolis <path>` — a bare path now serves that repo's city directly (no `--repo` needed).
+- `agentopolis --version` prints the installed version.
+- `agentopolis marathon --list` ranks a folder's repos as a table (add `--json` for JSON).
+
+### Changed
+- The live city now auto-attaches Claude Code hooks for the run and detaches on exit (unless
+  you've attached them for good with `agentopolis attach`) — so a Claude Code session reports
+  to the floor with zero setup. The old `agentopolis .` one-shot is folded into the default.
+- Mobile dispatch floor: a one-finger drag now scrolls the page instead of panning the floor;
+  pinch still zooms it.
+
+### Removed
+- `agentopolis crawl` — replaced by `agentopolis marathon --list`.
+- `agentopolis .` — the default `agentopolis` now does the same zero-setup auto-hook run.
+
 ## [0.19.0] - 2026-06-16
 
 ### Added

@@ -261,7 +261,7 @@ def test_build_nation_seeds_a_real_workspace(workspace, monkeypatch):
     assert {c["repo"] for c in nat["cities"]} == {"alpha", "beta"}
 
 
-# ---- survey: the movie scorer, reached through `crawl` (its cli entry) --------
+# ---- survey: the movie scorer, reached through `marathon --list` (its cli entry) --
 
 def test_evaluate_scores_a_repo_with_history(history_repo, monkeypatch):
     monkeypatch.setattr(forge, "disk_cache", False)
@@ -273,7 +273,7 @@ def test_evaluate_scores_a_repo_with_history(history_repo, monkeypatch):
 
 def test_crawl_command_ranks_repos_as_a_table(history_repo, capsys, monkeypatch):
     monkeypatch.setattr(forge, "disk_cache", False)
-    cli.run_crawl(history_repo, as_json=False)           # the `agentopolis crawl` path
+    cli.run_crawl(history_repo, as_json=False)           # the `agentopolis marathon --list` path
     out = capsys.readouterr().out
     assert "movie potential" in out and "best:" in out
 
@@ -366,7 +366,7 @@ def test_main_routes_subcommands_without_booting_a_server(monkeypatch):
     monkeypatch.setattr(cli, "run_crawl", lambda root, as_json: calls.setdefault("crawl", (root, as_json)))
     for argv, key in ([["agentopolis", "attach"], "attach"],
                       [["agentopolis", "detach"], "detach"],
-                      [["agentopolis", "crawl", "somedir", "--json"], "crawl"]):
+                      [["agentopolis", "marathon", "somedir", "--list", "--json"], "crawl"]):
         monkeypatch.setattr("sys.argv", argv)
         cli.main()
     assert calls == {"attach": 4242, "detach": True, "crawl": ("somedir", True)}
