@@ -13,8 +13,13 @@ const TOOL_STATION = {
 };
 const HAIR = ['#2d1b12', '#6b3e1e', '#c9a227', '#3a3a3a'];
 const MOVIE = !!window.DEMO_MOVIE;
-const frantic = () => MOVIE && !!window.MOVIE_PLAYING;   // the meme: cranked only while the timelapse is actually playing
-const speed = () => frantic() ? 8 : 3.2;                 // calm 3.2 when paused / outside the movie
+const CALM_MS = 2600;                                    // normal dispatch cadence: a live city, or a finished/idle reel
+// The floor tracks the reel's transport: play → speedy, pause → frozen still, complete → normal calm.
+// Outside a movie (live city / nation) it's always 'live' = normal calm.
+const phase = () => (MOVIE && window.movieState) ? window.movieState() : 'live';   // 'play' | 'pause' | 'done' | 'live'
+const frantic = () => phase() === 'play';                // speedy build pace, only while the reel actually rolls
+const frozen = () => phase() === 'pause';                // paused mid-reel: the floor holds still
+const speed = () => frantic() ? 6 : 3.2;                 // speedy while rolling; normal otherwise (a freeze stops motion in frame())
 const bubbleMs = () => frantic() ? 1600 : 4700;          // rapid: bubbles flash; calm: they linger
 const SEATS = [[0, 0], [.55, 0], [0, .55], [.55, .55], [-.5, .3], [.3, -.5], [-.5, -.5], [.7, .35]];
 
@@ -147,10 +152,11 @@ function tick(e) {
   while (ticker.children.length > 40) ticker.lastChild.remove();
 }
 
-(function wander() {                        // idle agents drift between stations: brisk while frantic, languid when calm
-  for (const av of avatars.values())
-    if (av.isAgent && !av.leaving && av.state === 'idle' && Math.random() < .35)
-      send(av, randomStation());
+(function wander() {                        // idle agents drift between stations while the reel runs; a paused reel holds them still
+  if (!frozen())
+    for (const av of avatars.values())
+      if (av.isAgent && !av.leaving && av.state === 'idle' && Math.random() < .35)
+        send(av, randomStation());
   setTimeout(wander, frantic() ? 1600 : 5000);
 })();
 
@@ -158,18 +164,19 @@ let last = performance.now();
 function frame(t) {
   const dt = Math.min((t - last) / 1000, .1);
   last = t;
-  for (const av of [...avatars.values()]) {
-    const dx = av.tx - av.x, dy = av.ty - av.y;
-    const sp = speed();
-    if (Math.abs(dx) > .05) av.x += Math.sign(dx) * Math.min(sp * dt, Math.abs(dx));
-    else if (Math.abs(dy) > .05) av.y += Math.sign(dy) * Math.min(sp * dt, Math.abs(dy));
-    else {
-      av.x = av.tx; av.y = av.ty;
-      if (av.leaving) { avatars.delete(av.id); continue; }
-      av.state = av.pending;
+  if (!frozen())                            // a paused reel freezes the floor — agents hold position, bubbles persist
+    for (const av of [...avatars.values()]) {
+      const dx = av.tx - av.x, dy = av.ty - av.y;
+      const sp = speed();
+      if (Math.abs(dx) > .05) av.x += Math.sign(dx) * Math.min(sp * dt, Math.abs(dx));
+      else if (Math.abs(dy) > .05) av.y += Math.sign(dy) * Math.min(sp * dt, Math.abs(dy));
+      else {
+        av.x = av.tx; av.y = av.ty;
+        if (av.leaving) { avatars.delete(av.id); continue; }
+        av.state = av.pending;
+      }
+      if (av.bubble && t - av.bubble.t > bubbleMs()) av.bubble = null;
     }
-    if (av.bubble && t - av.bubble.t > bubbleMs()) av.bubble = null;
-  }
   render(ctx, [...avatars.values()], t);
   requestAnimationFrame(frame);
 }
@@ -271,10 +278,11 @@ function startDemoLoop(buildings, opts = {}) {
   if (location.hostname === 'localhost' && !forced) return;   // local real-hook use: stay quiet (but the showcase meme floor animates)
   if (demoTimer) clearTimeout(demoTimer);        // restart on the newly-focused city's buildings
   const script = buildScript(buildings || []);
-  const fast = opts.interval || 2600;
-  const beat = () => {                            // self-rescheduling: in the movie, events stream fast while frantic, unhurried when calm
-    handle(script.next().value);
-    demoTimer = setTimeout(beat, MOVIE && !frantic() ? fast * 4 : fast);
+  const fast = opts.interval || CALM_MS;
+  const beat = () => {                            // play → speedy dispatch; done/live → normal cadence; pause → idle (no new work)
+    const p = phase();
+    if (p !== 'pause') handle(script.next().value);
+    demoTimer = setTimeout(beat, p === 'play' ? fast : p === 'pause' ? 800 : CALM_MS);
   };
   beat();
 }

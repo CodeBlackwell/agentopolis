@@ -702,6 +702,10 @@ function rewindForTour() {
 }
 window.movieRewindForTour = rewindForTour;                 // tour.js calls this on replay (movie already loaded)
 
+// The dispatch floor (hotel.js) paces its agents off this: speedy while playing, frozen when paused
+// mid-reel, calm-normal once the history is complete (parked at HEAD).
+window.movieState = () => playing ? 'play' : (ptr >= commits.length - 1 ? 'done' : 'pause');
+
 function jumpChapter(dir) {                               // ⏮ / ⏭ and , / . hop between formation transitions
   setPlay(false);
   const marks = layouts.map(l => l.ep.start);            // each epoch begins at a transition (chapter) commit
@@ -1026,7 +1030,7 @@ function buildExplain() {
   const dock = document.getElementById('dock');
   if (!dock) return;
   if (window.DEMO_MOVIE) {                          // the agent-speed meme: keep the live dispatch hall, no explain cards
-    startDemoLoop?.(state.buildings, { interval: 300 });
+    startDemoLoop?.(state.buildings, { interval: 650 });   // the "play" (speedy) dispatch pace; normal/calm is CALM_MS
     return;
   }
   document.querySelector('#dock .dispatch')?.style.setProperty('display', 'none');   // retire the agent floor
