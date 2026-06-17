@@ -1,6 +1,6 @@
 [project]
 name = "agentopolis"
-version = "0.18.0"
+version = "0.18.1"
 description = "Agentopolis — Habbo-style visualization of Claude Code agents building your repo as a city"
 readme = "README.md"
 license = "MIT"
