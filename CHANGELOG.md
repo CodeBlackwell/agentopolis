@@ -6,6 +6,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- Social-card titles: the showcase landing now reads "Agentopolis — Your Codebase as a
+  living isometric city"; a forge link reads "&lt;repo&gt; — reanimated as a living
+  isometric city" (was "… — a codebase as a living isometric city").
+
 ### Fixed
 - Tour no longer crashes on a first visit to the movie/landing: `movieRewindForTour()` is
   now a no-op until the reel has loaded, so the auto-run tour shows instead of aborting.

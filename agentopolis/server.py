@@ -416,7 +416,8 @@ def _page(request: Request, forge: str | None, embed: bool = False) -> HTMLRespo
     else:
         og_key, og_url = None, f"{base}/"
     if og_key:
-        og_title = f"{name} — a codebase as a living isometric city"
+        # the showcase landing pitches the viewer's own repo ("Your Codebase"); a forge card is the named repo "reanimated"
+        og_title = f"{name} — {'Your Codebase' if demo_movie else 'reanimated'} as a living isometric city"
         og_desc = (f"Watch {name}'s git history build itself as an isometric city — "
                    "Claude Code agents are pixel workers on the dispatch floor.")
     else:
