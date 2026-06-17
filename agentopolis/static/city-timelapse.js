@@ -1049,6 +1049,13 @@ function buildExplain() {
     letter-spacing:.1em;text-transform:uppercase;padding:5px 8px;display:flex;align-items:center;gap:6px}
     .xcard h5 .chip{width:10px;height:10px;flex:0 0 10px;border:1px solid var(--plum)}
     .xcard p{font:9px 'Silkscreen',monospace;color:var(--cream);line-height:1.55;padding:7px 9px;margin:0}
+    /* Now Playing (phones only): one card per row has no sibling to stretch against, so its height jumps
+       as the commit subject wraps per frame. Lock the body to a fixed 4 lines (clamp long subjects, pad
+       short ones) so it holds steady while the reel plays. On desktop the flex row already stretches every
+       card to a shared height, so leave it be. Height is border-box → add the 14px vertical padding back. */
+    @media (max-width:720px){
+    .xcard[data-tip="commit"] p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;
+    overflow:hidden;height:calc(4 * 1.55em + 14px)}}
     .reform-scroll{max-height:220px;overflow-y:auto}
     .reform-scroll p+p{border-top:1px solid rgba(243,207,217,.15)}
     .xcard .em{color:var(--gold)}

@@ -12,6 +12,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 - Onboarding tour no longer prompts you to hover/tap a worker to inspect it — there is no
   inspect-a-worker feature.
+- Mobile "build a city" CTA now sticks flush to the bottom of the screen in movie mode (it was
+  floating above where the transport bar used to be pinned, before the floor became scrollable).
+- Mobile "Now Playing" card holds a fixed size as the reel plays, instead of jumping each time the
+  commit subject wraps to a different number of lines.
 
 ## [0.20.0] - 2026-06-16
 

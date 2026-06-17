@@ -302,9 +302,9 @@
                  background: var(--gold); color: var(--plum); border: 2px solid var(--gold);
                  box-shadow: 3px 3px 0 var(--plum); font-family: 'Silkscreen', monospace;
                  font-size: 13px; font-weight: 700; letter-spacing: .04em; padding: 13px 10px; text-align: center; }
-    /* movie mode: the transport bar owns the very bottom strip — lift the build CTA above it (full width,
-       since the stats drawer button is hidden here) so neither control buries the other */
-    .mapwrap.tl-mode #build-btn { left: 12px; right: 12px; bottom: 66px; }
+    /* movie mode hides the stats drawer button, so the build CTA spans full width; it still sticks to
+       the viewport bottom — the transport bar now scrolls with the map, so there's nothing to lift above */
+    .mapwrap.tl-mode #build-btn { left: 12px; right: 12px; }
     #forge-sheet { position: fixed; left: 0; right: 0; bottom: 0; top: auto; transform: translateY(100%);
                    transition: transform .3s ease; z-index: 20; background: var(--plum);
                    border: 4px solid var(--gold); border-bottom: none; border-radius: 16px 16px 0 0;
