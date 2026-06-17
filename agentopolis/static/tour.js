@@ -73,7 +73,7 @@
     { center: 1, title: `⭐ ${city.toUpperCase()} CITY ⭐`,
       text: `${leader}, welcome to ${city} — jewel of the Republic, raised stone by stone in your honor (and entirely by your decree). Your Chief of Staff, at your service.` },
     { sel: '#map', viz: 1, title: 'Survey your city',
-      text: 'Take command of the camera, Excellency: zoom in upon the rooftops, pan across your boulevards, then press reset to restore the view. The city builds itself — for you, ceaselessly.' },
+      text: 'Take command of the camera, Excellency: zoom in upon the rooftops, rotate the skyline to admire it from every side, then press reset to restore the view. The city builds itself — for you, ceaselessly.' },
     { sel: '#mapctl', title: 'The royal controls',
       text: 'Zoom, rotate, and reset your view here, Excellency — and press ⊔ Share to flaunt your city before the envious neighboring states.',
       try: 'Press the controls — zoom or spin the skyline.' },
@@ -125,9 +125,9 @@
     { sel: '#tl-play', force: 1, proceed: 1, title: 'Press ▶ to begin',
       text: 'Behold your capital, complete and waiting. Press ▶ and watch it raise itself from a single humble commit into the metropolis it was always destined to become.',
       try: 'Press ▶ — start the founding.' },
-    { sel: '#map', title: 'The founding, replayed',
+    { sel: '#map', zoom: 1, title: 'The founding, replayed',
       text: 'There it rises — from a single humble commit toward the metropolis it was always destined to become. It builds itself, as all things do, for you.',
-      try: 'Drag, scroll, and spin while it builds.' },
+      try: 'Go on — scroll to zoom into the rising city.' },
     { sel: '#hotel', title: 'The tireless workforce',
       text: `Each scurrying citizen is a Claude Code agent. What you see now is a faithful re-enactment, ${pres} — but install our humble tool and it hooks quietly into your own Claude Code, so THESE become your real agents: checking in to this very floor and toiling in real time as you work. Idle hands are, naturally, unconstitutional.` },
     { sel: '#ticker', title: 'The State Record',
@@ -190,7 +190,7 @@
   }
 
   // ---- overlay (built once, lazily) ----
-  let steps = [], at = 0, typing = null, ui = null, help = null, farewellShown = false, prefetched = false;
+  let steps = [], at = 0, typing = null, ui = null, help = null, farewellShown = false, prefetched = false, revealTimer = 0;
   const el = (tag, props) => Object.assign(document.createElement(tag), props);
   const waitFor = (sel, ms = 8000) => new Promise(res => {     // async transport bar isn't there on load
     const t0 = performance.now();
@@ -290,12 +290,12 @@
       if (sheet) {
         if (!sheet.classList.contains('open')) {
           (sheet.id === 'forge-sheet' ? window.openForgeSheet : window.openStatsSheet)?.();
-          setTimeout(() => show(i), 340);                  // wait out the .3s slide-up before measuring
+          revealTimer = setTimeout(() => show(i), 340);    // wait out the .3s slide-up before measuring
           return false;
         }
       } else if (document.querySelector('#forge-sheet.open, #side.open')) {
         window.closeSheets?.();                            // leaving the sheets: tuck them away so they can't cover the spotlight
-        setTimeout(() => show(i), 340);
+        revealTimer = setTimeout(() => show(i), 340);
         return false;
       }
     }
@@ -305,12 +305,13 @@
 
   function show(i) {
     at = i;
+    clearTimeout(revealTimer);                               // supersede any pending sheet-deferred re-render — last nav wins
     if (i >= 2) prefetchForge();                             // a few steps in = intent to finish → start the clone NOW
     const step = steps[i];
     const fw = !!step.farewell, cel = !!step.celebrate;
     const target = step.center ? null : document.querySelector(step.sel);
     if (target && !reveal(target, i)) return;               // open/close the right sheet + snap into view, then re-render
-    const forced = (!!step.force || !!step.viz) && !!target;
+    const forced = (!!step.force || !!step.viz || !!step.zoom) && !!target;
     if (target) {
       const r = target.getBoundingClientRect();
       ui.hole.className = forced ? 'force' : '';
@@ -333,12 +334,13 @@
     ui.back.style.visibility = (i && !fw && !cel) ? 'visible' : 'hidden';
     ui.next.hidden = forced;                                   // forced: the only way on is the real control / gesture
     ui.nudge.hidden = !forced;
-    ui.nudge.textContent = step.viz ? 'zoom · pan · reset ↑' : 'press it ↑';
+    ui.nudge.textContent = step.viz ? (ctx === 'nation' ? 'zoom · pan · reset ↑' : `zoom · ${TOUCH ? 'twist' : 'rotate'} · reset ↑`)
+      : step.zoom ? 'zoom in ↑' : 'press it ↑';
     ui.next.textContent = cel ? 'magnificent ▸'
       : fw ? 'got it ✓'
       : step.nav ? (step.navLabel || 'show me ▸')
       : i === steps.length - 1 ? 'done ✓' : 'next ▸';
-    if (forced) (step.viz ? armViz(step) : arm(target, step));   // arm after the try-hint so armViz owns it
+    if (forced) (step.viz ? armViz(step) : step.zoom ? armZoom(step) : arm(target, step));   // arm after the try-hint so armViz owns it
   }
 
   // ---- interaction cutout: four transparent panels frame the spotlit element, blocking clicks everywhere
@@ -367,30 +369,48 @@
     target.addEventListener('click', target._tourArm, { capture: true, once: true });
   }
 
-  // A hands-on gate: the tour won't advance until the President has zoomed in, panned, then pressed reset.
+  // A hands-on gate: the tour won't advance until the President has zoomed in, rotated, then pressed reset.
   // Engine-agnostic — it watches window.apxCam (set by whichever map engine is live) and the shared reset
-  // button, so the same three-gesture handshake works on desktop (wheel/drag) and phone (pinch/swipe).
+  // button, so the same three-gesture handshake works on desktop (wheel/keys) and phone (pinch/controls).
+  // The nation's world map can't spin, so there the middle gesture stays a pan.
   let vizRaf = 0;
   function armViz(step) {
     cancelAnimationFrame(vizRaf);
     const cam = window.apxCam;
     if (!cam) return go(at + 1);                              // no camera to watch — never trap the user
-    const startS = cam.s, canvas = document.getElementById('map');
+    const rotatable = ctx !== 'nation';                      // city/movie cameras spin; the world map only pans
+    const startS = cam.s, startRot = cam.rot || 0, canvas = document.getElementById('map');
     const PAN_MIN = (canvas ? canvas.width : 1280) * 0.06;    // relative to the canvas, not a hard pixel count
-    const names = ['zoom in', 'now pan', 'press reset'];
+    const names = ['zoom in', rotatable ? (TOUCH ? 'now twist' : 'now rotate') : 'now pan', 'press reset'];
     let phase = 0, panRef = null;
     const mark = () => ui.tryEl.innerHTML = '👆 ' + names.map((g, k) =>
       k < phase ? `${g} ✓` : k === phase ? `<b>${g}</b>` : g).join('  ·  ');
     mark();
     const resetBtn = document.querySelector('#mapctl [data-act="reset"]');
     const stop = () => { cancelAnimationFrame(vizRaf); resetBtn && resetBtn.removeEventListener('click', onReset); };
-    function onReset() { if (phase === 2) { stop(); go(at + 1); } }   // reset only counts once zoom + pan are done
+    function onReset() { if (phase === 2) { stop(); go(at + 1); } }   // reset only counts once zoom + middle gesture are done
     if (resetBtn) { resetBtn.removeEventListener('click', resetBtn._viz);   // de-dup across re-renders (resize/back)
                     resetBtn._viz = onReset; resetBtn.addEventListener('click', onReset); }
+    const midDone = () => rotatable ? (cam.rot || 0) !== startRot
+                                    : Math.hypot(cam.ox - panRef.ox, cam.oy - panRef.oy) > PAN_MIN;
     (function watch() {
       if (steps[at] !== step) return stop();                 // moved on → detach
       if (phase === 0 && cam.s > startS * 1.25) { phase = 1; panRef = { ox: cam.ox, oy: cam.oy }; mark(); }
-      else if (phase === 1 && Math.hypot(cam.ox - panRef.ox, cam.oy - panRef.oy) > PAN_MIN) { phase = 2; mark(); }
+      else if (phase === 1 && midDone()) { phase = 2; mark(); }
+      vizRaf = requestAnimationFrame(watch);
+    })();
+  }
+
+  // A lighter hands-on gate than armViz: advance the instant the President zooms in (scroll / pinch). No pan
+  // or reset demanded — just prove the camera obeys. Watches the same engine-agnostic window.apxCam scale.
+  function armZoom(step) {
+    cancelAnimationFrame(vizRaf);
+    const cam = window.apxCam;
+    if (!cam) return go(at + 1);                              // no camera to watch — never trap the user
+    const startS = cam.s;
+    (function watch() {
+      if (steps[at] !== step) return cancelAnimationFrame(vizRaf);   // moved on → detach
+      if (cam.s > startS * 1.25) return go(at + 1);            // zoomed in → gate opens
       vizRaf = requestAnimationFrame(watch);
     })();
   }

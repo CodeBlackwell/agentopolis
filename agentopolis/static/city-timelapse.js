@@ -917,7 +917,9 @@ function buildTransport() {
       #tl-speed .tl-dd-trigger{height:36px;font-size:14px;padding:0 28px 0 13px;
         background-position:right 10px center;background-size:11px 7px}
       #tl-speed .tl-dd-opt{font-size:14px;padding:10px 16px}
-      #tl-date{font-size:10px;top:10px}}`;
+      /* phones: drop the date to the bottom-left so it clears the city title up top; lift it above the
+         transport strip (~52px bar + 8px gap) that owns the bottom of the wrap in movie mode */
+      #tl-date{font-size:10px;top:auto;right:auto;left:14px;bottom:64px;text-align:left}}`;
   document.head.appendChild(document.createElement('style')).textContent = css;
   const bar = document.createElement('div');
   bar.id = 'transport';

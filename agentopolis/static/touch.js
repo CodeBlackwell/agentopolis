@@ -5,7 +5,7 @@
 // onePan=false leaves single-finger drags to the browser (so the page can scroll over the canvas) while
 // still handling two-finger pinch/twist and long-press — used by the dispatch floor on phones.
 function attachTouch(canvas, { pan, pinch, twist, tap, hold, onePan = true }) {
-  const TAP_MS = 300, HOLD_MS = 500, MOVE = 6, TWIST_STEP = Math.PI / 4;   // 45° = one of the 8 city rotations
+  const TAP_MS = 300, HOLD_MS = 500, MOVE = 6, TWIST_STEP = Math.PI / 8;   // a 22.5° wrist-turn spins one 45° city step — small turns, responsive
   const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
   const angle = (a, b) => Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
   let last = null, holdTimer = null, moved = false, startT = 0, pinchDist = 0, lastAngle = 0, twistAcc = 0;
