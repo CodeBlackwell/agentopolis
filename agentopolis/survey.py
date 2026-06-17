@@ -210,16 +210,17 @@ def _metrics(zone: dict, head: list, commits: list) -> dict | None:
     def alive_at(i):
         return [buildings[j] for j in birth
                 if birth[j] <= i and not (death_at.get(j) is not None and i >= death_at[j])]
-    dwell = max(2, round(n * 0.01))
-    epochs = []
+    dwell = max(6, round(n * 0.05))
+    epochs = []                                          # (start, end, form) — spans needed to fold runts
     cur = pend = pend_since = None
+    run_start = 0
     for i in range(n):
         alive = alive_at(i)
         if not alive:
             continue
         form = _formation(zone, alive)
         if cur is None:
-            cur = form
+            cur, run_start = form, i
             continue
         if form == cur:
             pend = None
@@ -227,12 +228,30 @@ def _metrics(zone: dict, head: list, commits: list) -> dict | None:
         if pend != form:
             pend, pend_since = form, i
         if i - pend_since + 1 >= dwell:
-            epochs.append(cur)
-            cur, pend = form, None
+            epochs.append((run_start, pend_since - 1, cur))
+            cur, run_start, pend = form, pend_since, None
     if cur is not None:
-        epochs.append(cur)
+        epochs.append((run_start, n - 1, cur))
 
-    ladder = [f for i, f in enumerate(epochs) if i == 0 or f != epochs[i - 1]]   # collapse repeats
+    # Fold runts (< dwell) into a neighbor, then merge adjacent same-form epochs — mirror detectEpochs.
+    k = len(epochs) - 1
+    while k >= 0 and len(epochs) > 1:
+        s, e, f = epochs[k]
+        if e - s + 1 >= dwell:
+            k -= 1
+            continue
+        if k > 0:
+            epochs[k - 1] = (epochs[k - 1][0], e, epochs[k - 1][2])
+        else:
+            epochs[1] = (s, epochs[1][1], epochs[1][2])
+        epochs.pop(k)
+        k -= 1
+    for k in range(len(epochs) - 1, 0, -1):
+        if epochs[k][2] == epochs[k - 1][2]:
+            epochs[k - 1] = (epochs[k - 1][0], epochs[k][1], epochs[k - 1][2])
+            epochs.pop(k)
+
+    ladder = [f for _, _, f in epochs]
     transitions = max(0, len(ladder) - 1)
     deaths = len(dead)
     peak = len(birth)

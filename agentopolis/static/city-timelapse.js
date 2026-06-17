@@ -15,6 +15,8 @@ let layouts = [], epochIndex = -1;                        // one fixed layout pe
 let reformShown = -1;                                      // last epoch the Re-Form card auto-scrolled to (snap on new only)
 let transition = null;                                    // active demolish-and-rebuild between two epochs
 let ptr = -1, playing = false, speed = 12, acc = 0, last = 0, slider = null, label = null, dateEl = null;
+let holdUntil = 0;                                         // settle the completed formation before re-forming (timestamp)
+const REFORM_HOLD = 1500;                                  // ms a finished formation holds so it reads before it transforms
 let megaCommit = 15;                                      // commit-size gate for coupling; set relatively in index()
 
 // crisp filled-glyph transport icons (currentColor → flip to plum on hover) instead of emoji/plain-triangle
@@ -280,7 +282,7 @@ function detectEpochs(data, commits) {
   const all = data.buildings;
   const aliveAt = i => all.filter(b => bornAt.has(b) && bornAt.get(b) <= i
     && !(b.death !== undefined && i >= b.death));
-  const dwell = Math.max(2, Math.round(commits.length * 0.01));
+  const dwell = Math.max(6, Math.round(commits.length * 0.05));
   const epochs = [];
   let curForm = null, runStart = 0, pendForm = null, pendSince = 0;
   for (let i = 0; i < commits.length; i++) {
@@ -297,6 +299,23 @@ function detectEpochs(data, commits) {
   }
   if (curForm) epochs.push({ start: runStart, end: commits.length - 1, formation: curForm,
     buildingsAlive: aliveAt(commits.length - 1) });
+  // Fold runts (shorter than the dwell window) into a neighbor so no phase flickers past too fast to
+  // read — the last formation always survives, so a repo keeps >=1 epoch. Buildings born during an
+  // absorbed span fall under the neighbor's formation, so recompute its alive-set at the new end.
+  for (let k = epochs.length - 1; k >= 0 && epochs.length > 1; k--) {
+    const ep = epochs[k];
+    if (ep.end - ep.start + 1 >= dwell) continue;
+    if (k > 0) { epochs[k - 1].end = ep.end; epochs[k - 1].buildingsAlive = aliveAt(ep.end); }
+    else epochs[1].start = ep.start;
+    epochs.splice(k, 1);
+  }
+  // A runt fold can leave two same-formation epochs adjacent (X→runt→X) — merge them so the city
+  // never re-forms into the shape it already wears.
+  for (let k = epochs.length - 1; k > 0; k--)
+    if (epochs[k].formation.id === epochs[k - 1].formation.id) {
+      epochs[k - 1].end = epochs[k].end; epochs[k - 1].buildingsAlive = aliveAt(epochs[k].end);
+      epochs.splice(k, 1);
+    }
   return epochs;
 }
 
@@ -588,7 +607,7 @@ function recompute(i) {                                   // set targets + visib
 }
 
 function seek(i) {                                        // scrub / init: snap instantly, no tween or collapse
-  transition = null;                                      // scrubbing snaps to the settled epoch (no live re-form)
+  transition = null; holdUntil = 0;                       // scrubbing snaps to the settled epoch (no live re-form / pending hold)
   recompute(i);
   for (const b of state.buildings) {
     const vis = bornAt.has(b) && bornAt.get(b) <= i && !(b.death !== undefined && i >= b.death + decaySpan);
@@ -628,8 +647,13 @@ function loop(t) {
     if (drawTransition(t)) seek(transition.at);             // settle at full height (seek snaps floors; tween won't regrow)
     last = 0; requestAnimationFrame(loop); return;
   }
+  if (holdUntil && playing && t >= holdUntil) {            // the formation has had its moment → re-form now
+    const e = epochAt(ptr); holdUntil = 0;
+    beginTransition(e, e + 1, layouts[e + 1].ep.start);
+    requestAnimationFrame(loop); return;
+  }
   const cardHeld = pinnedFocus || document.querySelector('#explain .xcard[data-focus]:hover');
-  if (playing && !cardHeld && ptr < commits.length - 1) {  // a hovered / tapped legend card holds the reel for inspection
+  if (playing && !holdUntil && !cardHeld && ptr < commits.length - 1) {  // a hovered / tapped legend card holds the reel for inspection
     if (!last) last = t;
     acc += (t - last) / 1000 * speed;
     last = t;
@@ -637,7 +661,7 @@ function loop(t) {
       const n = Math.floor(acc); acc -= n;
       const e = epochAt(ptr), nextStart = layouts[e + 1] ? layouts[e + 1].ep.start : Infinity;
       const target = Math.min(commits.length - 1, ptr + n);
-      if (target >= nextStart) { advance(nextStart - 1); beginTransition(e, e + 1, nextStart); }   // re-form first
+      if (target >= nextStart) { advance(nextStart - 1); holdUntil = t + REFORM_HOLD; }   // settle the finished form, then re-form
       else advance(target);
     }
     if (ptr >= commits.length - 1) { const justFinished = playing; setPlay(false); if (justFinished) onMovieComplete(); }
