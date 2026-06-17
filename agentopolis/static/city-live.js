@@ -2,6 +2,7 @@
 const cityCanvas = document.getElementById('map');
 const cityCtx = cityCanvas.getContext('2d');
 const cityCam = { ox: 0, oy: 0, s: 1 };
+window.apxCam = cityCam;                                   // the tour watches this to gate the zoom/pan/reset step
 let cityState = null;
 const FIT = [115, 30, 1.18];                               // City.fit (pad, margin, zoom) for the live view
 

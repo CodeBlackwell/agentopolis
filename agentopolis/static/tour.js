@@ -52,9 +52,8 @@
   const NATION = [
     { center: 1, title: '⭐ THE NATION OF AGENTOPOLIS ⭐',
       text: `${leader}! You have been re-elected with 100% of the vote. Again. Congratulations are, as ever, mandatory. Permit your humble Chief of Staff to present the Republic.` },
-    { sel: '#map', title: 'Your glorious dominion',
-      text: 'Behold the Nation, surveyed from on high. Drag to parade across it, scroll to zoom, Q or E to spin it for the cameras. Every pixel adores you.',
-      try: 'Go on — drag, scroll, and Q/E to spin. I shall wait.' },
+    { sel: '#map', viz: 1, title: 'Your glorious dominion',
+      text: 'Behold the Nation, surveyed from on high. Before we proceed, take the controls: zoom in upon your realm, pan across it, then press reset to restore the royal view. Every pixel adores you.' },
     { sel: '#tiers', title: 'Chain of command',
       text: 'WORLD ▸ STATE ▸ CITY. Descend from the heavens into any province, Excellency — click a city to enter, zoom out when the peasants bore you.',
       try: 'Click a province to descend into it.' },
@@ -76,9 +75,8 @@
   const CITY = [
     { center: 1, title: `⭐ ${city.toUpperCase()} CITY ⭐`,
       text: `${leader}, welcome to ${city} — jewel of the Republic, raised stone by stone in your honor (and entirely by your decree). Your Chief of Staff, at your service.` },
-    { sel: '#map', title: 'Survey your city',
-      text: 'Drag to stroll your boulevards, scroll to zoom upon the rooftops, Q or E to spin the skyline. The city builds itself — for you, ceaselessly.',
-      try: 'Try it now — drag, scroll, Q/E to spin.' },
+    { sel: '#map', viz: 1, title: 'Survey your city',
+      text: 'Take command of the camera, Excellency: zoom in upon the rooftops, pan across your boulevards, then press reset to restore the view. The city builds itself — for you, ceaselessly.' },
     { sel: '#mapctl', title: 'The royal controls',
       text: 'Zoom, rotate, and reset your view here, Excellency — and press ⊔ Share to flaunt your city before the envious neighboring states.',
       try: 'Press the controls — zoom or spin the skyline.' },
@@ -317,7 +315,7 @@
     const fw = !!step.farewell, cel = !!step.celebrate;
     const target = step.center ? null : document.querySelector(step.sel);
     if (target && !reveal(target, i)) return;               // open/close the right sheet + snap into view, then re-render
-    const forced = !!step.force && !!target;
+    const forced = (!!step.force || !!step.viz) && !!target;
     if (target) {
       const r = target.getBoundingClientRect();
       ui.hole.className = forced ? 'force' : '';
@@ -326,7 +324,6 @@
       if (fw) maskFull();                                      // farewell: highlight the handle but don't let them poke it
       else mask(hx, hy, hw, hh);                               // block everything BUT the spotlit element — it stays live
       place(r);
-      if (forced) arm(target, step);
     } else {
       scrim();                                                 // full-screen dim, no cutout
       maskFull();                                              // block all interaction during intro / close
@@ -334,17 +331,19 @@
     }
     ui.h3.textContent = step.title;
     type(touchify(step.text));
-    ui.tryEl.hidden = !(step.try && target);                   // encourage hands-on play with the live element
-    if (step.try && target) ui.tryEl.textContent = '👆 ' + touchify(step.try);
+    ui.tryEl.hidden = !((step.try || step.viz) && target);     // encourage hands-on play with the live element
+    if (step.try && target && !step.viz) ui.tryEl.textContent = '👆 ' + touchify(step.try);
     ui.dots.innerHTML = (fw || cel) ? '' : steps.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('');
     ui.skip.style.display = (fw || cel) ? 'none' : '';
     ui.back.style.visibility = (i && !fw && !cel) ? 'visible' : 'hidden';
-    ui.next.hidden = forced;                                   // forced: the only way on is the real button
+    ui.next.hidden = forced;                                   // forced: the only way on is the real control / gesture
     ui.nudge.hidden = !forced;
+    ui.nudge.textContent = step.viz ? 'zoom · pan · reset ↑' : 'press it ↑';
     ui.next.textContent = cel ? 'magnificent ▸'
       : fw ? 'got it ✓'
       : step.nav ? (step.navLabel || 'show me ▸')
       : i === steps.length - 1 ? 'done ✓' : 'next ▸';
+    if (forced) (step.viz ? armViz(step) : arm(target, step));   // arm after the try-hint so armViz owns it
   }
 
   // ---- interaction cutout: four transparent panels frame the spotlit element, blocking clicks everywhere
@@ -371,6 +370,34 @@
       localStorage.setItem(DONE, '1');                         // a hand-off control: it navigates; resume on the next page
     };
     target.addEventListener('click', target._tourArm, { capture: true, once: true });
+  }
+
+  // A hands-on gate: the tour won't advance until the President has zoomed in, panned, then pressed reset.
+  // Engine-agnostic — it watches window.apxCam (set by whichever map engine is live) and the shared reset
+  // button, so the same three-gesture handshake works on desktop (wheel/drag) and phone (pinch/swipe).
+  let vizRaf = 0;
+  function armViz(step) {
+    cancelAnimationFrame(vizRaf);
+    const cam = window.apxCam;
+    if (!cam) return go(at + 1);                              // no camera to watch — never trap the user
+    const startS = cam.s, canvas = document.getElementById('map');
+    const PAN_MIN = (canvas ? canvas.width : 1280) * 0.06;    // relative to the canvas, not a hard pixel count
+    const names = ['zoom in', 'now pan', 'press reset'];
+    let phase = 0, panRef = null;
+    const mark = () => ui.tryEl.innerHTML = '👆 ' + names.map((g, k) =>
+      k < phase ? `${g} ✓` : k === phase ? `<b>${g}</b>` : g).join('  ·  ');
+    mark();
+    const resetBtn = document.querySelector('#mapctl [data-act="reset"]');
+    const stop = () => { cancelAnimationFrame(vizRaf); resetBtn && resetBtn.removeEventListener('click', onReset); };
+    function onReset() { if (phase === 2) { stop(); go(at + 1); } }   // reset only counts once zoom + pan are done
+    if (resetBtn) { resetBtn.removeEventListener('click', resetBtn._viz);   // de-dup across re-renders (resize/back)
+                    resetBtn._viz = onReset; resetBtn.addEventListener('click', onReset); }
+    (function watch() {
+      if (steps[at] !== step) return stop();                 // moved on → detach
+      if (phase === 0 && cam.s > startS * 1.25) { phase = 1; panRef = { ox: cam.ox, oy: cam.oy }; mark(); }
+      else if (phase === 1 && Math.hypot(cam.ox - panRef.ox, cam.oy - panRef.oy) > PAN_MIN) { phase = 2; mark(); }
+      vizRaf = requestAnimationFrame(watch);
+    })();
   }
 
   function place(r) {                                          // park the card clear of the spotlit element
@@ -510,7 +537,7 @@
   addEventListener('keydown', e => {
     if (!active()) return;                                     // ignore keys during the card-less opening scrim
     if (e.key === 'Escape') end();
-    else if ((e.key === 'ArrowRight' || e.key === 'Enter') && !steps[at]?.force) typing ? finishType() : go(at + 1);
+    else if ((e.key === 'ArrowRight' || e.key === 'Enter') && !steps[at]?.force && !steps[at]?.viz) typing ? finishType() : go(at + 1);
     else if (e.key === 'ArrowLeft') go(at - 1);
   });
   addEventListener('resize', () => { if (active()) show(at); });

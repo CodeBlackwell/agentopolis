@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Watch Claude Code build your codebase as a living isometric city — agents are pixel workers on a dispatch floor and the skyline grows from your git history.">
 {{OG_TAGS}}
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🛎️</text></svg>">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Limelight&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -256,8 +256,14 @@
   #scrim.open { display: block; }
   #sheet-handle { display: none; }   /* the bottom-sheet grab bar — only shown on phones */
   @media (max-width: 720px) {
-    body { grid-template-columns: 1fr; grid-template-rows: 1fr 40vh;
-           grid-template-areas: "map" "dock"; padding: 8px; gap: 8px; }
+    /* the phone view scrolls: map keeps its ~60vh slice (so the tour card still lands below it) while the
+       dock grows past the fold, making the whole page reachable by scrolling */
+    body { grid-template-columns: 1fr; grid-template-rows: 60vh 50vh;
+           grid-template-areas: "map" "dock"; padding: 8px; gap: 8px;
+           height: auto; min-height: 100vh; overflow: auto; }
+    /* keep the stats button pinned while the page scrolls (the build CTA is pinned in its own rule below,
+       which sets its offsets) */
+    #drawer-btn { position: fixed; }
     header p:not(.demo-only) { display: none; }   /* mouse/wheel/Q-E hints don't apply on touch */
     /* keep the "explore the nation" banner to one tidy line so it clears the city's canvas labels */
     header p.demo-only { font-size: 10px; letter-spacing: .08em; white-space: nowrap; }
@@ -290,7 +296,7 @@
     /* forge funnel — the CTA + sheet appear only where the server enables forging (toggle via body attrs) */
     body[data-mode="nation"] #build-btn, body[data-demo="1"] #build-btn { display: block; }
     body[data-mode="nation"] #forge-sheet, body[data-demo="1"] #forge-sheet { display: block; }
-    #build-btn { position: absolute; bottom: 12px; left: 12px; right: 92px; z-index: 8; cursor: pointer;
+    #build-btn { position: fixed; bottom: 12px; left: 12px; right: 92px; z-index: 8; cursor: pointer;
                  background: var(--gold); color: var(--plum); border: 2px solid var(--gold);
                  box-shadow: 3px 3px 0 var(--plum); font-family: 'Silkscreen', monospace;
                  font-size: 13px; font-weight: 700; letter-spacing: .04em; padding: 13px 10px; text-align: center; }

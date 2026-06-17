@@ -20,6 +20,7 @@ let focusState = null;                                     // province framed in
 let mapTween = null, stateFitS = 1;                        // eased map-cam target + state framing scale
 let currentCity = null, lastCity = null;                   // active city; last one visited (for tier snap)
 const mapCam = { ox: 0, oy: 0, s: 1 };
+window.apxCam = mapCam;                                    // the tour watches this to gate the zoom/pan/reset step
 const cityCam = { ox: 0, oy: 0, s: 1, rot: 0, cx: 0, cy: 0 };
 let cityFitS = 1;                                          // city scale at full fit (zoom-out drill trigger)
 

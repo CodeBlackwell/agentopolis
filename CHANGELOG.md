@@ -6,7 +6,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Custom isometric-skyline favicon (gold-on-plum, matching the brand) replaces the bell emoji.
+- Onboarding tour: the city and nation "survey the map" steps are now a hands-on gate — the
+  tour won't advance until you zoom in, pan, then press reset (works on desktop wheel/drag and
+  phone pinch/swipe, shown as a live `zoom in ✓ · now pan ✓ · press reset` checklist).
+
 ### Changed
+- Mobile: the page now scrolls — the map keeps its ~60vh slice while the dispatch dock grows
+  past the fold, so the whole page is reachable. The stats + build buttons stay pinned.
+- Dispatch floor: ephemeral agent dialogue now draws on top of the static district placards,
+  so a name label no longer hides what an agent is saying.
 - Demo dispatch floor now tracks the reel's transport as three states: **play** → speedy
   agents, **pause** → frozen floor (agents hold still, no new work), **complete** → normal
   calm cadence. Fixes the permanently-frantic, never-pausing look on the landing.

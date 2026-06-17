@@ -163,8 +163,8 @@ function render(ctx, avatars, t) {
     if (item.av) labels.push({ av: item.av, ...drawAvatar(ctx, item.av, t) });
     else item.draw();
   }
-  drawSpeech(ctx, labels, t);
-  drawOfficeLabels(ctx);
+  drawOfficeLabels(ctx);                                     // static district placards first...
+  drawSpeech(ctx, labels, t);                                // ...so ephemeral agent dialogue sits on top of them
 }
 
 // Office placards drawn in screen space: the canvas is downscaled to fit the dock, so labels are

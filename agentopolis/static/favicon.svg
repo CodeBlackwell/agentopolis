@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect x="4" y="4" width="92" height="92" rx="20" fill="#3d1832" stroke="#d4a953" stroke-width="6"/>
+  <!-- tall tower (back) -->
+  <polygon points="42,31 60,40 42,49 24,40" fill="#ecc878"/>
+  <polygon points="24,40 42,49 42,79 24,70" fill="#d4a953"/>
+  <polygon points="42,49 60,40 60,70 42,79" fill="#9c7833"/>
+  <rect x="29" y="50" width="4" height="4" fill="#5a2c4d"/>
+  <rect x="29" y="60" width="4" height="4" fill="#5a2c4d"/>
+  <rect x="35" y="55" width="4" height="4" fill="#5a2c4d"/>
+  <!-- short tower (front) -->
+  <polygon points="66,49.5 79,56 66,62.5 53,56" fill="#ecc878"/>
+  <polygon points="53,56 66,62.5 66,82.5 53,76" fill="#d4a953"/>
+  <polygon points="66,62.5 79,56 79,76 66,82.5" fill="#9c7833"/>
+  <rect x="57" y="64" width="3.5" height="3.5" fill="#5a2c4d"/>
+  <rect x="57" y="72" width="3.5" height="3.5" fill="#5a2c4d"/>
+</svg>

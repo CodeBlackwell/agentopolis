@@ -5,6 +5,7 @@
 const tlCanvas = document.getElementById('map');
 const tlCtx = tlCanvas.getContext('2d');
 const cam = { ox: 0, oy: 0, s: 1 };
+window.apxCam = cam;                                       // the tour watches this to gate the zoom/pan/reset step
 const FIT = [150, 30, 1.18];                               // City.fit (pad, margin, zoom) for the movie view
 let state = null, commits = [], births = [], mods = [], deaths = [], bornAt = new Map(), props = [];
 // match backing store to box × DPR; on resize re-fit the current epoch's village to the new shape
