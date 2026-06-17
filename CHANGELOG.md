@@ -7,6 +7,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
+- Demo-land tour now frames the showcase as a live demonstration of the tool and explains,
+  in character, that it hooks into your own Claude Code so your real agents appear on the floor.
 - Social-card titles: the showcase landing now reads "Agentopolis — Your Codebase as a
   living isometric city"; a forge link reads "&lt;repo&gt; — reanimated as a living
   isometric city" (was "… — a codebase as a living isometric city").

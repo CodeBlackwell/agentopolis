@@ -127,7 +127,7 @@
   //      navigation itself (no clone to type), carrying the tour onward to where the explanation cards live. ----
   const DEMO_LAND = [
     { center: 1, title: '⭐ WELCOME TO THE REPUBLIC ⭐',
-      text: `${leader}! Your capital stands complete before you, ready to rebuild its entire glorious history at your command. Permit your Chief of Staff to narrate the spectacle.` },
+      text: `${leader}! What follows is a live demonstration of Agentopolis — a taste of what the tool does on your own machine. Your capital stands complete, ready to rebuild its entire glorious history at your command. Permit your Chief of Staff to narrate.` },
     { sel: '#tl-play', force: 1, proceed: 1, title: 'Press ▶ to begin',
       text: 'Behold your capital, complete and waiting. Press ▶ and watch it raise itself from a single humble commit into the metropolis it was always destined to become.',
       try: 'Press ▶ — start the founding.' },
@@ -135,7 +135,7 @@
       text: 'There it rises — from a single humble commit toward the metropolis it was always destined to become. It builds itself, as all things do, for you.',
       try: 'Drag, scroll, and spin while it builds.' },
     { sel: '#hotel', title: 'The tireless workforce',
-      text: 'Your citizens — each a Claude Code agent — scurry faster the instant the reel rolls, laboring for the Motherland at every station. Idle hands are, naturally, unconstitutional.',
+      text: `Each scurrying citizen is a Claude Code agent. What you see now is a faithful re-enactment, ${pres} — but install our humble tool and it hooks quietly into your own Claude Code, so THESE become your real agents: checking in to this very floor and toiling in real time as you work. Idle hands are, naturally, unconstitutional.`,
       try: 'Hover a worker to read its devoted assignment.' },
     { sel: '#ticker', title: 'The State Record',
       text: 'And here, the official log: every action your agents take — files read, commands run, agents dispatched — scrolls past the instant it happens. The chronicle of your tireless administration, entirely factual and approved by you.' },
