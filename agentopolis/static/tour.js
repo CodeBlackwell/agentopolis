@@ -43,9 +43,7 @@
     .replaceAll('Press ■ live', 'Tap ■ live').replaceAll('Press ▶ Replay', 'Tap ▶ Replay')
     .replaceAll('Press ▶', 'Tap ▶')
     .replaceAll('Click', 'Tap').replaceAll('click', 'tap')
-    .replaceAll('Hover one', 'Tap & hold one').replaceAll('Hover a worker', 'Tap & hold a worker')
-    .replaceAll('Hover an agent', 'Tap & hold an agent').replaceAll('Hover a citizen', 'Tap & hold a citizen')
-    .replaceAll('Hover to inspect', 'Tap & hold to inspect').replaceAll('Hover', 'Tap');
+    .replaceAll('Hover', 'Tap');
 
   // ---- the script: each step spotlights one #id; center steps have no target; a forced step blocks the
   //      tour until the President presses the real highlighted control (and carries the tour onward). ----
@@ -60,8 +58,7 @@
     { sel: '#panel-guide', title: 'Ministry briefing',
       text: 'Your dossier decodes every banner and rooftop in the realm. Memorize it — or do not; who would dare correct you?' },
     { sel: '#hotel', title: 'The loyal workforce',
-      text: 'Your tireless citizens — each a Claude Code agent — check in here to labor for the Motherland. Hover one to read its devoted assignment.',
-      try: 'Hover a worker to read its task.' },
+      text: 'Your tireless citizens — each a Claude Code agent — check in here to labor for the Motherland.' },
     { sel: '#ticker', title: 'The State Record',
       text: 'Every decree your agents carry out scrolls through this log the instant it happens — official, unbiased, entirely factual news of the Republic. Approved by you, naturally.' },
     (demo                                                    // demo: spotlight the paste box; local: teach the CLI
@@ -86,8 +83,7 @@
       text: 'A rare grant of choice, Excellency: reshape every building by file family, rarity, size, age — or a tasteful uniform decree. The look of the city bends to your aesthetic whim.',
       try: 'Change it now — watch the whole city re-shape.' },
     { sel: '#hotel', title: 'The dispatch floor',
-      text: 'Each pixel worker below is a live agent serving you this very moment. Hover to inspect their devotion. Idle hands are, naturally, unconstitutional.',
-      try: 'Hover an agent to inspect its devotion.' },
+      text: 'Each pixel worker below is a live agent serving you this very moment. Idle hands are, naturally, unconstitutional.' },
     { sel: '#ticker', title: 'The State Record',
       text: 'And here, the official log — every file your agents touch, every command they run, scrolling by as it happens. The chronicle of your tireless administration.' },
     { sel: '#replay', force: 1, title: 'Now — the founding myth',
@@ -133,8 +129,7 @@
       text: 'There it rises — from a single humble commit toward the metropolis it was always destined to become. It builds itself, as all things do, for you.',
       try: 'Drag, scroll, and spin while it builds.' },
     { sel: '#hotel', title: 'The tireless workforce',
-      text: `Each scurrying citizen is a Claude Code agent. What you see now is a faithful re-enactment, ${pres} — but install our humble tool and it hooks quietly into your own Claude Code, so THESE become your real agents: checking in to this very floor and toiling in real time as you work. Idle hands are, naturally, unconstitutional.`,
-      try: 'Hover a worker to read its devoted assignment.' },
+      text: `Each scurrying citizen is a Claude Code agent. What you see now is a faithful re-enactment, ${pres} — but install our humble tool and it hooks quietly into your own Claude Code, so THESE become your real agents: checking in to this very floor and toiling in real time as you work. Idle hands are, naturally, unconstitutional.` },
     { sel: '#ticker', title: 'The State Record',
       text: 'And here, the official log: every action your agents take — files read, commands run, agents dispatched — scrolls past the instant it happens. The chronicle of your tireless administration, entirely factual and approved by you.' },
     { sel: '#tl-shape', title: 'Shape the skyline',
@@ -236,7 +231,7 @@
       @keyframes tour-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
       #tour-card .txt{flex:1;min-width:0}
       #tour-card h3{color:var(--gold);font-size:11px;letter-spacing:.04em;margin-bottom:6px;line-height:1.4}
-      #tour-card p{font-size:10px;line-height:1.65;min-height:60px}
+      #tour-card p{font-size:10px;line-height:1.8;min-height:60px;white-space:pre-line}
       #tour-card .who{display:block;margin-top:8px;font-size:8px;color:var(--pink-deep);letter-spacing:.08em}
       #tour-card .bar{display:flex;align-items:center;gap:8px;padding:0 12px 12px}
       #tour-card .dots{flex:1;display:flex;gap:4px;flex-wrap:wrap}
@@ -410,6 +405,7 @@
 
   function type(text) {                                        // typewriter, for that addressing-the-nation cadence
     clearInterval(typing);
+    text = text.replace(/([.!?])\s+/g, '$1\n');                // one sentence per line — let the dialogue breathe (CSS pre-line)
     ui.p.dataset.full = text;
     let n = 0;
     ui.p.textContent = '';

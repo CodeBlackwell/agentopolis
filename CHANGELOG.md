@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Onboarding tour dialogue now reads one sentence per line for clearer pacing.
+
+### Fixed
+- Onboarding tour no longer prompts you to hover/tap a worker to inspect it — there is no
+  inspect-a-worker feature.
+
 ## [0.20.0] - 2026-06-16
 
 ### Added
