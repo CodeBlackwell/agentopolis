@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-06-18
+
 ### Added
 - Click or tap a building in the city/movie views to highlight it (recoloured white, the same focus
   mechanic the movie's explanation cards use) and pin its tooltip.
