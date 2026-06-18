@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-06-18
+
 ### Changed
 - Sharing a movie now cards the **finished** city: opening Share snaps the reel to its completed build
   (silently, waiting briefly if it's still loading) before capturing the still, so a link shared
