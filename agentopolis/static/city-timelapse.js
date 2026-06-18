@@ -86,7 +86,7 @@ try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');
   buildExplain();                                        // the dispatch floor becomes a live, repo-specific legend
   seek(-1);
   loading.remove();
-  speed = autoSpeed();                                    // size the walk to ~45s regardless of repo size (calm, not chaotic)
+  speed = autoSpeed();                                    // size the walk to ~30s regardless of repo size (calm, not chaotic)
   // First-time visitors get the onboarding tour, which opens the city already FINISHED and paused, then
   // walks the President to ▶ Replay it himself — calmer than a frantic auto-playing reel. Returning
   // visitors (tour seen) and embeds still autoplay from the empty lot.
@@ -99,7 +99,7 @@ try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');
   requestAnimationFrame(loop);
 })().catch(e => { loading.remove(); console.error('timelapse load failed', e); });
 
-const autoSpeed = () => Math.max(3, Math.min(120, commits.length / 45));   // commits/sec → ~45s history walk
+const autoSpeed = () => Math.max(3, Math.min(120, commits.length / 30));   // commits/sec → ~30s history walk
 
 const fmtDate = ts => {                                   // "September 16, 2025 - 3:15am UTC" for the current commit
   const d = new Date(ts * 1000);
