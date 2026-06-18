@@ -1342,15 +1342,26 @@ tlCanvas.addEventListener('wheel', m => {
 }, { passive: false });
 let drag = null;
 tlCanvas.addEventListener('pointerdown', () => pinnedFocus = null);   // touching the map releases a pinned card
-tlCanvas.addEventListener('mousedown', m => drag = { x: m.clientX, y: m.clientY });
-window.addEventListener('mouseup', () => drag = null);
+tlCanvas.addEventListener('mousedown', m => drag = { x: m.clientX, y: m.clientY, ix: m.clientX, iy: m.clientY, moved: false });
+window.addEventListener('mouseup', m => {
+  if (drag && !drag.moved) selectAt(m);                     // a click, not a drag: select what's under it
+  drag = null;
+});
 window.addEventListener('mousemove', m => {
   if (!drag) return;
   const r = tlCanvas.getBoundingClientRect();
+  if (Math.hypot(m.clientX - drag.ix, m.clientY - drag.iy) > 4) drag.moved = true;
   cam.ox += (m.clientX - drag.x) * (tlCanvas.width / r.width);
   cam.oy += (m.clientY - drag.y) * (tlCanvas.height / r.height);
   drag.x = m.clientX; drag.y = m.clientY;
 });
+function selectAt(m) {                                       // pin the highlight + show that item's tooltip
+  if (!state) return;
+  const r = tlCanvas.getBoundingClientRect();
+  const mx = (m.clientX - r.left) * (tlCanvas.width / r.width), my = (m.clientY - r.top) * (tlCanvas.height / r.height);
+  City.select(state, mx, my);
+  tipAt(mx, my, m.clientX, m.clientY);
+}
 
 // ---- hover tooltips: same City.pick inspector as the live city, plus the building's live encoding ----
 function buildingTags(b) {                                 // decode the pixels the viewer is looking at
@@ -1390,5 +1401,6 @@ attachTouch(tlCanvas, {                                     // the movie was mou
   pan: (dx, dy) => { cam.ox += dx; cam.oy += dy; document.getElementById('tooltip').style.display = 'none'; },
   pinch: (k, mx, my) => zoom(k, mx, my),
   twist: rotate,
+  tap: (mx, my, cx, cy) => { if (state) { City.select(state, mx, my); tipAt(mx, my, cx, cy); } },
   hold: tipAt,
 });

@@ -99,7 +99,20 @@ cityCanvas.addEventListener('wheel', m => {
 let cityDrag = null;
 cityCanvas.addEventListener('mousedown', m =>
   cityDrag = { x: m.clientX, y: m.clientY, ix: m.clientX, iy: m.clientY, moved: false });
-window.addEventListener('mouseup', () => cityDrag = null);
+window.addEventListener('mouseup', m => {
+  if (cityDrag && !cityDrag.moved) {                        // a click, not a drag: select what's under it
+    const r = cityCanvas.getBoundingClientRect();
+    selectAt((m.clientX - r.left) * (cityCanvas.width / r.width),
+             (m.clientY - r.top) * (cityCanvas.height / r.height), m.clientX, m.clientY);
+  }
+  cityDrag = null;
+});
+
+function selectAt(mx, my, cx, cy) {                         // pin the highlight + show that item's tooltip
+  if (!cityState) return;
+  City.select(cityState, mx, my);
+  tipAt(mx, my, cx, cy);
+}
 
 function tipAt(mx, my, cx, cy) {                           // shared by hover + touch long-press
   const hit = cityState && City.pick(cityState, mx, my);
@@ -135,5 +148,6 @@ attachTouch(cityCanvas, {
                      document.getElementById('tooltip').style.display = 'none'; City.roster(''); },
   pinch: (k, mx, my) => cityZoom(k, mx, my),
   twist: cityRotate,
+  tap: selectAt,
   hold: tipAt,
 });

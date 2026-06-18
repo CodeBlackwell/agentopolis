@@ -54,7 +54,7 @@ function attachTouch(canvas, { pan, pinch, twist, tap, hold, onePan = true }) {
     }
     if (!moved && e.timeStamp - startT < TAP_MS && last && tap) {
       const r = canvas.getBoundingClientRect();
-      tap((last.x - r.left) * (canvas.width / r.width), (last.y - r.top) * (canvas.height / r.height));
+      tap((last.x - r.left) * (canvas.width / r.width), (last.y - r.top) * (canvas.height / r.height), last.x, last.y);
     }
     last = null; pinchDist = 0;
   });

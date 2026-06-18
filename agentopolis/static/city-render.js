@@ -1391,6 +1391,9 @@ const City = (() => {
     const hall = state.cityHall;                             // hall sorts by its centre, like any building, so
     const hallKey = hall ? k(hall) : Infinity;               // neighbours in front draw over it and those behind don't
     let hallDrawn = !hall;
+    const sel = !opts.embedded && state.selected;            // clicked building renders white — the movie's focus recolour, one building
+    const selColor = sel && sel.color;
+    if (sel) sel.color = '#ffffff';
     for (const it of state.items) {
       if (!hallDrawn && k(it) > hallKey) { drawCityHall(ctx, cam, hall); hallDrawn = true; }
       if (it.kind) {                                        // _alpha lets a transition cross-fade dressing
@@ -1400,6 +1403,7 @@ const City = (() => {
         ctx.globalAlpha = 1;
       } else drawBuilding(ctx, cam, it, t);
     }
+    if (sel) sel.color = selColor;                           // restore before the next frame
     if (!hallDrawn) drawCityHall(ctx, cam, hall);
     if (!opts.embedded && state.docker.length) CityScape.drawPort(ctx, cam, state, t);   // ships ride the rotating harbor
     if (opts.embedded) return;
@@ -1432,6 +1436,12 @@ const City = (() => {
     return hit;
   }
 
+  function select(state, mx, my) {                          // click/tap: pin the picked building as the selection
+    const hit = pick(state, mx, my);
+    state.selected = hit && hit.screen ? hit : null;        // only buildings ring; prop hits just show their tip
+    return hit;
+  }
+
   let rosterT = null, rosterShown = false, rosterWired = false;
   function roster(text, x, y) {                            // pinned, scrollable panel for long hit lists
     const el = document.getElementById('roster');
@@ -1455,7 +1465,7 @@ const City = (() => {
     }
   }
 
-  return { layout, fit, draw, applyEvent, pick, roster,
+  return { layout, fit, draw, applyEvent, pick, select, roster,
            proj, hash, shade, near, chooseFormation, statsOf, FORM_CUT, clearPocket,
            SHAPE_MODES, applyShapes: assignMasses,
            get shapeMode() { return shapeMode; },
