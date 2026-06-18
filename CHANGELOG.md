@@ -6,6 +6,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- Sharing a movie now cards the **finished** city: opening Share snaps the reel to its completed build
+  (silently, waiting briefly if it's still loading) before capturing the still, so a link shared
+  mid-replay never unfurls a half-built skyline.
+
+### Added
+- Pre-warm the og:video so shared links unfurl with inline playback without waiting for a viewer to
+  render a clip. The demo landing is warmed server-side post-deploy (`just prewarm` / the release
+  deploy job headless-records its build and uploads it). Forge links warm themselves: a movie viewer's
+  natural first playthrough is captured in the background (no replay, no end-card) and cached once —
+  gated to fire at most once, only for shareable cities, and only when the server reports it isn't
+  cached yet (`window.OG_VIDEO_WARM`). Best-effort: a forge link warms when its movie actually plays.
+
 ## [0.21.0] - 2026-06-18
 
 ### Added

@@ -49,6 +49,11 @@ deploy:
     ssh "$AGENTOPOLIS_DEPLOY_HOST" 'cd /opt/agentopolis && git pull'
     rsync -az --delete agentopolis/showcase/ "$AGENTOPOLIS_DEPLOY_HOST":/opt/agentopolis/agentopolis/showcase/
     ssh "$AGENTOPOLIS_DEPLOY_HOST" 'cd /opt/agentopolis && docker compose up -d --build'
+    -just prewarm                                # best-effort: needs a local chromium (playwright install chromium)
+
+# Pre-warm the demo landing's og:video (headless-record the build, upload it) so the shared link plays inline
+prewarm:
+    AGENTOPOLIS_PUBLIC_URL="${AGENTOPOLIS_PUBLIC_URL:-https://agentopolis.codeblackwell.ai}" .venv/bin/python -m agentopolis.prewarm
 
 # Install hooks into ~/.claude/settings.json (new sessions report in)
 attach:

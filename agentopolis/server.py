@@ -507,6 +507,7 @@ def _page(request: Request, forge: str | None, embed: bool = False) -> HTMLRespo
                         .replace("{{DEMO_MOVIE}}", "1" if demo_movie else "")
                         .replace("{{EMBED}}", "1" if embed else "")
                         .replace("{{OG_TAGS}}", og_tags)
+                        .replace("{{OG_VIDEO_WARM}}", "true" if og_video else "false")   # client skips the warm-capture when already cached
                         .replace("{{MARATHON}}", marathon_json))
 
 

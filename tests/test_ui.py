@@ -146,6 +146,79 @@ def test_share_does_not_record_on_open(page, base_url):
     assert "download movie" in labels                         # the clip is an explicit, opt-in menu choice
 
 
+def test_sharing_a_movie_cards_the_finished_city(page, base_url):
+    # the still must show the COMPLETE build — opening Share mid-reel snaps the movie to HEAD before capture
+    page.goto(base_url + "/?timelapse")
+    page.wait_for_function(
+        "window.CITY_STATS && window.movieState && document.getElementById('tl-seek')", timeout=15000)
+    page.evaluate("""() => {
+        const s = document.getElementById('tl-seek');
+        s.value = String(Math.floor((window.CITY_STATS.commits || 20) / 3));
+        s.dispatchEvent(new Event('input'));
+    }""")
+    assert page.evaluate("window.movieState()") != "done"     # genuinely mid-build
+    page.click("#share")
+    page.wait_for_function("window.movieState() === 'done'", timeout=10000)   # snapped to the finished city
+
+
+def test_background_video_warm_does_not_restart_the_movie(page, base_url):
+    # B: warming the og:video rides the playback in place — replay:false must NOT reset the playhead
+    page.goto(base_url + "/?timelapse")
+    page.wait_for_function(
+        "window.recordTimelapseClip && window.CITY_STATS && document.getElementById('tl-seek')", timeout=15000)
+    r = page.evaluate("""() => {
+        const s = document.getElementById('tl-seek');
+        s.value = '8'; s.dispatchEvent(new Event('input'));
+        const before = +s.value;
+        window.recordTimelapseClip({ replay: false });    // ride in place — no restart
+        const afterFalse = +s.value;
+        window.recordTimelapseClip({ replay: true });     // clean pass from the empty lot
+        const afterTrue = +s.value;
+        return { before, afterFalse, afterTrue };
+    }""")
+    assert r["afterFalse"] == r["before"]                     # silent warm leaves the playhead put
+    assert r["afterTrue"] == -1                               # explicit clip replays from the start
+
+
+def test_download_movie_warms_the_og_video(page, base_url):
+    page.add_init_script("""
+        window.__ogv = [];
+        const of = window.fetch;
+        window.fetch = (u, o) => { if (String(u).startsWith('/og-video')) { window.__ogv.push(String(u));
+            return Promise.resolve(new Response('{}')); } return of(u, o); };
+        Object.defineProperty(navigator, 'share', {value: undefined, configurable: true});
+    """)
+    page.goto(base_url + "/?timelapse")
+    page.wait_for_function("typeof window.recordTimelapseClip === 'function'", timeout=15000)
+    # stub the heavy recorder so the test is fast + deterministic (a tiny valid-magic mp4 blob)
+    page.evaluate("""window.recordTimelapseClip = () =>
+        Promise.resolve(new Blob([new Uint8Array([0,0,0,24,102,116,121,112])], {type:'video/mp4'}))""")
+    page.click("#share")
+    page.wait_for_selector("#share-menu")
+    page.click("#share-menu >> text=download movie")
+    page.wait_for_function("window.__ogv.length > 0", timeout=10000)   # rendering a clip also warms the cache
+    assert "/og-video?key=" in page.evaluate("window.__ogv[0]")
+
+
+def test_clicking_a_building_pins_its_tooltip(page, base_url):
+    # click/tap a building → it resolves the file under the cursor and pins that item's tooltip
+    _open_city(page, base_url)
+    page.wait_for_timeout(600)                                # let a frame paint the building hit-boxes
+    found = page.evaluate("""() => {
+        const cv = document.getElementById('map'), r = cv.getBoundingClientRect();
+        const tip = document.getElementById('tooltip');
+        const fire = (t,x,y) => cv.dispatchEvent(new MouseEvent(t,{clientX:x,clientY:y,bubbles:true}));
+        const win  = (t,x,y) => window.dispatchEvent(new MouseEvent(t,{clientX:x,clientY:y,bubbles:true}));
+        for (let fy=0.30; fy<=0.70; fy+=0.05) for (let fx=0.30; fx<=0.70; fx+=0.04) {
+            const x=r.left+r.width*fx, y=r.top+r.height*fy;
+            fire('mousedown',x,y); win('mouseup',x,y);       // a non-drag click selects what's under it
+            if (tip.style.display==='block' && /commits/.test(tip.textContent)) return tip.textContent;
+        }
+        return null;
+    }""")
+    assert found and "commits" in found                       # a click landed on a building and pinned its info
+
+
 # ---- #3 video end-card -------------------------------------------------------
 
 def _open_movie(page, base_url):

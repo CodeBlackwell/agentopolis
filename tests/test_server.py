@@ -196,3 +196,27 @@ def test_og_video_upload_is_graceful_without_ffmpeg(client, monkeypatch):
 
 def test_og_video_route_rejects_path_traversal(client):
     assert client.get("/og-video/not-a-hash.mp4").status_code == 404
+
+
+def test_cold_forge_link_tells_the_client_to_warm(client):
+    r = client.get("/c/facebook/react")
+    assert "window.OG_VIDEO_WARM = false" in r.text                   # no clip yet → client captures one
+
+
+def test_warmed_forge_link_tells_the_client_to_skip(client, monkeypatch):
+    monkeypatch.setattr(forge_mod, "ogv_exists", lambda key: True)
+    r = client.get("/c/facebook/react")
+    assert "window.OG_VIDEO_WARM = true" in r.text                    # already cached → client skips the capture
+
+
+def test_cached_clip_is_served_with_range_support(client):
+    key = "https://github.com/facebook/react"
+    h = forge_mod.save_ogv(key, b"\x00\x00\x00\x18ftypmp42" + bytes(range(64)))
+    try:
+        r = client.get(f"/og-video/{h}.mp4", headers={"Range": "bytes=0-3"})
+        assert r.status_code == 206                                  # Discord / Safari need partial content to play
+        assert r.headers["content-range"].startswith("bytes 0-3/")
+        assert r.headers["content-type"] == "video/mp4"
+        assert len(r.content) == 4
+    finally:
+        forge_mod.ogv_path(key).unlink(missing_ok=True)

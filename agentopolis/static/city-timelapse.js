@@ -727,6 +727,21 @@ function rewindForTour() {
 }
 window.movieRewindForTour = rewindForTour;                 // tour.js calls this on replay (movie already loaded)
 
+// Sharing wants the still card to show the FINISHED city, never a mid-reel frame. On share, snap to HEAD
+// (the complete build, paused — the same direct jump as the tour, no CTA pop), waiting briefly if the reel
+// is still loading, then resolve once it's painted so the OG capture grabs a complete frame.
+window.movieToComplete = () => new Promise(resolve => {
+  let tries = 0;
+  const go = () => {
+    if (commits.length && layouts.length) {
+      rewindForTour();                                     // seek to the finished skyline, paused
+      requestAnimationFrame(() => requestAnimationFrame(resolve));   // let the loop paint it before the grab
+    } else if (++tries < 50) setTimeout(go, 100);          // still loading → finish silently in the background (≤5s)
+    else resolve();
+  };
+  go();
+});
+
 // The dispatch floor (hotel.js) paces its agents off this: speedy while playing, frozen when paused
 // mid-reel, calm-normal once the history is complete (parked at HEAD).
 window.movieState = () => playing ? 'play' : (ptr >= commits.length - 1 ? 'done' : 'pause');
@@ -764,8 +779,10 @@ window.__endCard = { text: canonText, draw: drawEndCard, fps: captureFps };   //
 
 // record one fast replay pass of the movie as a short video to share — the build itself is the payload.
 // Resolves a Blob, or null if MediaRecorder/codecs are unavailable; share.js drives this in movie mode.
-window.recordTimelapseClip = () => new Promise(resolve => {
+window.recordTimelapseClip = (opts = {}) => new Promise(resolve => {
   if (!window.MediaRecorder || !tlCanvas.captureStream) return resolve(null);
+  const replay = opts.replay !== false;                                 // default: a clean branded pass from the start.
+  // replay=false rides the movie that's already playing (a silent og:video warm — no restart, no end-card).
   // mp4/h264 where the browser records it (iOS Safari wants mp4 for the share sheet), else webm
   const TYPES = ['video/mp4;codecs=h264', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
   const mimeType = TYPES.find(t => MediaRecorder.isTypeSupported(t));
@@ -776,15 +793,16 @@ window.recordTimelapseClip = () => new Promise(resolve => {
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   rec.onstop = () => { endCardAt = 0; resolve(new Blob(chunks, { type: rec.mimeType || 'video/webm' })); };
   const prevSpeed = speed;
-  const finish = () => {                                                 // build done → hold the branded outro, then cut
+  const finish = () => {                                                 // build done → (brand the outro, then) cut
     clearTimeout(cap); clearInterval(poll); speed = prevSpeed;
-    endCardAt = performance.now();
-    setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, 1200);
+    if (replay) { endCardAt = performance.now(); setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, 1200); }
+    else if (rec.state !== 'inactive') rec.stop();
   };
-  const cap = setTimeout(finish, 20000);                                 // hard cap so a huge repo can't run away
+  const cap = setTimeout(finish, replay ? 20000 : 30000);               // hard cap so a huge repo can't run away
   const poll = setInterval(() => { if (!playing && ptr >= commits.length - 1) finish(); }, 150);
-  seek(-1); speed = Math.max(3, Math.min(120, commits.length / 11));     // pace the pass to land near ~12s
-  rec.start(); setPlay(true);
+  if (replay) { seek(-1); speed = Math.max(3, Math.min(120, commits.length / 11)); }   // pace the pass to land near ~12s
+  rec.start();
+  if (replay) setPlay(true);                                            // a silent warm rides the playback already underway
 });
 
 // the demo movie ends → hold on the finished city and point the viewer at the forge box to build their own

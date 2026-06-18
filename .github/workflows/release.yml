@@ -54,3 +54,13 @@ jobs:
           mkdir -p ~/.ssh && echo "$SSH_KEY" > ~/.ssh/id && chmod 600 ~/.ssh/id
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id "root@$DEPLOY_HOST" \
             'cd /opt/agentopolis && git pull && docker compose up -d --build'
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Pre-warm the demo og:video (headless-record the build, upload it)
+        continue-on-error: true                    # best-effort: a warming hiccup must not fail an otherwise-good release
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+          for i in $(seq 1 30); do curl -fsS https://agentopolis.codeblackwell.ai/health && break; sleep 5; done
+          AGENTOPOLIS_PUBLIC_URL=https://agentopolis.codeblackwell.ai python -m agentopolis.prewarm

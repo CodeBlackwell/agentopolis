@@ -61,6 +61,7 @@ function downloadBlob(file) {                            // hand the asset to a 
 let still = null, menuEl = null;
 
 async function warm() {                                  // capture the still (for image-download / native attach) + upload so the link unfurls
+  if (window.MOVIE && window.movieToComplete) await window.movieToComplete();   // a movie cards the FINISHED city, not a mid-reel frame
   const blob = await captureOG();
   if (!blob) return;
   still = new File([blob], 'city.png', { type: 'image/png' });
@@ -137,6 +138,25 @@ function openMenu(btn) {
   setTimeout(() => { addEventListener('keydown', onKey); addEventListener('pointerdown', onOutside, true); }, 0);
 }
 
+// Pre-warm a forge/demo link's og:video so it unfurls with inline playback. We RIDE the build the
+// viewer is already watching (no replay, no end-card) and cache it once — gated so it fires at most
+// once, only for a shareable city (forge/demo), and never when the server says it's already warmed.
+// The demo is warmed server-side post-deploy (`just prewarm`), so this mostly covers forge links.
+function warmVideoOnce() {
+  if (!(window.MOVIE && !window.OG_VIDEO_WARM && (forge || window.DEMO_CITY) && window.recordTimelapseClip)) return;
+  window.OG_VIDEO_WARM = true;                            // capture at most once per page
+  let tries = 0;
+  const wait = setInterval(() => {                        // ride the build once it's actually playing; skip if it never does
+    if (window.movieState && window.movieState() === 'play') {
+      clearInterval(wait);
+      window.recordTimelapseClip({ replay: false }).then(clip => {
+        if (clip) fetch('/og-video?key=' + encodeURIComponent(shareKey()),
+          { method: 'POST', headers: { 'Content-Type': clip.type || 'video/webm' }, body: clip }).catch(() => {});
+      });
+    } else if (++tries > 100) clearInterval(wait);        // ~20s and still not playing → leave it cold
+  }, 200);
+}
+
 // one Share button in #mapctl — present over the map in both the live city and the movie
 function mount() {
   if (document.body.dataset.mode !== 'city') return;     // cities only; the nation map has no single repo to share
@@ -148,6 +168,7 @@ function mount() {
   btn.onclick = () => openMenu(btn);
   ctl.appendChild(btn);
 }
-if (document.readyState === 'loading') addEventListener('DOMContentLoaded', mount); else mount();
+function boot() { mount(); warmVideoOnce(); }
+if (document.readyState === 'loading') addEventListener('DOMContentLoaded', boot); else boot();
 window.__share = { text: shareText, url: shareUrl, open: openMenu };   // exposed for share self-tests (cf. window.__tl)
 })();
