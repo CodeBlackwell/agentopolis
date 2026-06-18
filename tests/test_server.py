@@ -170,3 +170,29 @@ def test_embed_page_never_advertises_a_player_card(client, monkeypatch):
     monkeypatch.setattr(server, "PLAYER_CARD", "1")            # even with the flag on
     r = client.get("/player/facebook/react")
     assert 'content="player"' not in r.text                   # else the iframe would nest itself
+
+
+# ---- og:video inline-play card (Discord / iMessage / Telegram / Slack) -------
+
+def test_default_has_no_og_video(client):
+    r = client.get("/c/facebook/react")
+    assert "og:video" not in r.text                           # no warmed clip → still-image card only
+
+
+def test_warmed_clip_advertises_inline_og_video(client, monkeypatch):
+    monkeypatch.setattr(forge_mod, "ogv_exists", lambda key: True)
+    h = forge_mod.og_hash("https://github.com/facebook/react")
+    r = client.get("/c/facebook/react")
+    assert f'property="og:video" content="http://testserver/og-video/{h}.mp4"' in r.text
+    assert 'property="og:video:type" content="video/mp4"' in r.text
+
+
+def test_og_video_upload_is_graceful_without_ffmpeg(client, monkeypatch):
+    monkeypatch.setattr(server, "FFMPEG", None)               # CLI install: no transcoder → no video card, image card stands
+    r = client.post("/og-video?key=x", content=b"\x00\x00\x00\x18ftypwebm",
+                    headers={"Content-Type": "video/webm"})
+    assert r.status_code == 503
+
+
+def test_og_video_route_rejects_path_traversal(client):
+    assert client.get("/og-video/not-a-hash.mp4").status_code == 404

@@ -6,6 +6,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Click or tap a building in the city/movie views to highlight it (recoloured white, the same focus
+  mechanic the movie's explanation cards use) and pin its tooltip.
+- "Download movie" in the Share menu (movie view) — saves the build as a video file (e.g. to upload
+  natively to LinkedIn, where link unfurls don't autoplay). Renamed from "download clip".
+- Shared links now unfurl with an inline-playing build clip (`og:video`) on Discord, iMessage,
+  Telegram, Slack, and Facebook. Downloading the movie (or sharing it) uploads the clip; the server
+  transcodes it to a streaming H.264 mp4 (ffmpeg) and caches it per repo, served with HTTP Range
+  support. Falls back to the still-image card where ffmpeg is absent or the platform ignores og:video.
+
 ### Changed
 - Onboarding tour dialogue now reads one sentence per line for clearer pacing.
 

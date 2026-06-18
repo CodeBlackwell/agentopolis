@@ -61,6 +61,32 @@ def save_og(key: str, data: bytes) -> str:
     return p.stem
 
 
+OGV_MAX_BYTES = 12 * 1024 * 1024                 # a transcoded ~15s clip is a few MB; cap well above that
+OGV_MAX_FILES = 100
+_MP4_FTYP = b"ftyp"                              # an mp4 opens with a 4-byte size then the 'ftyp' box type
+
+
+def ogv_path(key: str) -> Path:
+    return OG_DIR / f"{og_hash(key)}.mp4"
+
+
+def ogv_exists(key: str) -> bool:
+    return ogv_path(key).exists()
+
+
+def save_ogv(key: str, data: bytes) -> str:
+    """Cache an already-transcoded H.264 mp4; prune oldest over the cap. Returns the hash; raises ValueError on bad input."""
+    if len(data) > OGV_MAX_BYTES or data[4:8] != _MP4_FTYP:
+        raise ValueError("not a small mp4")
+    OG_DIR.mkdir(parents=True, exist_ok=True)
+    mp4s = sorted(OG_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime)
+    for old in mp4s[: max(0, len(mp4s) - OGV_MAX_FILES + 1)]:   # keep room for the one we're about to write
+        old.unlink(missing_ok=True)
+    p = ogv_path(key)
+    p.write_bytes(data)
+    return p.stem
+
+
 def _load(url: str, kind: str, mem: dict) -> dict | None:
     """Cache lookup: memory, then disk (warming memory). Returns the bundle or None."""
     if url in mem:

@@ -143,7 +143,7 @@ def test_share_does_not_record_on_open(page, base_url):
     page.wait_for_selector("#share-menu")
     assert page.evaluate("window.__recorded") == 0            # opening the menu records nothing
     labels = page.eval_on_selector_all("#share-menu button", "els => els.map(e => e.textContent)")
-    assert "download clip" in labels                          # the clip is an explicit, opt-in menu choice
+    assert "download movie" in labels                         # the clip is an explicit, opt-in menu choice
 
 
 # ---- #3 video end-card -------------------------------------------------------

@@ -73,6 +73,8 @@ async function recordClip(btn) {                         // movie only — rende
   const label = btn.innerHTML; btn.innerHTML = '&#9679; rendering&hellip;'; toast('rendering your clip… (~12s)');
   const clip = await window.recordTimelapseClip();
   btn.innerHTML = label;
+  if (clip) fetch('/og-video?key=' + encodeURIComponent(shareKey()),   // warm the og:video so the link unfurls with inline playback
+    { method: 'POST', headers: { 'Content-Type': clip.type || 'video/webm' }, body: clip }).catch(() => {});
   return clip && new File([clip], 'city.' + (clip.type.includes('mp4') ? 'mp4' : 'webm'), { type: clip.type });
 }
 
@@ -111,7 +113,7 @@ function openMenu(btn) {
   rows.push(['post to hacker news', intent(`https://news.ycombinator.com/submitlink?u=${encodeURIComponent(url)}&t=${encodeURIComponent(text)}`)]);
   rows.push(['copy link', async () => { try { await navigator.clipboard.writeText(text + ' ' + url); toast('link copied'); } catch {} done(); }]);
   rows.push(['download image', async () => { if (!still) await warm(); if (still) downloadBlob(still); done(); }]);
-  if (window.MOVIE) rows.push(['download clip', async () => { const f = await recordClip(btn); if (f) downloadBlob(f); done(); }]);
+  if (window.MOVIE) rows.push(['download movie', async () => { const f = await recordClip(btn); if (f) downloadBlob(f); done(); }]);
 
   const m = menuEl = document.createElement('div');
   m.id = 'share-menu';

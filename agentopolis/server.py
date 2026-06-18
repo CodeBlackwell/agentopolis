@@ -7,6 +7,9 @@ seeds the configured repo's city on demand (cached per git HEAD).
 import asyncio
 import json
 import os
+import shutil
+import subprocess
+import tempfile
 import threading
 from collections import Counter, deque
 from contextlib import asynccontextmanager
@@ -17,6 +20,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from . import forge as forge_mod
 from . import og as og_mod
@@ -52,6 +56,8 @@ LOOP_EDGES = {"land", "forge", "share_tapped", "share_completed", "build_your_ow
 STATS_FILE = Path(p) if (p := os.environ.get("AGENTOPOLIS_STATS_FILE")) else None
 STATS_TOKEN = os.environ.get("AGENTOPOLIS_STATS_TOKEN")
 PLAYER_CARD = os.environ.get("AGENTOPOLIS_PLAYER_CARD")   # X player cards need per-account approval; off by default
+FFMPEG = shutil.which("ffmpeg")                  # inline-play unfurls need an H.264 mp4; absent on CLI installs → still-image card
+OGV_UPLOAD_MAX = 60 * 1024 * 1024                # accept a chunky raw client recording; the transcode shrinks it
 loop = Counter(json.loads(STATS_FILE.read_text())) if STATS_FILE and STATS_FILE.exists() else Counter()
 
 
@@ -281,6 +287,50 @@ def og_image(name: str):
     return FileResponse(p, media_type="image/png") if p.exists() else Response(status_code=404)
 
 
+def _transcode_mp4(src: bytes) -> bytes | None:
+    """Client clip (webm/mp4) → a broadly-embeddable H.264 mp4: 1200x630 (matches the OG still), yuv420p,
+    faststart for streaming, no audio. Pad-fits any source aspect on the brand plum. None if ffmpeg is absent or fails."""
+    if not FFMPEG:
+        return None
+    with tempfile.TemporaryDirectory() as d:
+        ip, op = Path(d) / "in", Path(d) / "out.mp4"
+        ip.write_bytes(src)
+        try:
+            subprocess.run([FFMPEG, "-y", "-i", str(ip), "-an", "-c:v", "libx264", "-preset", "veryfast",
+                            "-crf", "30", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                            "-vf", "scale=1200:630:force_original_aspect_ratio=decrease,"
+                                   "pad=1200:630:(ow-iw)/2:(oh-ih)/2:color=0x241020", str(op)],
+                           check=True, capture_output=True, timeout=120)
+        except (subprocess.SubprocessError, OSError):
+            return None
+        return op.read_bytes() if op.exists() else None
+
+
+@app.post("/og-video")                           # the movie page uploads its recorded clip; we transcode → cache the mp4
+async def ogv_upload(key: str, request: Request):
+    if not request.headers.get("content-type", "").startswith("video/"):
+        return Response(status_code=400)
+    body = await request.body()
+    if len(body) > OGV_UPLOAD_MAX:
+        return Response(status_code=413)
+    mp4 = await run_in_threadpool(_transcode_mp4, body)
+    if mp4 is None:
+        return Response(status_code=503)         # ffmpeg unavailable / failed → no video card, the still card still works
+    try:
+        return {"ok": True, "hash": forge_mod.save_ogv(key, mp4)}
+    except ValueError:
+        return Response(status_code=400)
+
+
+@app.get("/og-video/{name}")                     # serve a cached build clip (name = <16-hex>.mp4); FileResponse honors Range
+def ogv_file(name: str):
+    h = name[:-4] if name.endswith(".mp4") else name
+    if len(h) != 16 or any(c not in "0123456789abcdef" for c in h):   # hash only — no path traversal
+        return Response(status_code=404)
+    p = forge_mod.OG_DIR / f"{h}.mp4"
+    return FileResponse(p, media_type="video/mp4") if p.exists() else Response(status_code=404)
+
+
 @app.get("/events")
 async def events(request: Request) -> StreamingResponse:
     queue: asyncio.Queue = asyncio.Queue()
@@ -318,8 +368,10 @@ async def no_stale_assets(request: Request, call_next):
     return response
 
 
-def _og_block(title: str, desc: str, img: str, url: str, player: str | None = None) -> str:
-    e = lambda s: s.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
+def _og_block(title: str, desc: str, img: str, url: str,
+              player: str | None = None, video: str | None = None) -> str:
+    def e(s):                                            # html-escape for attribute values
+        return s.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
     t, d, i, u = e(title), e(desc), e(img), e(url)
     # player card plays the build inline in-feed; falls back to the still image where it isn't honored.
     if player:
@@ -329,6 +381,12 @@ def _og_block(title: str, desc: str, img: str, url: str, player: str | None = No
                 f'<meta name="twitter:player:height" content="630">\n')
     else:
         card = '<meta name="twitter:card" content="summary_large_image">\n'
+    # og:video plays the build clip inline on Discord / iMessage / Telegram / Slack / Facebook; image is the poster.
+    vid = (f'<meta property="og:video" content="{e(video)}">\n'
+           f'<meta property="og:video:secure_url" content="{e(video)}">\n'
+           f'<meta property="og:video:type" content="video/mp4">\n'
+           f'<meta property="og:video:width" content="1200">\n'
+           f'<meta property="og:video:height" content="630">\n') if video else ""
     return (f'<link rel="canonical" href="{u}">\n'
             f'<meta property="og:type" content="website">\n'
             f'<meta property="og:url" content="{u}">\n'
@@ -338,7 +396,7 @@ def _og_block(title: str, desc: str, img: str, url: str, player: str | None = No
             f'<meta property="og:image:width" content="1200">\n'
             f'<meta property="og:image:height" content="630">\n'
             f'<meta property="og:image:alt" content="{t}">\n'
-            + card +
+            + vid + card +
             f'<meta name="twitter:title" content="{t}">\n'
             f'<meta name="twitter:description" content="{d}">\n'
             f'<meta name="twitter:image" content="{i}">')
@@ -434,7 +492,9 @@ def _page(request: Request, forge: str | None, embed: bool = False) -> HTMLRespo
     # reliable still-image card stays the default. embed pages never advertise themselves as a card.
     cp = _canon_path(forge) if forge else None
     player_url = base + cp.replace("/c/", "/player/") if (PLAYER_CARD and cp and not embed) else None
-    og_tags = _og_block(og_title, og_desc, og_img, og_url, player_url)
+    # a warmed build clip (uploaded + transcoded when someone rendered one) plays inline in OG-video feeds
+    og_video = f"{base}/og-video/{forge_mod.og_hash(og_key)}.mp4" if (og_key and forge_mod.ogv_exists(og_key)) else None
+    og_tags = _og_block(og_title, og_desc, og_img, og_url, player_url, og_video)
 
     repo_url = forge or ""           # forge cities link their title back to the source repo; private/local cities don't
     html = (Path(__file__).parent / "static" / "index.html").read_text()

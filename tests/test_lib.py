@@ -20,8 +20,8 @@ REPO = str(Path(__file__).resolve().parent.parent)
 # ---- formation ladder: the algorithm that decides every city's shape ----------
 
 def _zone(*layers):
-    return {"components": [{"id": f"c{i}", "layer": l, "kind": "service"}
-                           for i, l in enumerate(layers)]}
+    return {"components": [{"id": f"c{i}", "layer": layer, "kind": "service"}
+                           for i, layer in enumerate(layers)]}
 
 
 def _alive(comps, centrality=1, commits=1):
@@ -65,12 +65,18 @@ def test_decimate_thins_churn_but_keeps_structure_and_ends():
 def test_timeline_folds_a_rename_onto_one_path(tmp_path):
     r = tmp_path / "r"
     r.mkdir()
-    run = lambda *a: subprocess.run(["git", "-C", str(r), *a], check=True, capture_output=True)
-    run("init", "-q"); run("config", "user.email", "t@t"); run("config", "user.name", "t")
+    def run(*a):
+        return subprocess.run(["git", "-C", str(r), *a], check=True, capture_output=True)
+    run("init", "-q")
+    run("config", "user.email", "t@t")
+    run("config", "user.name", "t")
     (r / "old.py").write_text("a\nb\nc\nd\ne\n")
-    run("add", "-A"); run("commit", "-q", "-m", "add")
-    (r / "new.py").write_text("a\nb\nc\nd\ne\n"); (r / "old.py").unlink()
-    run("add", "-A"); run("commit", "-q", "-m", "rename")
+    run("add", "-A")
+    run("commit", "-q", "-m", "add")
+    (r / "new.py").write_text("a\nb\nc\nd\ne\n")
+    (r / "old.py").unlink()
+    run("add", "-A")
+    run("commit", "-q", "-m", "rename")
     renames = [f for c in build_timeline(str(r))["commits"] for f in c["files"] if f["c"] == "R"]
     assert renames == [{"p": "new.py", "c": "R", "from": "old.py"}]
 

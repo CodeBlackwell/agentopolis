@@ -24,10 +24,12 @@ def _git(cwd, *args):
 def _make_repo(path, files):
     path.mkdir(parents=True, exist_ok=True)
     _git(path, "init", "-q")
-    _git(path, "config", "user.email", "t@t"); _git(path, "config", "user.name", "t")
+    _git(path, "config", "user.email", "t@t")
+    _git(path, "config", "user.name", "t")
     for name, body in files.items():
         (path / name).write_text(body)
-    _git(path, "add", "-A"); _git(path, "commit", "-q", "-m", "init")
+    _git(path, "add", "-A")
+    _git(path, "commit", "-q", "-m", "init")
     return path
 
 
@@ -47,19 +49,24 @@ def history_repo(tmp_path_factory):
     ruins, index coupling, detect epochs, build the ladder."""
     r = tmp_path_factory.mktemp("hist")
     _git(r, "init", "-q")
-    _git(r, "config", "user.email", "t@t"); _git(r, "config", "user.name", "t")
+    _git(r, "config", "user.email", "t@t")
+    _git(r, "config", "user.name", "t")
 
     def commit(msg):
-        _git(r, "add", "-A"); _git(r, "commit", "-q", "-m", msg)
+        _git(r, "add", "-A")
+        _git(r, "commit", "-q", "-m", msg)
 
     base = {"api/server.py": "import os\n" + "x=1\n" * 20, "api/db.py": "q=1\n" * 15,
             "api/util.py": "u=1\n" * 10, "web/app.js": "a\n" * 12, "web/ui.js": "b\n" * 8,
             "web/page.js": "c\n" * 6, "web/extra.js": "d\n" * 6, "legacy.py": "l\n" * 30}
     for p, b in base.items():
-        f = r / p; f.parent.mkdir(parents=True, exist_ok=True); f.write_text(b)
+        f = r / p
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(b)
     commit("init")
     for i in range(3):                                   # churn → commit depth for epochs
-        (r / "api/server.py").write_text("import os\n" + f"x={i}\n" * 20); commit(f"edit {i}")
+        (r / "api/server.py").write_text("import os\n" + f"x={i}\n" * 20)
+        commit(f"edit {i}")
     (r / "tools").mkdir()
     (r / "legacy.py").rename(r / "tools" / "new.py")     # a rename to fold (-M)
     commit("rename legacy")
@@ -322,7 +329,9 @@ def test_is_url():
 
 def test_repo_problem_catches_the_unmappable_and_clears_the_real(tmp_path):
     assert "isn't one" in cli.repo_problem(str(tmp_path))          # not a git repo
-    empty = tmp_path / "empty"; empty.mkdir(); _git(empty, "init", "-q")
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    _git(empty, "init", "-q")
     assert "no commits" in cli.repo_problem(str(empty))            # git repo, no history
     good = _make_repo(tmp_path / "good", {"a.py": "1\n"})
     assert cli.repo_problem(str(good)) is None                     # a real repo passes

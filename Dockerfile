@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
-# git: forge clones public repos at request time
-RUN apt-get update && apt-get install -y --no-install-recommends git \
+# git: forge clones public repos at request time. ffmpeg: transcode shared build clips to H.264 mp4 (og:video inline play)
+RUN apt-get update && apt-get install -y --no-install-recommends git ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
