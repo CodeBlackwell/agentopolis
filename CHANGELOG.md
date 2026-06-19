@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-06-19
+
 ### Added
 - A **date + commit caption** baked into the downloaded movie — a documentary lower-third showing each
   commit's timestamp, its position in history (`42/137`), and its truncated subject, in lockstep with the
