@@ -6,6 +6,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-06-18
+
+### Changed
+- The movie's legend cards now describe **this** repo instead of static per-kind labels: each district
+  card names what it actually holds (`mostly Python`, `JS & CSS`) and calls out a clear lead file when
+  one stands out, while staying glanceable — the deeper "why" stays one hover away in the tooltip.
+- Normalized the history walk to ~30s (was ~45s) regardless of repo size — a calmer, quicker reel.
+
+### Added
+- A **Building Shapes** legend card that reads the live skyline under the active shape rule (language by
+  default, or size / age / rarity), and re-renders the moment you switch the dropdown — even when paused.
+- An **Anatomy of a Building** card that fully decodes one real landmark (the tallest tower), with hover
+  highlighting it white on the map.
+- Hovering a legend card now flips it to a black-&-white palette (alongside the existing raise + outline)
+  to echo the white-recoloured building it points at — card and building light up together.
+
 ## [0.22.0] - 2026-06-18
 
 ### Changed
