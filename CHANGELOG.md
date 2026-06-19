@@ -6,6 +6,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- The OG share card and time-lapse movie end card now credit **"Built with <3 by CodeBlackwell w/ Claude"**
+  (a text heart, so the Silkscreen pixel font renders it cleanly) in place of "built by Claude Code".
+- Shared movie clips now record at the live movie's pace (matching what the viewer sees), show a live
+  render percentage on the Share button, and download with a repo-named filename (`agentopolis-<owner>-<repo>`).
+
 ## [0.26.0] - 2026-06-19
 
 ### Added
