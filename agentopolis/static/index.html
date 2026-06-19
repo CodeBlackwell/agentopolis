@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- clean URLs (/c/owner/repo, .../embed) sit below root; pin every relative asset to root so scripts don't resolve into the page route -->
+<base href="/">
 <title>Agentopolis — Claude Code as a living isometric city</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Watch Claude Code build your codebase as a living isometric city — agents are pixel workers on a dispatch floor and the skyline grows from your git history.">
@@ -338,7 +340,7 @@
             onsubmit="try{navigator.sendBeacon('/e/build_your_own')}catch(e){}location.href='/?forge='+encodeURIComponent(this.url.value.trim());return false">
         <div class="forge-hint demo-only">now build <b>your</b> repo &rarr;</div>
         <input name="url" autocomplete="off" spellcheck="false"
-               placeholder="paste your repo's github url &rarr; watch it become a city">
+               placeholder="your repo: owner/repo or github url &rarr; watch it become a city">
         <div class="install-row demo-only">
           <button type="button" class="install-badge" data-copy="brew install codeblackwell/tap/agentopolis">&#127866; brew install agentopolis</button>
           <button type="button" class="install-badge" data-copy="pip install agentopolis">&#128013; pip install agentopolis</button>

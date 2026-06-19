@@ -8,7 +8,6 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from urllib.parse import urlparse
 
 from .seed import seed
 from .timeline import build_timeline
@@ -114,22 +113,33 @@ def peek_tl(url: str) -> dict | None:
     return _load(url, "tl", forged_tl)
 
 
+_PART = re.compile(r"^[A-Za-z0-9._-]+$")            # github owner/repo charset — rejects ssh, '@', path tricks
+
+
+def _owner_repo(url: str) -> tuple[str, str] | None:
+    """owner/repo from a github url OR bare `owner/repo` shorthand (leading slash + github.com prefix optional).
+    None if it doesn't parse to exactly two clean segments."""
+    raw = re.sub(r"^(?:https?://)?(?:www\.)?github\.com/", "", (url or "").strip())
+    parts = [p for p in raw.split("/") if p]
+    if len(parts) != 2:
+        return None
+    owner, repo = parts[0], parts[1].removesuffix(".git")
+    if ".." in owner + repo or not _PART.match(owner) or not _PART.match(repo):
+        return None
+    return owner, repo
+
+
 def owner_repo(url: str) -> tuple[str | None, str | None]:
-    """Parse a github.com/owner/repo url into (owner, repo); (None, None) if it doesn't match."""
-    m = re.match(r"https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$", url or "")
-    return (m.group(1), m.group(2)) if m else (None, None)
+    """Parse a github url or owner/repo shorthand into (owner, repo); (None, None) if it doesn't match."""
+    return _owner_repo(url) or (None, None)
 
 
 def clone_url(url: str) -> str:
-    """Validate a public github.com/owner/repo url; return the https clone url or raise."""
-    u = urlparse(url.strip())
-    parts = [p for p in u.path.split("/") if p]
-    if u.scheme not in ("http", "https") or u.netloc != "github.com" or len(parts) != 2:
-        raise ValueError("not a github.com/owner/repo url")
-    owner, repo = parts[0], parts[1].removesuffix(".git")
-    if ".." in (owner + repo) or not owner or not repo:
-        raise ValueError("bad owner/repo")
-    return f"https://github.com/{owner}/{repo}.git"
+    """Validate a github repo ref — full url or `owner/repo` shorthand — and return the https clone url, or raise."""
+    parsed = _owner_repo(url)
+    if not parsed:
+        raise ValueError("not a github.com/owner/repo")
+    return "https://github.com/{}/{}.git".format(*parsed)
 
 
 def forge(url: str) -> dict:

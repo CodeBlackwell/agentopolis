@@ -127,6 +127,9 @@ def test_detach_is_a_noop_without_settings(settings):
     ("https://github.com/facebook/react.git", "https://github.com/facebook/react.git"),
     ("https://github.com/facebook/react/", "https://github.com/facebook/react.git"),
     ("http://github.com/a/b", "https://github.com/a/b.git"),
+    ("facebook/react", "https://github.com/facebook/react.git"),
+    ("/facebook/react", "https://github.com/facebook/react.git"),
+    ("github.com/facebook/react", "https://github.com/facebook/react.git"),
 ])
 def test_clone_url_accepts_and_normalizes_github(url, expected):
     assert forge.clone_url(url) == expected
