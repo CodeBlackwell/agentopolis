@@ -681,7 +681,7 @@ function loop(t) {
     applyCardHighlight(af.cards);                          // raise the cards a hovered building belongs to
     syncScroll(af.ping);                                   // reveal that card if the map hover scrolled it off
     focusPing = af.ping;                                   // recolour on the next frame (mapHit isn't known until draw)
-    if (endCardAt) drawEndCard(t);                         // branded outro, only while recording a clip
+    if (endCardAt) drawEndCard(t);                         // branded outro: on screen during a shareable warm, and in every clip
   }
   requestAnimationFrame(loop);
 }
@@ -801,15 +801,22 @@ let endCardAt = 0;
 let activeRec = null, activeAbort = null;                  // only one capture runs at a time — they share the playhead
 function drawEndCard(t) {
   const W = tlCanvas.width, H = tlCanvas.height, u = H / 18, k = Math.min(1, (t - endCardAt) / 300);
+  const name = document.body.dataset.hallName || 'this city', title = `${name} City — The Movie`;
   tlCtx.save();
   tlCtx.globalAlpha = k * 0.9; tlCtx.fillStyle = '#241020'; tlCtx.fillRect(0, 0, W, H);
   tlCtx.globalAlpha = k; tlCtx.textAlign = 'center'; tlCtx.textBaseline = 'middle';
-  tlCtx.fillStyle = '#f9efe3'; tlCtx.font = `${u * 1.7}px 'Silkscreen', monospace`;
-  tlCtx.fillText(document.body.dataset.hallName || 'this city', W / 2, H * 0.40);
+  let titleSize = u * 1.7;                                  // shrink the longer "City — The Movie" title to fit the frame
+  tlCtx.font = `${titleSize}px 'Silkscreen', monospace`;
+  while (tlCtx.measureText(title).width > W * 0.9 && titleSize > u * 0.8) {
+    titleSize -= u * 0.1; tlCtx.font = `${titleSize}px 'Silkscreen', monospace`;
+  }
+  tlCtx.fillStyle = '#f9efe3'; tlCtx.fillText(title, W / 2, H * 0.37);
+  tlCtx.fillStyle = '#c77aaa'; tlCtx.font = `${u * 0.7}px 'Silkscreen', monospace`;
+  tlCtx.fillText('An 8-Bit Productions Film', W / 2, H * 0.49);
   tlCtx.fillStyle = '#d4a953'; tlCtx.font = `${u}px 'Silkscreen', monospace`;
-  tlCtx.fillText(canonText(), W / 2, H * 0.55);
+  tlCtx.fillText(canonText(), W / 2, H * 0.61);
   tlCtx.fillStyle = '#c77aaa'; tlCtx.font = `${u * 0.8}px 'Silkscreen', monospace`;
-  tlCtx.fillText('Built with <3 by CodeBlackwell w/ Claude', W / 2, H * 0.65);
+  tlCtx.fillText('Built with <3 by CodeBlackwell w/ Claude', W / 2, H * 0.70);
   tlCtx.restore();
 }
 window.__endCard = { text: canonText, draw: drawEndCard, fps: captureFps };   // exposed for the end-card self-tests
@@ -819,7 +826,8 @@ window.__endCard = { text: canonText, draw: drawEndCard, fps: captureFps };   //
 window.recordTimelapseClip = (opts = {}) => new Promise(resolve => {
   if (!window.MediaRecorder || !tlCanvas.captureStream) return resolve(null);
   const replay = opts.replay !== false;                                 // default: a clean branded pass from the start.
-  // replay=false rides the movie that's already playing (a silent og:video warm — no restart, no end-card).
+  // replay=false rides the movie that's already playing (a silent warm — no restart). Both passes bake the
+  // branded end-card, so a shareable city's natural finish shows it on screen and the cached clip carries it.
   if (activeRec) {                                                       // both captures share the playhead, so never overlap
     if (!replay) return resolve(null);                                  //   a background warm yields to a capture already running
     activeAbort();                                                       //   a user download supersedes the warm ride-along
@@ -834,10 +842,10 @@ window.recordTimelapseClip = (opts = {}) => new Promise(resolve => {
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   rec.onstop = () => { if (activeRec === rec) { activeRec = activeAbort = null; } endCardAt = 0;
     resolve(new Blob(chunks, { type: rec.mimeType || 'video/webm' })); };
-  const finish = () => {                                                 // build done → (brand the outro, then) cut
+  const finish = () => {                                                 // build done → brand the outro, then cut
     clearTimeout(cap); clearInterval(poll);
-    if (replay) { endCardAt = performance.now(); setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, 1200); }
-    else if (rec.state !== 'inactive') rec.stop();
+    endCardAt = performance.now();                                       // shown on screen during the warm; baked into both clips
+    setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, 1200);
   };
   // The clip is the movie at its real pace — the same speed the viewer sees, so the download matches the live
   // build 1:1 (plus a ~1.2s branded outro). Real completion (poll) ends it; the timeout is only a safety net,

@@ -59,6 +59,11 @@ function downloadBlob(file) {                            // hand the asset to a 
 }
 
 let still = null, menuEl = null;
+// shareable cities: one silent branded ride-along of the first natural playback, captured while the viewer
+// watches and cached here — so "download movie" / share is instant instead of forcing a fresh 30s replay.
+let moviePromise = null, movieClip = null, warmStarted = false;
+const clipFile = (clip) => clip && new File([clip],
+  `agentopolis-${repoSlug()}.${clip.type.includes('mp4') ? 'mp4' : 'webm'}`, { type: clip.type });
 
 async function warm() {                                  // capture the still (for image-download / native attach) + upload so the link unfurls
   if (window.MOVIE && window.movieToComplete) await window.movieToComplete();   // a movie cards the FINISHED city, not a mid-reel frame
@@ -76,16 +81,24 @@ const repoSlug = () => {
   return (document.body.dataset.hallName || 'city').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'city';
 };
 
-async function recordClip(btn) {                         // movie only — render the build to a short video on demand
+async function recordClip(btn) {                         // movie only — the build as a short branded video
   if (!(window.MOVIE && window.recordTimelapseClip)) return null;
+  if (movieClip) return clipFile(movieClip);             // shareable: captured during the watch → instant, no replay
   const label = btn.innerHTML;
+  if (moviePromise) {                                    // ride-along still finishing → wait for it, don't force a fresh pass
+    btn.innerHTML = `<span class="rec-dot"></span>rendering…`;
+    const clip = await moviePromise;
+    btn.innerHTML = label;
+    if (clip) return clipFile(clip);
+  }
+  // local CLI movie (no warm ride-along) → record on demand, the slow branded replay from the empty lot
   const show = (pct) => { btn.innerHTML = `<span class="rec-dot"></span>rendering ${pct}%`; };   // live build progress on the button
   show(0);
   const clip = await window.recordTimelapseClip({ onProgress: p => show(Math.round(p * 100)) });
   btn.innerHTML = label;
   if (clip) fetch('/og-video?key=' + encodeURIComponent(shareKey()),   // warm the og:video so the link unfurls with inline playback
     { method: 'POST', headers: { 'Content-Type': clip.type || 'video/webm' }, body: clip }).catch(() => {});
-  return clip && new File([clip], `agentopolis-${repoSlug()}.${clip.type.includes('mp4') ? 'mp4' : 'webm'}`, { type: clip.type });
+  return clipFile(clip);
 }
 
 function closeMenu() {
@@ -147,19 +160,23 @@ function openMenu(btn) {
   setTimeout(() => { addEventListener('keydown', onKey); addEventListener('pointerdown', onOutside, true); }, 0);
 }
 
-// Pre-warm a forge/demo link's og:video so it unfurls with inline playback. We RIDE the build the
-// viewer is already watching (no replay, no end-card) and cache it once — gated so it fires at most
-// once, only for a shareable city (forge/demo), and never when the server says it's already warmed.
-// The demo is warmed server-side post-deploy (`just prewarm`), so this mostly covers forge links.
+// Shareable cities (forge/demo): RIDE the build the viewer is already watching (no replay) and cache the
+// clip locally, so "download movie" / share is instant. The same pass bakes the branded end-card, so the
+// natural finish shows it on screen too. We also POST it to warm the og:video (so the link unfurls with
+// inline playback) — skipped when the server already warmed it (`just prewarm`), but we still capture for
+// the local cache. Fires at most once per page; a local CLI movie has no forge/DEMO_CITY, so it stays cold.
 function warmVideoOnce() {
-  if (!(window.MOVIE && !window.OG_VIDEO_WARM && (forge || window.DEMO_CITY) && window.recordTimelapseClip)) return;
-  window.OG_VIDEO_WARM = true;                            // capture at most once per page
+  if (!(window.MOVIE && (forge || window.DEMO_CITY) && window.recordTimelapseClip)) return;
+  if (warmStarted) return;
+  warmStarted = true;
   let tries = 0;
   const wait = setInterval(() => {                        // ride the build once it's actually playing; skip if it never does
     if (window.movieState && window.movieState() === 'play') {
       clearInterval(wait);
-      window.recordTimelapseClip({ replay: false }).then(clip => {
-        if (clip) fetch('/og-video?key=' + encodeURIComponent(shareKey()),
+      moviePromise = window.recordTimelapseClip({ replay: false });
+      moviePromise.then(clip => {
+        movieClip = clip;                                 // cache for instant download/share
+        if (clip && !window.OG_VIDEO_WARM) fetch('/og-video?key=' + encodeURIComponent(shareKey()),
           { method: 'POST', headers: { 'Content-Type': clip.type || 'video/webm' }, body: clip }).catch(() => {});
       });
     } else if (++tries > 100) clearInterval(wait);        // ~20s and still not playing → leave it cold
