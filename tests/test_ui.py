@@ -200,6 +200,32 @@ def test_download_movie_warms_the_og_video(page, base_url):
     assert "/og-video?key=" in page.evaluate("window.__ogv[0]")
 
 
+def test_shareable_download_reuses_the_cached_warm_clip(page, base_url):
+    # a shareable city (forge/demo) records the build ONCE, silently, while the viewer watches; "download
+    # movie" then hands back that cached clip instead of forcing a fresh 30s replay. We fake shareability by
+    # pinning DEMO_CITY, and count recorder calls via a getter stub so the real heavy recorder never runs.
+    page.add_init_script("""
+        Object.defineProperty(window, 'DEMO_CITY', { configurable: true, get() { return 'testrepo'; }, set() {} });
+        window.__recCalls = 0;
+        Object.defineProperty(window, 'recordTimelapseClip', { configurable: true,
+            get() { return () => { window.__recCalls++;
+                return Promise.resolve(new Blob([new Uint8Array([0,0,0,24,102,116,121,112])], {type:'video/mp4'})); }; },
+            set() {} });
+        const of = window.fetch;
+        window.fetch = (u, o) => String(u).startsWith('/og-video') ? Promise.resolve(new Response('{}')) : of(u, o);
+        Object.defineProperty(navigator, 'share', {value: undefined, configurable: true});
+    """)
+    page.goto(base_url + "/?timelapse")
+    page.wait_for_selector("#tl-play")
+    page.click("#tl-play")                                    # start the build → the silent warm rides it and caches
+    page.wait_for_function("window.__recCalls === 1", timeout=10000)
+    page.click("#share")
+    page.wait_for_selector("#share-menu")
+    page.click("#share-menu >> text=download movie")
+    page.wait_for_selector("#share-menu", state="detached")   # the menu closes once the download fires
+    assert page.evaluate("window.__recCalls") == 1            # reused the cache — no second recording
+
+
 def test_clicking_a_building_pins_its_tooltip(page, base_url):
     # click/tap a building → it resolves the file under the cursor and pins that item's tooltip
     _open_city(page, base_url)
