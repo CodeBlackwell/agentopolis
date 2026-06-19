@@ -975,7 +975,8 @@ function buildTransport() {
     options: modeOpts(TRANSITION_MODES), value: transMode, onSelect: v => transMode = v }), label);
   bar.insertBefore(makeDropdown({ id: 'tl-shape', title: 'how building shapes are chosen',
     options: modeOpts(City.SHAPE_MODES), value: City.shapeMode,
-    onSelect: v => { City.setShapeMode(v); for (const l of layouts) City.applyShapes(l.state); } }), label);
+    onSelect: v => { City.setShapeMode(v); for (const l of layouts) City.applyShapes(l.state);
+                     if (lastShown) renderExplain(lastShown, lastI); } }), label);   // refresh the Shapes card now, even when paused
   document.addEventListener('click', () => document.querySelectorAll('.tl-dd.open').forEach(d => d.classList.remove('open')));
   if (liveHref) bar.querySelector('#tl-exit').onclick = () => location.href = liveHref;
 }
@@ -1056,8 +1057,10 @@ const TIP = {
   street: `<h6>Street life</h6>Ambient life tracks recent activity — residents on foot and cars on the road thicken in whichever districts saw the most recent commits, and thin where work has gone quiet. A glanceable heat-map of where the action is now.`,
   stall: `<h6>Market stalls</h6>Stalls ring the central plaza, one per district still receiving commits at this point in history. As parts of the codebase fall dormant their stalls disappear, so the market shows the repo's currently-active surface.`,
   boat: `<h6>Canal traffic</h6>Canals divide the data-flow layers of the city. The boats working them stand for traffic between those layers — a nod to how data moves through the stack from one tier to the next.`,
+  shapes: `<h6>Building shapes</h6>A building's silhouette tells you what its file is. Non-code files take a fixed form — houses for docs, sheds for config, vaults for secrets. Code files are shaped by the dropdown's current rule: by <b>language</b> (the default), or by file <b>size</b>, <b>age</b>, or <b>rarity</b>. Switch the dropdown to re-read the whole skyline.`,
+  anatomy: `<h6>Reading one building</h6>Every building encodes its file at a glance: <b>height</b> = lines of code plus how much the rest of the repo imports it, <b>lit windows</b> = edited recently, an <b>antenna</b> = an import hub, a <b>crane</b> = TODO debt, a <b>billboard</b> = its district's hottest third.`,
 };
-let tipEl = null;
+let tipEl = null, lastShown = null, lastI = 0;            // lastShown/lastI: re-render the legend on a shape-paradigm switch
 function hideTip() { if (tipEl) tipEl.style.display = 'none'; }
 function placeTip(cardEl) {                                // float above the card, flip below + clamp if no room
   const r = cardEl.getBoundingClientRect(), t = tipEl.getBoundingClientRect();
@@ -1086,8 +1089,15 @@ function buildExplain() {
     border:2px solid var(--gold);box-shadow:4px 4px 0 var(--plum-soft);display:flex;flex-direction:column;
     transition:transform .12s ease,box-shadow .12s ease,outline-color .12s ease;outline:2px solid transparent;outline-offset:1px}
     .xcard[data-focus]{cursor:pointer}
+    /* hover/focus: raise + pink outline (as before), AND flip to a black-&-white palette to echo the
+       white-recoloured building it points at on the map — the card and its building light up together */
     .xcard[data-focus]:hover,.xcard.xfocus{transform:translateY(-4px);outline-color:#f2b5c9;
+    background:#f4f1ea;border-color:#141414;
     box-shadow:5px 9px 0 var(--plum-soft),0 0 12px rgba(232,168,189,.55)}
+    .xcard[data-focus]:hover h5,.xcard.xfocus h5{background:#141414;color:#fff}
+    .xcard[data-focus]:hover h5 .chip,.xcard.xfocus h5 .chip{filter:grayscale(1) brightness(1.9);border-color:#fff}
+    .xcard[data-focus]:hover p,.xcard.xfocus p{color:#141414}
+    .xcard[data-focus]:hover .em,.xcard.xfocus .em{color:#000}
     .xcard.live{flex:1 1 230px;max-width:320px}
     .xcard h5{background:var(--gold);color:var(--plum);font:700 10px 'Silkscreen',monospace;
     letter-spacing:.1em;text-transform:uppercase;padding:5px 8px;display:flex;align-items:center;gap:6px}
@@ -1127,6 +1137,60 @@ function buildExplain() {
 const FORM_TITLE = { village: 'Small Town', acropolis: 'Acropolis', radial: 'Radial', spine: 'Spine',
                      constellation: 'Constellation', grid: 'Grid' };
 const RELIC_KIND = { cityfarm: 'city farm', windmill: 'windmill', fountain: 'fountain', watertower: 'water tower' };
+
+// ---- tailored card copy: describe THIS repo's districts / shapes / landmark, derived from the live buildings.
+// Each helper returns ONE plain phrase (the deeper "why" lives in the hover tooltip), so cards stay glanceable. ----
+const LANG_LABEL = { py: 'Python', rb: 'Ruby', js: 'JavaScript', ts: 'TypeScript', jsx: 'JavaScript', tsx: 'TypeScript',
+  mjs: 'JavaScript', vue: 'Vue', svelte: 'Svelte', go: 'Go', rs: 'Rust', java: 'Java', kt: 'Kotlin', cs: 'C#',
+  swift: 'Swift', scala: 'Scala', c: 'C', cc: 'C++', cpp: 'C++', h: 'C', hpp: 'C++', md: 'Markdown', rst: 'docs',
+  txt: 'text', json: 'JSON', yml: 'YAML', yaml: 'YAML', toml: 'config', ini: 'config', cfg: 'config',
+  lock: 'lockfiles', html: 'HTML', css: 'CSS', scss: 'CSS', sh: 'shell', bash: 'shell', sql: 'SQL',
+  env: 'secrets', pem: 'secrets', key: 'secrets', crt: 'secrets' };
+const fileName = path => path.split('/').pop();           // basename, no dir
+
+function districtRole(blds) {                             // one plain phrase for what this district actually holds
+  if (!blds.length) return '';
+  const by = {};
+  for (const b of blds) { const l = LANG_LABEL[b.ext] || (b.ext ? '.' + b.ext : 'misc'); by[l] = (by[l] || 0) + 1; }
+  const ranked = Object.entries(by).sort((a, c) => c[1] - a[1]);
+  if (ranked[0][1] / blds.length >= 0.6) return `mostly ${ranked[0][0]}`;     // one flavor dominates
+  return ranked[1] ? `${ranked[0][0]} & ${ranked[1][0]}` : ranked[0][0];      // else the top one or two
+}
+
+function leadFile(blds) {                                 // name a clear standout file, else nothing (stay quiet)
+  if (blds.length < 3) return '';
+  const [top, next] = [...blds].sort((a, b) => (b.commits || 0) - (a.commits || 0));
+  return (top.commits || 0) >= 3 && (top.commits || 0) >= 1.6 * ((next && next.commits) || 0) ? fileName(top.path) : '';
+}
+
+const SHAPE_OF = { py: 'pyramid', rb: 'pyramid', js: 'cylinder', ts: 'cylinder', jsx: 'cylinder', tsx: 'cylinder',
+  mjs: 'cylinder', vue: 'cylinder', svelte: 'cylinder', go: 'ziggurat', rs: 'ziggurat', java: 'ziggurat',
+  kt: 'ziggurat', cs: 'ziggurat', swift: 'ziggurat', scala: 'ziggurat', c: 'obelisk', cc: 'obelisk',
+  cpp: 'obelisk', h: 'obelisk', hpp: 'obelisk' };
+const SHAPE_NAME = { pyramid: 'stepped pyramids', cylinder: 'round towers', ziggurat: 'terraced blocks', obelisk: 'tall spires' };
+const SHAPE_LANG = { pyramid: 'Python/Ruby', cylinder: 'JS/TS', ziggurat: 'Go/Rust/Java', obelisk: 'C/C++' };
+
+function shapesBlurb(shown) {                             // what the silhouettes mean under the ACTIVE paradigm, named for this city
+  const mode = City.shapeMode;
+  if (mode === 'size') return `Shapes show <span class="em">size</span> — the bigger the file, the more monumental its tower.`;
+  if (mode === 'age') return `Shapes show <span class="em">age</span> — fresh code is fancy, old code settles into plain boxes.`;
+  if (mode === 'rarity') return `Shapes show <span class="em">rarity</span> — the rarer a language is here, the more exotic its shape.`;
+  if (mode === 'uniform') return `Shape encoding is <span class="em">off</span> — every code file is a plain box.`;
+  const by = {};                                          // family (default): name the language shapes actually on screen
+  for (const b of shown) { if (b.form) continue; const sh = SHAPE_OF[b.ext]; if (sh) by[sh] = (by[sh] || 0) + 1; }
+  const present = Object.entries(by).sort((a, c) => c[1] - a[1]).slice(0, 3).map(([sh]) => `${SHAPE_NAME[sh]} = ${SHAPE_LANG[sh]}`);
+  return present.length ? `Shapes show <span class="em">language</span> — ${present.join(', ')}.`
+    : `Shapes show language — this city is mostly docs & config, not code.`;
+}
+
+function anatomyCard(shown) {                             // decode the grammar on one real landmark the viewer can find
+  const pick = [...shown].filter(b => !b.kind).sort((a, b) => (b.floors || 0) - (a.floors || 0) || (b.loc || 0) - (a.loc || 0))[0];
+  if (!pick) return '';
+  let body = `<span class="em">${esc(fileName(pick.path))}</span> is the tallest tower — its height is lines of code plus how many files lean on it.`;
+  if (pick.lit > 0.5) body += ` Its lit windows mean it changed recently.`;
+  else if (pick.hub) body += ` Its antenna marks it as an import hub.`;
+  return card('Anatomy of a Building', body, null, 'building:' + pick.path, 'anatomy');
+}
 
 function formationCard(id, s) {                            // the secret sauce, in this repo's own thresholds
   const k = City.FORM_CUT, d = s.dominance.toFixed(1), m = s.mass.toFixed(1);
@@ -1184,6 +1248,7 @@ function renderExplain(shown, i) {
   const box = document.getElementById('explain');
   if (!box || !state) return;
   hideTip();                                              // DOM is about to be rebuilt; drop any open tooltip
+  lastShown = shown; lastI = i;                           // remember the frame so a shape-paradigm switch can re-render
   const c = commits[i], id = layouts[epochIndex].ep.formation.id;
   const s = City.statsOf({ zone: state.zone, buildings: shown });
   const perDist = {};                                     // standing buildings per district at this commit
@@ -1207,9 +1272,15 @@ function renderExplain(shown, i) {
     + stat('districts', districts.length) + stat('shape', id) + `</div></div>`);
   const reformed = reformedCard(); if (reformed) cards.push(reformed);   // persists until the next re-form
   cards.push(formationCard(id, s));
-  for (const d of districts)
-    cards.push(card(d.name, `<span class="em">${pl(perDist[d.id], 'file')}</span> · ${KIND_ROLE[d.kind] || d.kind}`
+  for (const d of districts) {                            // tailored: what THIS district holds, not a static per-kind label
+    const blds = shown.filter(b => b.component === d.id);
+    const role = districtRole(blds) || KIND_ROLE[d.kind] || d.kind, lead = leadFile(blds);
+    cards.push(card(d.name, `<span class="em">${pl(perDist[d.id], 'file')}</span> · ${esc(role)}`
+      + (lead ? ` · <span class="em">${esc(lead)}</span> leads` : '')
       + (d.id === s.hub ? ' · <span class="em">★ coupling hub</span>' : ''), d.color, 'district:' + d.id, 'district'));
+  }
+  cards.push(card('Building Shapes', shapesBlurb(shown), null, null, 'shapes'));   // read the silhouettes (paradigm-aware)
+  const anat = anatomyCard(shown); if (anat) cards.push(anat);                     // one landmark, fully decoded
   if (hubs) cards.push(card('Import Hubs', `Antennas mark ${pl(hubs, 'file')} in the repo's top 10% by imports — the wiring others lean on.`, null, 'hub'));
   if (debts) cards.push(card('TODO Debt', `Cranes hang over ${pl(debts, 'file')} in the top 10% by TODO / FIXME count.`, null, 'debt'));
   if (state.deps.length) cards.push(card('Freight Rail', `${state.deps.length} package deps ride the freight line — read from the manifest.`, null, 'deps'));
@@ -1238,6 +1309,7 @@ function focusShapes(focus) {                              // hit-rects (buildin
   const [type, arg] = focus.split(':');
   const drawn = (state.items || []).filter(b => b.screen && !b.kind);
   if (type === 'district') return drawn.filter(b => b.component === arg);   // buildings → footprint silhouette
+  if (type === 'building') return drawn.filter(b => b.path === arg);        // the Anatomy card's single landmark
   if (type === 'hub') return drawn.filter(b => b.hub);
   if (type === 'debt') return drawn.filter(b => b.debt);
   if (type === 'graves') return drawn.filter(b => b.ruined);
