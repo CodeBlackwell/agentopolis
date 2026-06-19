@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-06-19
+
 ### Changed
 - The OG share card and time-lapse movie end card now credit **"Built with <3 by CodeBlackwell w/ Claude"**
   (a text heart, so the Silkscreen pixel font renders it cleanly) in place of "built by Claude Code".
