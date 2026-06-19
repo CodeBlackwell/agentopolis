@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-06-19
+
 ### Added
 - A `scout` command that ranks GitHub repos by time-lapse "movie potential". `agentopolis scout` lists
   trending (`--since daily|weekly|monthly`, `--lang <language>`), or pass a search query to rank results;
