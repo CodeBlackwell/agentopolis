@@ -88,11 +88,13 @@ try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');
   seek(-1);
   loading.remove();
   speed = autoSpeed();                                    // size the walk to ~30s regardless of repo size (calm, not chaotic)
-  // The opening is a POSTER, not a tour: hold the finished city (the payoff), glow ▶ as the one cue, and
-  // soft-fall into the build if untouched. Embeds autoplay; a resuming tour drives ▶ itself, so leave it be.
+  // Embeds and the demo landing start the build on first land — play the history from the empty lot.
+  // Forge-movie links (and reduced-motion / resuming-tour visitors) instead hold a POSTER — the finished
+  // city, ▶ glowing — and soft-fall into the build if untouched. A resuming tour drives ▶ itself.
   const embed = document.body.dataset.embed === '1';
   const resuming = !!localStorage.getItem('agentopolis-tour-resume');   // a paused tour is about to take the wheel
-  if (embed) setPlay(true);                                // a movie plays itself from the empty lot
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (embed || (window.DEMO_MOVIE && !resuming && !reduce)) setPlay(true);   // autoplay from the empty lot
   else { rewindForTour(); if (!resuming) armPoster(); }    // poster on the finished city; glow ▶ + soft-fallback
   startIntro();                                           // ease the camera in from the live view's frame (no-op without one)
   requestAnimationFrame(loop);

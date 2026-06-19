@@ -13,6 +13,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   you play it.
 
 ### Changed
+- The demo landing now **starts the build immediately** on first land (autoplay from the empty lot)
+  instead of holding the finished-city poster for ~5s. Shared forge-movie links still open on the poster,
+  and reduced-motion visitors still get the tap-to-play poster (no auto-motion).
 - Movie-potential scoring now rewards **pacing**: a repo that moves through several formations scores
   higher than one that dwells in a single shape, and the crawl/scout tables show each phase's share of
   history (e.g. `village·42% → spine·33% → grid·25%`) instead of a bare formation ladder.
