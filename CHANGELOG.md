@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **Downloading a shared movie is now instant.** On forge/demo cities the build is recorded once silently
+  while you watch and cached, so "download movie" (and the native share sheet) hands back that clip
+  immediately instead of forcing a fresh ~30s replay from the empty lot. Local CLI movies are unchanged.
+- The branded movie end card is now a **title card** (`<City> City — The Movie` / "An 8-Bit Productions
+  Film") and plays at the natural end of the movie on shareable cities — so the finish shows it on screen,
+  and the cached download carries the same branded outro.
+
 ## [0.27.0] - 2026-06-19
 
 ### Changed
