@@ -6,13 +6,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- A **date + commit caption** baked into the downloaded movie — a documentary lower-third showing each
+  commit's timestamp, its position in history (`42/137`), and its truncated subject, in lockstep with the
+  build on screen (the live page keeps its own transport label, which the canvas recording can't capture).
+
 ### Changed
-- **Downloading a shared movie is now instant.** On forge/demo cities the build is recorded once silently
-  while you watch and cached, so "download movie" (and the native share sheet) hands back that clip
-  immediately instead of forcing a fresh ~30s replay from the empty lot. Local CLI movies are unchanged.
-- The branded movie end card is now a **title card** (`<City> City — The Movie` / "An 8-Bit Productions
-  Film") and plays at the natural end of the movie on shareable cities — so the finish shows it on screen,
-  and the cached download carries the same branded outro.
+- **Downloading a movie is now instant, on every city.** The build is recorded once silently while you
+  watch and cached, so "download movie" (and the native share sheet) hands back that clip immediately
+  instead of replaying from the empty lot — now for local CLI movies too, not just forge/demo cities.
+- The branded movie end card is a **title card** (`<City> City — The Movie` / "An 8-Bit Productions Film")
+  that now **holds** at the natural end of every movie — on screen after the build, and as a ~2.6s branded
+  outro in the downloaded clip.
+
+### Fixed
+- **Downloaded movies played as a black screen in macOS QuickTime / Finder Quick Look.** Chrome's recorder
+  writes a fragmented MP4 those players can't render; "download movie" now hands back the server's faststart
+  H.264 transcode instead (falling back to the raw recording only where ffmpeg is unavailable).
+- The recorded clip no longer truncates before the end card on longer (~30s+) movies — the capture's safety
+  cap is now sized to the actual runtime instead of a fixed 30s.
 
 ## [0.27.0] - 2026-06-19
 

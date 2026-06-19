@@ -609,7 +609,7 @@ function recompute(i) {                                   // set targets + visib
 }
 
 function seek(i) {                                        // scrub / init: snap instantly, no tween or collapse
-  transition = null; holdUntil = 0;                       // scrubbing snaps to the settled epoch (no live re-form / pending hold)
+  transition = null; holdUntil = 0; endCardAt = 0;        // scrubbing / replaying clears a held end card and snaps to the settled epoch
   recompute(i);
   for (const b of state.buildings) {
     const vis = bornAt.has(b) && bornAt.get(b) <= i && !(b.death !== undefined && i >= b.death + decaySpan);
@@ -647,6 +647,7 @@ function loop(t) {
   if (state) state.skyPhase = (ptr + 1) / commits.length;  // history walks dawn → night as the city ages
   if (transition) {                                        // a formation re-form is playing: hold the playhead
     if (drawTransition(t)) seek(transition.at);             // settle at full height (seek snaps floors; tween won't regrow)
+    if (activeRec && !endCardAt) drawCommitHud();           // keep the caption up through the re-form, not just static frames
     last = 0; requestAnimationFrame(loop); return;
   }
   if (holdUntil && playing && t >= holdUntil) {            // the formation has had its moment → re-form now
@@ -666,7 +667,8 @@ function loop(t) {
       if (target >= nextStart) { advance(nextStart - 1); holdUntil = t + REFORM_HOLD; }   // settle the finished form, then re-form
       else advance(target);
     }
-    if (ptr >= commits.length - 1) { const justFinished = playing; setPlay(false); if (justFinished) onMovieComplete(); }
+    if (ptr >= commits.length - 1) { const justFinished = playing; setPlay(false);
+      if (justFinished) { if (!window.DEMO_MOVIE) endCardAt ||= performance.now(); onMovieComplete(); } }   // hold the title card on the finish (demo keeps its finished-city beat)
   } else { last = 0; }
   if (!transition) {
     if (intro) stepIntro(t);
@@ -681,6 +683,7 @@ function loop(t) {
     applyCardHighlight(af.cards);                          // raise the cards a hovered building belongs to
     syncScroll(af.ping);                                   // reveal that card if the map hover scrolled it off
     focusPing = af.ping;                                   // recolour on the next frame (mapHit isn't known until draw)
+    if (activeRec && !endCardAt) drawCommitHud();          // bake the date + commit subject into the recorded clip
     if (endCardAt) drawEndCard(t);                         // branded outro: on screen during a shareable warm, and in every clip
   }
   requestAnimationFrame(loop);
@@ -798,7 +801,24 @@ const canonText = () => {
 };
 const captureFps = (cores) => ((cores ?? navigator.hardwareConcurrency ?? 8) <= 4 ? 24 : 30);  // lighter on weak phones
 let endCardAt = 0;
+const END_CARD_HOLD = 2600;                                // ms the branded title card holds in the recorded clip before the cut
 let activeRec = null, activeAbort = null;                  // only one capture runs at a time — they share the playhead
+// A documentary lower-third baked onto the canvas (so it survives into the recorded clip, unlike the DOM
+// transport label): the date + commit subject of the frame's commit, in lockstep with the build on screen.
+function drawCommitHud() {
+  const c = commits[ptr]; if (!c) return;
+  const W = tlCanvas.width, H = tlCanvas.height, u = H / 18, pad = u * 0.6;
+  tlCtx.save();
+  tlCtx.textAlign = 'left'; tlCtx.textBaseline = 'alphabetic';
+  tlCtx.fillStyle = 'rgba(36,16,32,.72)'; tlCtx.fillRect(0, H - u * 2.3, W, u * 2.3);   // legibility scrim
+  tlCtx.fillStyle = '#d4a953'; tlCtx.font = `${u * 0.6}px 'Silkscreen', monospace`;
+  tlCtx.fillText(`${fmtDate(c.ts)}    ${ptr + 1}/${commits.length}`, pad, H - u * 1.35);
+  tlCtx.fillStyle = '#f9efe3'; tlCtx.font = `${u * 0.72}px 'Silkscreen', monospace`;   // truncate the subject to the frame
+  let subject = c.subject;
+  while (subject.length > 1 && tlCtx.measureText(subject + '…').width > W - pad * 2) subject = subject.slice(0, -1);
+  tlCtx.fillText(subject === c.subject ? subject : subject + '…', pad, H - u * 0.5);
+  tlCtx.restore();
+}
 function drawEndCard(t) {
   const W = tlCanvas.width, H = tlCanvas.height, u = H / 18, k = Math.min(1, (t - endCardAt) / 300);
   const name = document.body.dataset.hallName || 'this city', title = `${name} City — The Movie`;
@@ -840,19 +860,20 @@ window.recordTimelapseClip = (opts = {}) => new Promise(resolve => {
   catch (e) { return resolve(null); }
   const chunks = [];
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-  rec.onstop = () => { if (activeRec === rec) { activeRec = activeAbort = null; } endCardAt = 0;
+  rec.onstop = () => { if (activeRec === rec) { activeRec = activeAbort = null; }   // leave endCardAt: the title card holds past the cut (seek/replay clears it)
     resolve(new Blob(chunks, { type: rec.mimeType || 'video/webm' })); };
   const finish = () => {                                                 // build done → brand the outro, then cut
     clearTimeout(cap); clearInterval(poll);
     endCardAt = performance.now();                                       // shown on screen during the warm; baked into both clips
-    setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, 1200);
+    setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, END_CARD_HOLD);   // hold the title card before the cut
   };
   // The clip is the movie at its real pace — the same speed the viewer sees, so the download matches the live
-  // build 1:1 (plus a ~1.2s branded outro). Real completion (poll) ends it; the timeout is only a safety net,
-  // sized past the actual runtime (walk at the current speed + reform holds) so it never truncates a real pass.
+  // build 1:1 (plus the held branded outro). Real completion (poll) ends it; the timeout is only a safety net,
+  // sized past the actual runtime (walk at the current speed + reform holds) so it never truncates before the
+  // end card — for BOTH the ride-along (replay:false) and the on-demand replay, since both now run at live pace.
   const holdSec = Math.max(0, layouts.length - 1) * REFORM_HOLD / 1000;
   const expectedSec = commits.length / Math.max(1, speed) + holdSec;
-  const cap = setTimeout(finish, replay ? (expectedSec * 1.5 + 5) * 1000 : 30000);
+  const cap = setTimeout(finish, (expectedSec * 1.5 + 5) * 1000);
   const poll = setInterval(() => {
     opts.onProgress?.(commits.length ? Math.min(1, (ptr + 1) / commits.length) : 0);
     if (!playing && ptr >= commits.length - 1) finish();

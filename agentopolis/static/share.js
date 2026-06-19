@@ -65,6 +65,28 @@ let moviePromise = null, movieClip = null, warmStarted = false;
 const clipFile = (clip) => clip && new File([clip],
   `agentopolis-${repoSlug()}.${clip.type.includes('mp4') ? 'mp4' : 'webm'}`, { type: clip.type });
 
+// POST a recording so the shared link unfurls with inline video; resolves the server cache hash (null if
+// ffmpeg is absent, i.e. CLI installs — then there's no transcode and the raw clip is all we have).
+async function warmOgv(file) {
+  try {
+    const r = await fetch('/og-video?key=' + encodeURIComponent(shareKey()),
+      { method: 'POST', headers: { 'Content-Type': file.type || 'video/webm' }, body: file });
+    return r.ok ? (await r.json()).hash : null;
+  } catch { return null; }
+}
+
+// The raw recording is a fragmented mp4 that macOS QuickTime/Preview render as a black screen; hand back the
+// server's faststart H.264 transcode instead. Falls back to the raw file when ffmpeg can't transcode.
+async function playableFile(file) {
+  if (!file) return file;
+  const hash = await warmOgv(file);
+  if (!hash) return file;
+  try {
+    const mp4 = await (await fetch('/og-video/' + hash + '.mp4')).blob();
+    return new File([mp4], `agentopolis-${repoSlug()}.mp4`, { type: 'video/mp4' });
+  } catch { return file; }
+}
+
 async function warm() {                                  // capture the still (for image-download / native attach) + upload so the link unfurls
   if (window.MOVIE && window.movieToComplete) await window.movieToComplete();   // a movie cards the FINISHED city, not a mid-reel frame
   const blob = await captureOG();
@@ -96,9 +118,7 @@ async function recordClip(btn) {                         // movie only — the b
   show(0);
   const clip = await window.recordTimelapseClip({ onProgress: p => show(Math.round(p * 100)) });
   btn.innerHTML = label;
-  if (clip) fetch('/og-video?key=' + encodeURIComponent(shareKey()),   // warm the og:video so the link unfurls with inline playback
-    { method: 'POST', headers: { 'Content-Type': clip.type || 'video/webm' }, body: clip }).catch(() => {});
-  return clipFile(clip);
+  return clipFile(clip);                                  // og:video warm + faststart transcode happen in playableFile/warmOgv
 }
 
 function closeMenu() {
@@ -112,7 +132,10 @@ function onOutside(e) { if (menuEl && !menuEl.contains(e.target) && e.target.id 
 async function nativeShare(btn, url, text) {             // the OS share sheet — the only path that attaches the real media
   try {
     let file = still;
-    if (window.MOVIE) file = await recordClip(btn) || still;
+    if (window.MOVIE) {
+      const clip = await recordClip(btn);                 // iOS plays its own recorded mp4 fine — attach it as-is
+      if (clip) { warmOgv(clip); file = clip; }            // warm og:video in the background so the shared link unfurls
+    }
     const data = { title: 'Agentopolis', text, url };
     if (file && navigator.canShare?.({ files: [file] })) await navigator.share({ ...data, files: [file] });
     else await navigator.share(data);
@@ -136,7 +159,7 @@ function openMenu(btn) {
   rows.push(['post to hacker news', intent(`https://news.ycombinator.com/submitlink?u=${encodeURIComponent(url)}&t=${encodeURIComponent(text)}`)]);
   rows.push(['copy link', async () => { try { await navigator.clipboard.writeText(text + ' ' + url); toast('link copied'); } catch {} done(); }]);
   rows.push(['download image', async () => { if (!still) await warm(); if (still) downloadBlob(still); done(); }]);
-  if (window.MOVIE) rows.push(['download movie', async () => { const f = await recordClip(btn); if (f) downloadBlob(f); done(); }]);
+  if (window.MOVIE) rows.push(['download movie', async () => { const f = await playableFile(await recordClip(btn)); if (f) downloadBlob(f); done(); }]);
 
   const m = menuEl = document.createElement('div');
   m.id = 'share-menu';
@@ -160,13 +183,13 @@ function openMenu(btn) {
   setTimeout(() => { addEventListener('keydown', onKey); addEventListener('pointerdown', onOutside, true); }, 0);
 }
 
-// Shareable cities (forge/demo): RIDE the build the viewer is already watching (no replay) and cache the
-// clip locally, so "download movie" / share is instant. The same pass bakes the branded end-card, so the
-// natural finish shows it on screen too. We also POST it to warm the og:video (so the link unfurls with
-// inline playback) — skipped when the server already warmed it (`just prewarm`), but we still capture for
-// the local cache. Fires at most once per page; a local CLI movie has no forge/DEMO_CITY, so it stays cold.
+// Every movie: RIDE the build the viewer is already watching (no replay) and cache the clip locally, so
+// "download movie" / share is instant — no fresh restart from the empty lot. The same pass bakes the branded
+// end-card, so the natural finish shows it on screen too. For shareable cities (forge/DEMO_CITY) we also POST
+// it to warm the og:video so the link unfurls with inline playback — skipped when the server already warmed
+// it (`just prewarm`). Fires at most once per page.
 function warmVideoOnce() {
-  if (!(window.MOVIE && (forge || window.DEMO_CITY) && window.recordTimelapseClip)) return;
+  if (!(window.MOVIE && window.recordTimelapseClip)) return;
   if (warmStarted) return;
   warmStarted = true;
   let tries = 0;
@@ -175,9 +198,8 @@ function warmVideoOnce() {
       clearInterval(wait);
       moviePromise = window.recordTimelapseClip({ replay: false });
       moviePromise.then(clip => {
-        movieClip = clip;                                 // cache for instant download/share
-        if (clip && !window.OG_VIDEO_WARM) fetch('/og-video?key=' + encodeURIComponent(shareKey()),
-          { method: 'POST', headers: { 'Content-Type': clip.type || 'video/webm' }, body: clip }).catch(() => {});
+        movieClip = clip;                                 // cache for instant download/share (every movie)
+        if (clip && (forge || window.DEMO_CITY) && !window.OG_VIDEO_WARM) warmOgv(clip);   // unfurl warm: shareable links only
       });
     } else if (++tries > 100) clearInterval(wait);        // ~20s and still not playing → leave it cold
   }, 200);
