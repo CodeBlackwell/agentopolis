@@ -56,10 +56,9 @@ fetch(window.CITY_SRC || 'city-data.json').then(r => { if (!r.ok) throw r.status
   City.fit(cityCam, cityCanvas, cityState, ...FIT);
   try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');   // keep the frame carried from the movie
     if (c && c.k === camKey) { cityCam.ox = c.ox; cityCam.oy = c.oy; cityCam.s = c.s; cityCam.rot = c.rot; } } catch (e) {}
-  requestAnimationFrame(function frame(t) {
+  pacedLoop(t => {
     cityCtx.clearRect(0, 0, cityCanvas.width, cityCanvas.height);
     City.draw(cityCtx, cityCam, cityState, t);
-    requestAnimationFrame(frame);
   });
 }).catch(e => {                                            // a bad/missing repo on the static forge path → card, not a blank map
   if (window.CITY_SRC && window.CITY_SRC.includes('/forge?')) return showForgeError();

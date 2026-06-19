@@ -628,11 +628,11 @@ function frame(t) {
     }
     drawMap(t);
     if (focusState) drawDim();
-    requestAnimationFrame(frame); return;
+    return;
   }
   if (mode === 'city' && !trans) {
     City.draw(ctx, cityCam, currentCity.cityState, t);
-    requestAnimationFrame(frame); return;
+    return;
   }
   // transition: crossfade map (zooming) and the iso city
   const c = trans.c;
@@ -646,7 +646,6 @@ function frame(t) {
   }
   if (trans.dir === 'in' && trans.k > .97 && c.cityState) startCity(c);
   else if (trans.dir === 'out' && trans.k < .03) { mode = 'map'; trans = null; currentCity = null; switchPanel('guide'); updateChrome(); }
-  requestAnimationFrame(frame);
 }
 
 // demo: animate whichever city is currently drilled in (city-live.js owns this in city mode)
@@ -656,7 +655,7 @@ async function init() {
   nation = layoutNation(await (await fetch('nation-data.json')).json());
   fitMap();
   updateChrome();
-  requestAnimationFrame(frame);
+  pacedLoop(frame);
   const start = window.DEMO_CITY && nation.byRepo[window.DEMO_CITY];   // demo lands drilled into one city
   if (start) drillIn(start);
 }

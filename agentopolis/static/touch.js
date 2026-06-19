@@ -89,3 +89,20 @@ function autosizeCanvas(canvas, onResize) {
   new ResizeObserver(apply).observe(canvas);
   return apply;
 }
+
+// Frame pacing for the always-on backdrop loops (city-live.js, nation.js). Redrawing the whole
+// city at the display's native refresh (often 120/144Hz) is what runs a laptop hot on the demo,
+// so cap it: ~30fps while the view is being used, ~12fps once it's gone idle. The ambient twinkle/
+// clouds and the slow dispatch beat read fine at both. `draw(t)` paints one frame; it must NOT
+// re-arm rAF itself.
+function pacedLoop(draw) {
+  const ACTIVE = 1000 / 30, IDLE = 1000 / 12, IDLE_AFTER = 4000;
+  let last = 0, active = 0;
+  const bump = () => active = performance.now();
+  ['pointerdown', 'pointermove', 'wheel', 'keydown'].forEach(ev => addEventListener(ev, bump, { passive: true }));
+  bump();
+  requestAnimationFrame(function frame(t) {
+    if (t - last >= (t - active > IDLE_AFTER ? IDLE : ACTIVE)) { last = t; draw(t); }
+    requestAnimationFrame(frame);
+  });
+}

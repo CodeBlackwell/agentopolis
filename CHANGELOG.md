@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **The live city now sips CPU/GPU instead of pinning it.** The always-on backdrop loops
+  (`city-live.js`, `nation.js`) were redrawing the whole isometric city at the display's native
+  refresh — often 120/144 Hz — which ran laptops hot. They're now frame-paced through a shared
+  `pacedLoop` helper: ~30 fps while the view is in use, ~12 fps once it's gone idle (no pointer/
+  wheel/key activity for 4 s). The ambient twinkle, clouds, and dispatch beat read the same.
+
 ## [0.28.0] - 2026-06-19
 
 ### Added
