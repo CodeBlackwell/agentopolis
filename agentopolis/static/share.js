@@ -34,7 +34,7 @@ function captureOG() {                                    // #map → branded 12
   g.fillStyle = 'rgba(42,16,36,.82)'; g.fillRect(0, H - 54, W, 54);   // title strip
   g.textBaseline = 'middle';
   g.fillStyle = '#f9efe3'; g.font = "26px 'Silkscreen', monospace"; g.textAlign = 'left';
-  g.fillText((document.body.dataset.hallName || 'a codebase') + ' — built by Claude Code', 24, H - 27);
+  g.fillText((document.body.dataset.hallName || 'a codebase') + ' — Built with <3 by CodeBlackwell w/ Claude', 24, H - 27);
   g.fillStyle = '#d4a953'; g.font = "15px 'Silkscreen', monospace"; g.textAlign = 'right';
   g.fillText('agentopolis.codeblackwell.ai', W - 24, H - 27);
   return new Promise(res => off.toBlob(res, 'image/png'));
@@ -69,14 +69,23 @@ async function warm() {                                  // capture the still (f
     { method: 'POST', headers: { 'Content-Type': 'image/png' }, body: blob }); } catch {}
 }
 
+// a filename that names the repo, not a generic "city": owner-repo for a forge, else a slug of the hall name
+const repoSlug = () => {
+  const m = forge && /github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(forge);
+  if (m) return `${m[1]}-${m[2]}`.toLowerCase();
+  return (document.body.dataset.hallName || 'city').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'city';
+};
+
 async function recordClip(btn) {                         // movie only — render the build to a short video on demand
   if (!(window.MOVIE && window.recordTimelapseClip)) return null;
-  const label = btn.innerHTML; btn.innerHTML = '&#9679; rendering&hellip;'; toast('rendering your clip… (~12s)');
-  const clip = await window.recordTimelapseClip();
+  const label = btn.innerHTML;
+  const show = (pct) => { btn.innerHTML = `<span class="rec-dot"></span>rendering ${pct}%`; };   // live build progress on the button
+  show(0);
+  const clip = await window.recordTimelapseClip({ onProgress: p => show(Math.round(p * 100)) });
   btn.innerHTML = label;
   if (clip) fetch('/og-video?key=' + encodeURIComponent(shareKey()),   // warm the og:video so the link unfurls with inline playback
     { method: 'POST', headers: { 'Content-Type': clip.type || 'video/webm' }, body: clip }).catch(() => {});
-  return clip && new File([clip], 'city.' + (clip.type.includes('mp4') ? 'mp4' : 'webm'), { type: clip.type });
+  return clip && new File([clip], `agentopolis-${repoSlug()}.${clip.type.includes('mp4') ? 'mp4' : 'webm'}`, { type: clip.type });
 }
 
 function closeMenu() {
@@ -168,7 +177,15 @@ function mount() {
   btn.onclick = () => openMenu(btn);
   ctl.appendChild(btn);
 }
-function boot() { mount(); warmVideoOnce(); }
+const RENDER_CSS = `.rec-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#d4a953;`
+  + `margin-right:7px;vertical-align:middle;animation:rec-pulse 1s ease-in-out infinite}`
+  + `@keyframes rec-pulse{0%,100%{opacity:.35;box-shadow:0 0 0 0 rgba(212,169,83,.6)}`
+  + `50%{opacity:1;box-shadow:0 0 6px 2px rgba(212,169,83,.7)}}`
+  + `@media (prefers-reduced-motion:reduce){.rec-dot{animation:none;opacity:1}}`;
+function boot() {
+  document.head.appendChild(Object.assign(document.createElement('style'), { textContent: RENDER_CSS }));
+  mount(); warmVideoOnce();
+}
 if (document.readyState === 'loading') addEventListener('DOMContentLoaded', boot); else boot();
 window.__share = { text: shareText, url: shareUrl, open: openMenu };   // exposed for share self-tests (cf. window.__tl)
 })();

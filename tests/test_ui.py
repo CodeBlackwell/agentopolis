@@ -247,6 +247,7 @@ def test_end_card_text_is_the_branded_attribution(page, base_url):
 def test_recorded_clip_is_a_real_video_blob(page, base_url):
     _open_movie(page, base_url)
     clip = page.evaluate("""async () => {
+        window.__tl.speed = 400;                          // record fast — the clip now runs at the live movie's pace
         const b = await window.recordTimelapseClip();
         return b ? {size: b.size, type: b.type} : null;
     }""")

@@ -425,6 +425,7 @@ window.__planWaves = planWaves;                            // exposed for the sy
 window.__tl = { begin: (a, b, c) => beginTransition(a, b, c), step: t => drawTransition(t),
   get transition() { return transition; }, get layouts() { return layouts; },
   get epochs() { return window.__epochs; }, setEpoch, recompute,
+  get speed() { return speed; }, set speed(v) { speed = v; },           // lets a clip-record test run fast instead of real-time
   get mode() { return transMode; }, set mode(m) { transMode = m; } };   // QA hooks for the formation re-form
 
 // Activate an epoch: swap the live state + ground + props to its layout and restore every building
@@ -797,6 +798,7 @@ const canonText = () => {
 };
 const captureFps = (cores) => ((cores ?? navigator.hardwareConcurrency ?? 8) <= 4 ? 24 : 30);  // lighter on weak phones
 let endCardAt = 0;
+let activeRec = null, activeAbort = null;                  // only one capture runs at a time — they share the playhead
 function drawEndCard(t) {
   const W = tlCanvas.width, H = tlCanvas.height, u = H / 18, k = Math.min(1, (t - endCardAt) / 300);
   tlCtx.save();
@@ -807,7 +809,7 @@ function drawEndCard(t) {
   tlCtx.fillStyle = '#d4a953'; tlCtx.font = `${u}px 'Silkscreen', monospace`;
   tlCtx.fillText(canonText(), W / 2, H * 0.55);
   tlCtx.fillStyle = '#c77aaa'; tlCtx.font = `${u * 0.8}px 'Silkscreen', monospace`;
-  tlCtx.fillText('built by Claude Code', W / 2, H * 0.65);
+  tlCtx.fillText('Built with <3 by CodeBlackwell w/ Claude', W / 2, H * 0.65);
   tlCtx.restore();
 }
 window.__endCard = { text: canonText, draw: drawEndCard, fps: captureFps };   // exposed for the end-card self-tests
@@ -818,6 +820,10 @@ window.recordTimelapseClip = (opts = {}) => new Promise(resolve => {
   if (!window.MediaRecorder || !tlCanvas.captureStream) return resolve(null);
   const replay = opts.replay !== false;                                 // default: a clean branded pass from the start.
   // replay=false rides the movie that's already playing (a silent og:video warm — no restart, no end-card).
+  if (activeRec) {                                                       // both captures share the playhead, so never overlap
+    if (!replay) return resolve(null);                                  //   a background warm yields to a capture already running
+    activeAbort();                                                       //   a user download supersedes the warm ride-along
+  }
   // mp4/h264 where the browser records it (iOS Safari wants mp4 for the share sheet), else webm
   const TYPES = ['video/mp4;codecs=h264', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
   const mimeType = TYPES.find(t => MediaRecorder.isTypeSupported(t));
@@ -826,16 +832,27 @@ window.recordTimelapseClip = (opts = {}) => new Promise(resolve => {
   catch (e) { return resolve(null); }
   const chunks = [];
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-  rec.onstop = () => { endCardAt = 0; resolve(new Blob(chunks, { type: rec.mimeType || 'video/webm' })); };
-  const prevSpeed = speed;
+  rec.onstop = () => { if (activeRec === rec) { activeRec = activeAbort = null; } endCardAt = 0;
+    resolve(new Blob(chunks, { type: rec.mimeType || 'video/webm' })); };
   const finish = () => {                                                 // build done → (brand the outro, then) cut
-    clearTimeout(cap); clearInterval(poll); speed = prevSpeed;
+    clearTimeout(cap); clearInterval(poll);
     if (replay) { endCardAt = performance.now(); setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, 1200); }
     else if (rec.state !== 'inactive') rec.stop();
   };
-  const cap = setTimeout(finish, replay ? 20000 : 30000);               // hard cap so a huge repo can't run away
-  const poll = setInterval(() => { if (!playing && ptr >= commits.length - 1) finish(); }, 150);
-  if (replay) { seek(-1); speed = Math.max(3, Math.min(120, commits.length / 11)); }   // pace the pass to land near ~12s
+  // The clip is the movie at its real pace — the same speed the viewer sees, so the download matches the live
+  // build 1:1 (plus a ~1.2s branded outro). Real completion (poll) ends it; the timeout is only a safety net,
+  // sized past the actual runtime (walk at the current speed + reform holds) so it never truncates a real pass.
+  const holdSec = Math.max(0, layouts.length - 1) * REFORM_HOLD / 1000;
+  const expectedSec = commits.length / Math.max(1, speed) + holdSec;
+  const cap = setTimeout(finish, replay ? (expectedSec * 1.5 + 5) * 1000 : 30000);
+  const poll = setInterval(() => {
+    opts.onProgress?.(commits.length ? Math.min(1, (ptr + 1) / commits.length) : 0);
+    if (!playing && ptr >= commits.length - 1) finish();
+  }, 150);
+  if (replay) seek(-1);                                                 // a clean pass from the empty lot, at the live speed
+  activeRec = rec;
+  activeAbort = () => { clearTimeout(cap); clearInterval(poll); endCardAt = 0;
+    if (activeRec === rec) activeRec = activeAbort = null; if (rec.state !== 'inactive') rec.stop(); };
   rec.start();
   if (replay) setPlay(true);                                            // a silent warm rides the playback already underway
 });
