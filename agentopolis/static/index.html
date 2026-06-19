@@ -184,7 +184,7 @@
   #tooltip { position: fixed; display: none; pointer-events: none; z-index: 10;
              background: var(--cream); border: 2px solid var(--plum);
              box-shadow: 3px 3px 0 var(--plum); font-family: 'Silkscreen', monospace;
-             font-size: 10px; padding: 4px 8px; max-width: 460px; white-space: pre-line; line-height: 1.5; }
+             font-size: 10px; padding: 4px 8px; max-width: min(460px, calc(100vw - 24px)); white-space: pre-line; line-height: 1.5; }
   #roster { position: fixed; display: none; z-index: 11;
             background: var(--cream); border: 2px solid var(--plum); box-shadow: 3px 3px 0 var(--plum);
             font-family: 'Silkscreen', monospace; font-size: 10px; line-height: 1.6;
@@ -210,6 +210,8 @@
   #tl-cta .cta-s { font-size: 10px; color: var(--gold); margin-bottom: 3px; }
   .demo-only { display: none; }
   body[data-demo="1"] .demo-only { display: block; }
+  /* this line lives in <header> (pointer-events:none); re-enable so the "explore the nation" link is tappable */
+  header p.demo-only { pointer-events: auto; }
   .demo-only a { color: var(--gold); text-decoration: none; }
   .demo-only a:hover { color: var(--cream); }
   .forge-hint { font-family: 'Silkscreen', monospace; font-size: 11px; letter-spacing: .16em;
@@ -270,7 +272,7 @@
     #hotel { touch-action: pan-y; }
     header p:not(.demo-only) { display: none; }   /* mouse/wheel/Q-E hints don't apply on touch */
     /* keep the "explore the nation" banner to one tidy line so it clears the city's canvas labels */
-    header p.demo-only { font-size: 10px; letter-spacing: .08em; white-space: nowrap; }
+    header p.demo-only { font-size: 10px; letter-spacing: .08em; white-space: nowrap; padding: 6px 0; }
     /* bottom sheet: thumb-reachable, swipe the handle down to dismiss (the native phone idiom) */
     #side { display: block; position: fixed; left: 0; right: 0; bottom: 0; top: auto;
             width: auto; height: auto; max-height: 82vh;

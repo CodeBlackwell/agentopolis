@@ -61,6 +61,18 @@ function attachTouch(canvas, { pan, pinch, twist, tap, hold, onePan = true }) {
   canvas.addEventListener('touchcancel', () => { clearHold(); last = null; pinchDist = 0; });
 }
 
+// Show a tooltip near (cx, cy) but keep it on-screen: flip left/up when it would cross the
+// viewport edge, clamp to an 8px margin. Shared by every engine's tipAt so the edge logic lives once.
+function placeTooltip(el, cx, cy) {
+  el.style.display = 'block';
+  const w = el.offsetWidth, h = el.offsetHeight, p = 8;
+  let x = cx + 14, y = cy + 14;
+  if (x + w > innerWidth - p) x = cx - 14 - w;
+  if (y + h > innerHeight - p) y = cy - 14 - h;
+  el.style.left = Math.max(p, x) + 'px';
+  el.style.top = Math.max(p, y) + 'px';
+}
+
 // Size a canvas's backing store to its CSS box × devicePixelRatio so the view fills the frame
 // (no letterbox) and renders crisp on retina/phone screens. Every engine works in backing-store
 // pixels and already maps input by the box ratio, so resizing these dims is all that's needed for

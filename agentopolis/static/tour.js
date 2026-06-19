@@ -522,14 +522,14 @@
     document.body.appendChild(help);
     drawAide(cv, 2);
     help.onclick = start;
-    const place = () => {
+    const place = () => requestAnimationFrame(() => {           // rAF: measure after the mobile scale() transform applies
       const m = document.getElementById('mapctl');
       if (!m) { help.style.visibility = 'hidden'; return; }    // no camera panel here → no handle to anchor to
       help.style.visibility = '';
-      const r = m.getBoundingClientRect();
-      help.style.top = (r.bottom + 10) + 'px';
-      help.style.left = (r.left + r.width / 2 - help.offsetWidth / 2) + 'px';
-    };
+      const r = m.getBoundingClientRect(), w = help.offsetWidth;
+      help.style.top = (r.bottom + 10) + 'px';                 // clear below the controls — never over them
+      help.style.left = Math.min(Math.max(8, r.right - w), innerWidth - w - 8) + 'px';   // tuck under the panel's right edge, kept on-screen
+    });
     place();
     // the tour no longer auto-runs, so nudge the handle once for a first-timer to advertise it (motion-safe opt-out)
     if (!localStorage.getItem(DONE) && !matchMedia('(prefers-reduced-motion: reduce)').matches) {

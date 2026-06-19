@@ -737,7 +737,7 @@ function tipAt(mx, my, cx, cy) {                           // shared by hover + 
   }
   if (text) {
     tooltip.textContent = text;
-    tooltip.style.left = `${cx + 14}px`; tooltip.style.top = `${cy + 14}px`; tooltip.style.display = 'block';
+    placeTooltip(tooltip, cx, cy);
   } else tooltip.style.display = 'none';
 }
 canvas.addEventListener('mousemove', m => {

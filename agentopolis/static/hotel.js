@@ -204,9 +204,7 @@ function tipAt(mx, my, cx, cy) {                  // mx,my canvas-space; transfo
     tooltip.textContent = `${hit.name}${hit.task ? ' · ' + hit.task : ''}`
       + ` · ${hit.waiting ? 'waiting on you' : hit.state}`
       + `${hit.activity ? ' · ' + hit.activity : ''} · ${secs}s`;
-    tooltip.style.left = `${cx + 14}px`;
-    tooltip.style.top = `${cy + 14}px`;
-    tooltip.style.display = 'block';
+    placeTooltip(tooltip, cx, cy);
   } else tooltip.style.display = 'none';
 }
 canvas.addEventListener('mousemove', m => {

@@ -127,9 +127,7 @@ function tipAt(mx, my, cx, cy) {                           // shared by hover + 
     City.roster('');
     tip.textContent = hit.tip || `${hit.path} · ${hit.floors} fl · ${hit.commits} commits`
       + `${hit.scaffold ? ' · under construction' : ''}`;
-    tip.style.left = `${cx + 14}px`;
-    tip.style.top = `${cy + 14}px`;
-    tip.style.display = 'block';
+    placeTooltip(tip, cx, cy);
   } else { City.roster(''); tip.style.display = 'none'; }
 }
 cityCanvas.addEventListener('mousemove', m => {

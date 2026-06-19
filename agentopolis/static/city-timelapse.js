@@ -1520,7 +1520,7 @@ function tipAt(mx, my, cx, cy) {
     const tags = hit.path ? buildingTags(hit) : [];
     tip.textContent = hit.tip || `${hit.path} · ${hit.floors | 0} fl (lines + coupling) · ${hit.commits} commits`
       + (tags.length ? '\n' + tags.join('\n') : '');
-    tip.style.left = `${cx + 14}px`; tip.style.top = `${cy + 14}px`; tip.style.display = 'block';
+    placeTooltip(tip, cx, cy);
   } else { City.roster(''); tip.style.display = 'none'; }
 }
 tlCanvas.addEventListener('mousemove', m => {
@@ -1537,6 +1537,8 @@ attachTouch(tlCanvas, {                                     // the movie was mou
   pan: (dx, dy) => { cam.ox += dx; cam.oy += dy; document.getElementById('tooltip').style.display = 'none'; },
   pinch: (k, mx, my) => zoom(k, mx, my),
   twist: rotate,
-  tap: (mx, my, cx, cy) => { if (state) { City.select(state, mx, my); tipAt(mx, my, cx, cy); } },
-  hold: tipAt,
+  // touch has no hover, so a tap must not trigger the desktop building→district highlight:
+  // City.select lights just the tapped building (state.selected); clearing mapHit drops the district wash
+  tap: (mx, my, cx, cy) => { if (state) { City.select(state, mx, my); tipAt(mx, my, cx, cy); mapHit = null; } },
+  hold: (mx, my, cx, cy) => { tipAt(mx, my, cx, cy); mapHit = null; },
 });
