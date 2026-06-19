@@ -58,8 +58,9 @@ try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');
     const r = await fetch(citySrc); if (!r.ok) throw r.status;
     resp = isForge ? await readForgeStream(r, loading) : await r.json();  // forge streams clone progress
   }
-  catch (e) {                                             // forge clone failed / too large / gate busy → quick city
-    const m = citySrc.match(/url=(.+)$/);
+  catch (e) {                                             // forge fetch failed
+    if (e === 400) { showForgeError(); return; }          // invalid/missing repo → card, not a static retry that 400s too
+    const m = citySrc.match(/url=(.+)$/);                 // transient (clone failed / too large / gate busy) → quick city
     if (isForge && m) { location.href = '/?forge=' + m[1] + '&static'; return; }
     throw e;
   }
@@ -87,14 +88,12 @@ try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');
   seek(-1);
   loading.remove();
   speed = autoSpeed();                                    // size the walk to ~30s regardless of repo size (calm, not chaotic)
-  // First-time visitors get the onboarding tour, which opens the city already FINISHED and paused, then
-  // walks the President to ▶ Replay it himself — calmer than a frantic auto-playing reel. Returning
-  // visitors (tour seen) and embeds still autoplay from the empty lot.
+  // The opening is a POSTER, not a tour: hold the finished city (the payoff), glow ▶ as the one cue, and
+  // soft-fall into the build if untouched. Embeds autoplay; a resuming tour drives ▶ itself, so leave it be.
   const embed = document.body.dataset.embed === '1';
-  const tourPending = !embed &&
-    (!!localStorage.getItem('agentopolis-tour-resume') || !localStorage.getItem('agentopolis-tour-done'));
-  if (tourPending) rewindForTour();                       // hold on the finished city, paused & quiet — ▶ replays it
-  else setPlay(true);                                     // a movie plays itself from the empty lot
+  const resuming = !!localStorage.getItem('agentopolis-tour-resume');   // a paused tour is about to take the wheel
+  if (embed) setPlay(true);                                // a movie plays itself from the empty lot
+  else { rewindForTour(); if (!resuming) armPoster(); }    // poster on the finished city; glow ▶ + soft-fallback
   startIntro();                                           // ease the camera in from the live view's frame (no-op without one)
   requestAnimationFrame(loop);
 })().catch(e => { loading.remove(); console.error('timelapse load failed', e); });
@@ -710,7 +709,7 @@ function stepIntro(t) {
 
 function setPlay(p) {
   playing = p; last = 0; pinnedFocus = null;               // hitting play/pause releases a pinned card
-
+  if (p) { clearPoster(); hideCaption(); }                 // entering the build settles the poster cue
   window.MOVIE_PLAYING = p;                                 // hotel.js reads this: agents only go frantic while the reel rolls
   if (p && ptr >= commits.length - 1) seek(-1);          // replay from the start
   document.getElementById('tl-play').innerHTML = playing ? ICONS.pause : ICONS.play;
@@ -726,6 +725,40 @@ function rewindForTour() {
   document.getElementById('tl-play').innerHTML = ICONS.play;
 }
 window.movieRewindForTour = rewindForTour;                 // tour.js calls this on replay (movie already loaded)
+
+// ---- the poster beat: the finished city is held, ▶ glows as the sole (un-dimmed) cue, and a one-line
+//      caption names the repo. A passive visitor who never taps still sees the build via a soft fallback;
+//      reduced-motion users get a still glow and no auto-play (tap is the only way in). ----
+let posterTimer = 0;
+function armPoster() {
+  const btn = document.getElementById('tl-play');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  btn.classList.add(reduce ? 'glow-still' : 'glow');
+  showCaption();
+  addEventListener('pointerdown', clearPoster, { once: true });   // any deliberate touch ends the auto-fallback
+  addEventListener('keydown', clearPoster, { once: true });
+  if (!reduce) posterTimer = setTimeout(() => setPlay(true), 5000);
+}
+function clearPoster() {
+  clearTimeout(posterTimer); posterTimer = 0;
+  document.getElementById('tl-play')?.classList.remove('glow', 'glow-still');
+}
+
+function showCaption() {
+  if (document.getElementById('tl-caption')) return;
+  const url = (citySrc.match(/url=([^&]+)/) || [])[1];
+  const repo = url ? decodeURIComponent(url).replace(/^https?:\/\/(www\.)?github\.com\//, '').replace(/\.git$/, '')
+                   : (document.body.dataset.hallName || 'this city');
+  const cap = document.createElement('div');
+  cap.id = 'tl-caption';
+  cap.textContent = `${repo} — ${commits.length} commits`;
+  (document.querySelector('.mapwrap') || document.body).appendChild(cap);
+  requestAnimationFrame(() => cap.classList.add('show'));
+}
+function hideCaption() {
+  const c = document.getElementById('tl-caption');
+  if (c) { c.classList.add('gone'); setTimeout(() => c.remove(), 600); }
+}
 
 // Sharing wants the still card to show the FINISHED city, never a mid-reel frame. On share, snap to HEAD
 // (the complete build, paused — the same direct jump as the tour, no CTA pop), waiting briefly if the reel
@@ -862,6 +895,7 @@ function onMovieComplete() {
   localStorage.setItem(key, '1');
   celebrated = true;
   celebrate();
+  showFinishCTA();                                            // the climax: point the freshly-wowed viewer at "build your own"
   setTimeout(() => window.tourCelebrate?.(), 1300);          // once the confetti is flying, the Chief of Staff takes a bow
 }
 
@@ -926,6 +960,17 @@ function buildTransport() {
     #tl-date{position:absolute;top:14px;right:18px;z-index:4;pointer-events:none;text-align:right;
       font-family:'Silkscreen',monospace;font-size:13px;letter-spacing:.07em;color:var(--cream);
       opacity:.5;text-shadow:0 2px 7px rgba(0,0,0,.75)}
+    /* poster beat: a one-line lower-third naming the repo, and a gold glow drawing the eye to ▶ (no dim overlay) */
+    #tl-caption{position:absolute;left:50%;bottom:78px;transform:translateX(-50%);z-index:4;pointer-events:none;
+      white-space:nowrap;font-family:'Silkscreen',monospace;font-size:13px;letter-spacing:.07em;color:var(--cream);
+      text-shadow:0 2px 7px rgba(0,0,0,.8);opacity:0;transition:opacity .5s ease}
+    #tl-caption.show{opacity:.85}#tl-caption.gone{opacity:0}
+    #tl-play.glow{animation:tl-glow 1.25s ease-in-out infinite}
+    #tl-play.glow-still{box-shadow:0 0 0 2px var(--gold),0 0 13px 2px rgba(212,169,83,.7)}
+    @keyframes tl-glow{0%,100%{box-shadow:0 0 0 1px var(--gold),0 0 5px 1px rgba(212,169,83,.45)}
+      50%{box-shadow:0 0 0 2px var(--gold),0 0 16px 4px rgba(212,169,83,.9)}}
+    #tl-cta{animation:tl-cta-in .45s ease both}
+    @keyframes tl-cta-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
     /* phones: trim to the video-player essentials (play / scrub / speed / exit), bigger touch targets */
     @media (max-width:720px){#transport{gap:6px;padding:8px 8px;font-size:11px}
       #transport button{width:36px;height:36px}#transport button svg{width:16px;height:16px}
@@ -937,7 +982,8 @@ function buildTransport() {
       #tl-speed .tl-dd-opt{font-size:14px;padding:10px 16px}
       /* phones: drop the date to the bottom-left so it clears the city title up top; lift it above the
          transport strip (~52px bar + 8px gap) that owns the bottom of the wrap in movie mode */
-      #tl-date{font-size:10px;top:auto;right:auto;left:14px;bottom:64px;text-align:left}}`;
+      #tl-date{font-size:10px;top:auto;right:auto;left:14px;bottom:64px;text-align:left}
+      #tl-caption{font-size:11px;bottom:104px}}`;
   document.head.appendChild(document.createElement('style')).textContent = css;
   const bar = document.createElement('div');
   bar.id = 'transport';

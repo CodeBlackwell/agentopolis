@@ -6,6 +6,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-06-19
+
+### Changed
+- Reworked the shared-link / movie onboarding to lead with the show, not a tour. A new visitor now lands
+  on a **poster** — the finished skyline held, the ▶ button glowing, and a one-line caption naming the
+  repo — with no dimming overlay. Tapping ▶ plays the build; if untouched, it soft-falls into the build
+  after ~5s (reduced-motion users get a still glow and tap-only, no auto-play). When a forged city
+  finishes, a "build your own" card surfaces at the emotional peak. The narrated tour **no longer
+  auto-runs on any surface** — the "?" handle is the sole, opt-in entry, and it nudges itself once for
+  first-timers.
+
+### Added
+- A graceful forge dead-end: an invalid / private / missing repo (or a failed clone) now shows a
+  "couldn't build that repo — try another" card instead of a frozen loading screen, on both the live and
+  time-lapse map engines.
+
 ## [0.24.0] - 2026-06-19
 
 ### Fixed

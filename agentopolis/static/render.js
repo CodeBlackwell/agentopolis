@@ -185,3 +185,20 @@ function drawOfficeLabels(ctx) {
     ctx.fillText(o.text, x, y - pad * .4);
   }
 }
+
+// A forge dead-end (bad/private/missing repo, or a clone that failed) lands here instead of a frozen
+// loading screen: a card that names the repo and points back to the forge. Shared by both map engines.
+function showForgeError() {
+  document.getElementById('tl-loading')?.remove();
+  const h = document.querySelector('header h1 .m-city');
+  const name = (h && h.textContent) || 'that repo';
+  const el = document.createElement('div');
+  el.innerHTML = `<div style="font-size:15px;margin-bottom:9px">couldn't build ${name}</div>` +
+    `<div style="opacity:.78;font-size:11px;margin-bottom:18px">make sure it's a public github.com/owner/repo</div>` +
+    `<a href="/" style="color:#3d1832;background:#f9efe3;padding:9px 16px;border-radius:6px;` +
+    `text-decoration:none;pointer-events:auto">try another repo &rarr;</a>`;
+  Object.assign(el.style, { position: 'absolute', inset: '0', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center', zIndex: 9, color: '#f9efe3', textAlign: 'center',
+    font: "13px 'Silkscreen', monospace", letterSpacing: '.08em', textShadow: '0 2px 6px rgba(0,0,0,.85)' });
+  (document.querySelector('.mapwrap') || document.body).appendChild(el);
+}

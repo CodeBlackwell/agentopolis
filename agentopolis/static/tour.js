@@ -510,7 +510,11 @@
         font:700 11px 'Silkscreen',monospace;display:flex;align-items:center;justify-content:center;
         box-shadow:1px 1px 0 var(--plum-soft)}
       #tour-help:hover canvas{filter:drop-shadow(0 0 7px var(--gold))}
-      #tour-help:hover .q{background:var(--cream)}`;
+      #tour-help:hover .q{background:var(--cream)}
+      #tour-help.nudge{animation:tour-help-bob 1.1s ease-in-out 3}
+      #tour-help.nudge .q{animation:tour-help-glow 1.1s ease-in-out 3}
+      @keyframes tour-help-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+      @keyframes tour-help-glow{0%,100%{box-shadow:1px 1px 0 var(--plum-soft)}50%{box-shadow:0 0 9px 2px var(--gold)}}`;
     document.head.appendChild(document.createElement('style')).textContent = css;
     help = el('button', { id: 'tour-help', title: 'replay the tutorial' });
     const cv = el('canvas');
@@ -527,6 +531,11 @@
       help.style.left = (r.left + r.width / 2 - help.offsetWidth / 2) + 'px';
     };
     place();
+    // the tour no longer auto-runs, so nudge the handle once for a first-timer to advertise it (motion-safe opt-out)
+    if (!localStorage.getItem(DONE) && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      help.classList.add('nudge');
+      setTimeout(() => help.classList.remove('nudge'), 6000);
+    }
     addEventListener('resize', place);
     const m = document.getElementById('mapctl');               // the Share button grows #mapctl in city mode — re-anchor
     if (m && window.ResizeObserver) new ResizeObserver(place).observe(m);
@@ -557,8 +566,7 @@
     show(0);
   };
 
-  // Resume a forced/driven hand-off if one is pending; otherwise auto-run for ANY first-time visitor — including
-  // someone who lands straight on a shared movie / forge link (the movie + demo-cards tracks were resume-only before).
+  // Resume a forced/driven hand-off if one is pending. Otherwise the tour never auto-runs: the city leads with
+  // its own movie (poster → build → climax), and the "?" handle is the sole, opt-in entry on every surface.
   if (localStorage.getItem(RESUME)) { localStorage.removeItem(RESUME); start(); }
-  else if (!localStorage.getItem(DONE)) start();
 })();

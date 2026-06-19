@@ -18,7 +18,7 @@ addEventListener('pagehide', () => { try {
   sessionStorage.setItem('apx-cam', JSON.stringify({ k: camKey, src: 'live', ox: cityCam.ox, oy: cityCam.oy, s: cityCam.s, rot: cityCam.rot || 0 }));
 } catch (e) {} });
 
-fetch(window.CITY_SRC || 'city-data.json').then(r => r.json()).then(data => {
+fetch(window.CITY_SRC || 'city-data.json').then(r => { if (!r.ok) throw r.status; return r.json(); }).then(data => {
   cityState = City.layout(data);
   const dr = data.sample || {};                            // headline stats for the share caption (#6/#7)
   window.CITY_STATS = { files: data.buildings.reduce((n, b) => n + (b.files || 0), 0) + (dr.files?.dropped || 0),
@@ -61,6 +61,9 @@ fetch(window.CITY_SRC || 'city-data.json').then(r => r.json()).then(data => {
     City.draw(cityCtx, cityCam, cityState, t);
     requestAnimationFrame(frame);
   });
+}).catch(e => {                                            // a bad/missing repo on the static forge path → card, not a blank map
+  if (window.CITY_SRC && window.CITY_SRC.includes('/forge?')) return showForgeError();
+  console.error('city load failed', e);
 });
 
 function cityHandle(e) {

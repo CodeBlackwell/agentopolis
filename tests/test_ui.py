@@ -278,3 +278,10 @@ def test_forge_funnel_pushes_your_own_repo(page, base_url):
         return getComputedStyle(document.getElementById('forge')).display !== 'none';
     }""")
     assert shown is True
+
+
+def test_invalid_forge_link_shows_a_graceful_card(page, base_url):
+    page.goto(base_url + "/?forge=not-a-real-repo")           # rejected by the server (400), not a valid owner/repo
+    link = page.locator("a", has_text="try another repo")     # card, not a frozen loading screen
+    link.wait_for(timeout=15000)
+    assert link.get_attribute("href") == "/"
