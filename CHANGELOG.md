@@ -11,6 +11,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   package metadata so it matches what `agentopolis --version` reports. Hidden on phones.
 
 ### Changed
+- **The movie's ending breathes now.** When the build completes, the finished city holds for ~3 s so
+  the full product reads, then the title card **fades in over ~2 s** (was a 0.3 s snap) and sits for
+  ~2.5 s before the recorded clip cuts. Same beat on screen and in the downloaded/shared clip.
 - **The demo now sips CPU/GPU instead of pinning it.** Both always-on full-canvas loops — the
   isometric city (`city-live.js`, `nation.js`) and the dispatch floor (`hotel.js`) — were redrawing
   at the display's native refresh (often 120/144 Hz), which ran laptops hot. They're now frame-paced

@@ -609,7 +609,7 @@ function recompute(i) {                                   // set targets + visib
 }
 
 function seek(i) {                                        // scrub / init: snap instantly, no tween or collapse
-  transition = null; holdUntil = 0; endCardAt = 0;        // scrubbing / replaying clears a held end card and snaps to the settled epoch
+  transition = null; holdUntil = 0; endCardAt = 0; finishedAt = 0;   // scrubbing / replaying clears a held end card and snaps to the settled epoch
   recompute(i);
   for (const b of state.buildings) {
     const vis = bornAt.has(b) && bornAt.get(b) <= i && !(b.death !== undefined && i >= b.death + decaySpan);
@@ -668,8 +668,9 @@ function loop(t) {
       else advance(target);
     }
     if (ptr >= commits.length - 1) { const justFinished = playing; setPlay(false);
-      if (justFinished) { if (!window.DEMO_MOVIE) endCardAt ||= performance.now(); onMovieComplete(); } }   // hold the title card on the finish (demo keeps its finished-city beat)
+      if (justFinished) { if (!window.DEMO_MOVIE) finishedAt ||= performance.now(); onMovieComplete(); } }   // mark the finish; the city holds before the card (demo keeps its finished-city beat)
   } else { last = 0; }
+  if (finishedAt && !endCardAt && t - finishedAt >= FINISH_HOLD) endCardAt = performance.now();   // the full product has read → bring up the outro
   if (!transition) {
     if (intro) stepIntro(t);
     tween(t);
@@ -800,8 +801,10 @@ const canonText = () => {
   return m ? `agentopolis.codeblackwell.ai/c/${m[1]}/${m[2]}` : 'agentopolis.codeblackwell.ai';
 };
 const captureFps = (cores) => ((cores ?? navigator.hardwareConcurrency ?? 8) <= 4 ? 24 : 30);  // lighter on weak phones
-let endCardAt = 0;
-const END_CARD_HOLD = 2600;                                // ms the branded title card holds in the recorded clip before the cut
+let endCardAt = 0, finishedAt = 0;                         // finishedAt: the build completed; the city holds before the card
+const FINISH_HOLD = 3000;                                  // ms the finished city sits so the full product reads before the outro
+const END_CARD_FADE = 2000;                                // ms the title card fades in over
+const END_CARD_HOLD = 4500;                                // ms the card stays (2s fade + 2.5s sit) before the recorded cut
 let activeRec = null, activeAbort = null;                  // only one capture runs at a time — they share the playhead
 // A documentary lower-third baked onto the canvas (so it survives into the recorded clip, unlike the DOM
 // transport label): the date + commit subject of the frame's commit, in lockstep with the build on screen.
@@ -820,7 +823,7 @@ function drawCommitHud() {
   tlCtx.restore();
 }
 function drawEndCard(t) {
-  const W = tlCanvas.width, H = tlCanvas.height, u = H / 18, k = Math.min(1, (t - endCardAt) / 300);
+  const W = tlCanvas.width, H = tlCanvas.height, u = H / 18, k = Math.min(1, (t - endCardAt) / END_CARD_FADE);
   const name = document.body.dataset.hallName || 'this city', title = `${name} City — The Movie`;
   tlCtx.save();
   tlCtx.globalAlpha = k * 0.9; tlCtx.fillStyle = '#241020'; tlCtx.fillRect(0, 0, W, H);
@@ -862,10 +865,12 @@ window.recordTimelapseClip = (opts = {}) => new Promise(resolve => {
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   rec.onstop = () => { if (activeRec === rec) { activeRec = activeAbort = null; }   // leave endCardAt: the title card holds past the cut (seek/replay clears it)
     resolve(new Blob(chunks, { type: rec.mimeType || 'video/webm' })); };
-  const finish = () => {                                                 // build done → brand the outro, then cut
+  const finish = () => {                                                 // build done → hold the finished city, brand the outro, then cut
     clearTimeout(cap); clearInterval(poll);
-    endCardAt = performance.now();                                       // shown on screen during the warm; baked into both clips
-    setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, END_CARD_HOLD);   // hold the title card before the cut
+    setTimeout(() => {                                                   // let the completed city read first (matches the on-screen beat)
+      endCardAt ||= performance.now();                                   // shown on screen during the warm; baked into both clips
+      setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, END_CARD_HOLD);   // fade-in + sit, then cut
+    }, FINISH_HOLD);
   };
   // The clip is the movie at its real pace — the same speed the viewer sees, so the download matches the live
   // build 1:1 (plus the held branded outro). Real completion (poll) ends it; the timeout is only a safety net,
