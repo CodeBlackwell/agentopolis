@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-06-19
+
+### Fixed
+- The demo tour's camera step no longer skips ahead the instant you start to zoom. It now uses the same
+  hands-on handshake as the city tour — zoom in, rotate the skyline, then press reset — so you actually
+  get to use the camera and try rotation before the tour advances.
+
 ## [0.23.0] - 2026-06-18
 
 ### Changed

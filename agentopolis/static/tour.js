@@ -125,9 +125,8 @@
     { sel: '#tl-play', force: 1, proceed: 1, title: 'Press ▶ to begin',
       text: 'Behold your capital, complete and waiting. Press ▶ and watch it raise itself from a single humble commit into the metropolis it was always destined to become.',
       try: 'Press ▶ — start the founding.' },
-    { sel: '#map', zoom: 1, title: 'The founding, replayed',
-      text: 'There it rises — from a single humble commit toward the metropolis it was always destined to become. It builds itself, as all things do, for you.',
-      try: 'Go on — scroll to zoom into the rising city.' },
+    { sel: '#map', viz: 1, title: 'The founding, replayed',
+      text: 'There it rises — from a single humble commit toward the metropolis it was always destined to become. Take the camera while it builds, Excellency: scroll to zoom upon the rooftops, rotate to admire it from every side, then press reset to restore the royal view.' },
     { sel: '#hotel', title: 'The tireless workforce',
       text: `Each scurrying citizen is a Claude Code agent. What you see now is a faithful re-enactment, ${pres} — but install our humble tool and it hooks quietly into your own Claude Code, so THESE become your real agents: checking in to this very floor and toiling in real time as you work. Idle hands are, naturally, unconstitutional.` },
     { sel: '#ticker', title: 'The State Record',
@@ -311,7 +310,7 @@
     const fw = !!step.farewell, cel = !!step.celebrate;
     const target = step.center ? null : document.querySelector(step.sel);
     if (target && !reveal(target, i)) return;               // open/close the right sheet + snap into view, then re-render
-    const forced = (!!step.force || !!step.viz || !!step.zoom) && !!target;
+    const forced = (!!step.force || !!step.viz) && !!target;
     if (target) {
       const r = target.getBoundingClientRect();
       ui.hole.className = forced ? 'force' : '';
@@ -335,12 +334,12 @@
     ui.next.hidden = forced;                                   // forced: the only way on is the real control / gesture
     ui.nudge.hidden = !forced;
     ui.nudge.textContent = step.viz ? (ctx === 'nation' ? 'zoom · pan · reset ↑' : `zoom · ${TOUCH ? 'twist' : 'rotate'} · reset ↑`)
-      : step.zoom ? 'zoom in ↑' : 'press it ↑';
+      : 'press it ↑';
     ui.next.textContent = cel ? 'magnificent ▸'
       : fw ? 'got it ✓'
       : step.nav ? (step.navLabel || 'show me ▸')
       : i === steps.length - 1 ? 'done ✓' : 'next ▸';
-    if (forced) (step.viz ? armViz(step) : step.zoom ? armZoom(step) : arm(target, step));   // arm after the try-hint so armViz owns it
+    if (forced) (step.viz ? armViz(step) : arm(target, step));   // arm after the try-hint so armViz owns it
   }
 
   // ---- interaction cutout: four transparent panels frame the spotlit element, blocking clicks everywhere
@@ -397,20 +396,6 @@
       if (steps[at] !== step) return stop();                 // moved on → detach
       if (phase === 0 && cam.s > startS * 1.25) { phase = 1; panRef = { ox: cam.ox, oy: cam.oy }; mark(); }
       else if (phase === 1 && midDone()) { phase = 2; mark(); }
-      vizRaf = requestAnimationFrame(watch);
-    })();
-  }
-
-  // A lighter hands-on gate than armViz: advance the instant the President zooms in (scroll / pinch). No pan
-  // or reset demanded — just prove the camera obeys. Watches the same engine-agnostic window.apxCam scale.
-  function armZoom(step) {
-    cancelAnimationFrame(vizRaf);
-    const cam = window.apxCam;
-    if (!cam) return go(at + 1);                              // no camera to watch — never trap the user
-    const startS = cam.s;
-    (function watch() {
-      if (steps[at] !== step) return cancelAnimationFrame(vizRaf);   // moved on → detach
-      if (cam.s > startS * 1.25) return go(at + 1);            // zoomed in → gate opens
       vizRaf = requestAnimationFrame(watch);
     })();
   }
