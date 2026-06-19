@@ -178,9 +178,8 @@ function frame(t) {
       if (av.bubble && t - av.bubble.t > bubbleMs()) av.bubble = null;
     }
   render(ctx, [...avatars.values()], t);
-  requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+pacedLoop(frame);
 
 const canvas = document.getElementById('hotel');
 const tooltip = document.getElementById('tooltip');

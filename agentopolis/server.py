@@ -13,6 +13,7 @@ import tempfile
 import threading
 from collections import Counter, deque
 from contextlib import asynccontextmanager
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from urllib.parse import quote
 
@@ -28,6 +29,11 @@ from .nation import CAPITAL, discover_repos, is_mother, load_nation
 from .seed import git, seed
 from .timeline import build_timeline
 from .zone import load_zone
+
+try:
+    VERSION = version("agentopolis")             # stamped into the page; matches what `--version` reports
+except PackageNotFoundError:                     # running from source without an install
+    VERSION = "dev"
 
 shutting_down = asyncio.Event()                  # set on lifespan shutdown; SSE streams watch it to end
 
@@ -508,7 +514,8 @@ def _page(request: Request, forge: str | None, embed: bool = False) -> HTMLRespo
                         .replace("{{EMBED}}", "1" if embed else "")
                         .replace("{{OG_TAGS}}", og_tags)
                         .replace("{{OG_VIDEO_WARM}}", "true" if og_video else "false")   # client skips the warm-capture when already cached
-                        .replace("{{MARATHON}}", marathon_json))
+                        .replace("{{MARATHON}}", marathon_json)
+                        .replace("{{VERSION}}", VERSION))
 
 
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")

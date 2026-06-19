@@ -90,19 +90,22 @@ function autosizeCanvas(canvas, onResize) {
   return apply;
 }
 
-// Frame pacing for the always-on backdrop loops (city-live.js, nation.js). Redrawing the whole
-// city at the display's native refresh (often 120/144Hz) is what runs a laptop hot on the demo,
-// so cap it: ~30fps while the view is being used, ~12fps once it's gone idle. The ambient twinkle/
-// clouds and the slow dispatch beat read fine at both. `draw(t)` paints one frame; it must NOT
-// re-arm rAF itself.
+// One shared "last interaction" clock for every paced loop on the page (the city and the dispatch
+// floor each run one). Wired once; each loop reads it to decide active vs idle.
+let lastActivity = performance.now();
+['pointerdown', 'pointermove', 'wheel', 'keydown'].forEach(ev =>
+  addEventListener(ev, () => lastActivity = performance.now(), { passive: true }));
+
+// Frame pacing for the always-on backdrop loops (city-live.js, nation.js, hotel.js). Redrawing the
+// whole scene at the display's native refresh (often 120/144Hz) is what runs a laptop hot on the
+// demo, so cap it: ~30fps while the view is being used, ~12fps once it's gone idle. The ambient
+// twinkle/clouds, the dispatch beat, and the dt-corrected avatar walk read fine at both. `draw(t)`
+// paints one frame; it must NOT re-arm rAF itself.
 function pacedLoop(draw) {
   const ACTIVE = 1000 / 30, IDLE = 1000 / 12, IDLE_AFTER = 4000;
-  let last = 0, active = 0;
-  const bump = () => active = performance.now();
-  ['pointerdown', 'pointermove', 'wheel', 'keydown'].forEach(ev => addEventListener(ev, bump, { passive: true }));
-  bump();
+  let last = 0;
   requestAnimationFrame(function frame(t) {
-    if (t - last >= (t - active > IDLE_AFTER ? IDLE : ACTIVE)) { last = t; draw(t); }
+    if (t - last >= (t - lastActivity > IDLE_AFTER ? IDLE : ACTIVE)) { last = t; draw(t); }
     requestAnimationFrame(frame);
   });
 }

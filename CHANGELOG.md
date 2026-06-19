@@ -6,12 +6,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- A **small version stamp** in the demo's bottom-left corner (`v<x.y.z>`), read from the installed
+  package metadata so it matches what `agentopolis --version` reports. Hidden on phones.
+
 ### Changed
-- **The live city now sips CPU/GPU instead of pinning it.** The always-on backdrop loops
-  (`city-live.js`, `nation.js`) were redrawing the whole isometric city at the display's native
-  refresh — often 120/144 Hz — which ran laptops hot. They're now frame-paced through a shared
-  `pacedLoop` helper: ~30 fps while the view is in use, ~12 fps once it's gone idle (no pointer/
-  wheel/key activity for 4 s). The ambient twinkle, clouds, and dispatch beat read the same.
+- **The demo now sips CPU/GPU instead of pinning it.** Both always-on full-canvas loops — the
+  isometric city (`city-live.js`, `nation.js`) and the dispatch floor (`hotel.js`) — were redrawing
+  at the display's native refresh (often 120/144 Hz), which ran laptops hot. They're now frame-paced
+  through a shared `pacedLoop` helper off one shared activity clock: ~30 fps while the view is in
+  use, ~12 fps once it's gone idle (no pointer/wheel/key activity for 4 s). The ambient twinkle,
+  clouds, dispatch beat, and the (delta-time-corrected) avatar walk read the same.
 
 ## [0.28.0] - 2026-06-19
 

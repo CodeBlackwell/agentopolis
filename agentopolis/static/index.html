@@ -181,6 +181,9 @@
   #ticker div:first-child { background: rgba(255,255,255,.06); }
   #ticker .t { color: var(--gold); margin-right: 6px; opacity: .7; }
 
+  #version { position: fixed; bottom: 8px; left: 12px; z-index: 2; pointer-events: none;
+             font-family: 'Silkscreen', monospace; font-size: 9px; letter-spacing: .08em;
+             color: var(--gold); opacity: .45; }
   #tooltip { position: fixed; display: none; pointer-events: none; z-index: 10;
              background: var(--cream); border: 2px solid var(--plum);
              box-shadow: 3px 3px 0 var(--plum); font-family: 'Silkscreen', monospace;
@@ -267,6 +270,7 @@
            height: auto; min-height: 100vh; overflow: auto; }
     /* keep the stats button pinned while the page scrolls (the build CTA is pinned in its own rule below,
        which sets its offsets) */
+    #version { display: none; }   /* bottom corners hold the phone sheets/buttons */
     #drawer-btn { position: fixed; }
     /* the dispatch floor lets a 1-finger drag scroll the page (pinch still zooms it via JS) */
     #hotel { touch-action: pan-y; }
@@ -421,6 +425,7 @@
     <div id="forge-slot"></div>
   </div>
   <div id="scrim"></div>
+  <div id="version">v{{VERSION}}</div>
   <script src="city-render.js"></script>
   <script src="city-scape.js"></script>
   <script src="render.js"></script>
