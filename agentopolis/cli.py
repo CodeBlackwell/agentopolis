@@ -13,7 +13,7 @@ import uvicorn
 import json
 from urllib.parse import quote
 
-from . import forge, hooks, nation, server, survey
+from . import forge, hooks, nation, scout, server, survey
 from .seed import git
 
 
@@ -83,7 +83,7 @@ def serve(port: int) -> None:
         pass
 
 
-COMMANDS = ("serve", "movie", "marathon", "attach", "detach")
+COMMANDS = ("serve", "movie", "marathon", "scout", "attach", "detach")
 
 
 def main() -> None:
@@ -101,7 +101,10 @@ def main() -> None:
     parser.add_argument("--version", action="version", version=f"%(prog)s {version('agentopolis')}")
     parser.add_argument("--list", action="store_true", help="for `marathon`: rank the repos as a table instead of playing them")
     parser.add_argument("--json", action="store_true", help="for `marathon --list`: emit the ranking as JSON")
-    parser.add_argument("--top", type=int, help="for `marathon`: cap the playlist to the top N movies")
+    parser.add_argument("--top", type=int, help="for `marathon`: cap the playlist to the top N movies; "
+                                                "for `scout`: how many repos to fetch + rank (default 20)")
+    parser.add_argument("--since", default="daily", help="for `scout` trending: daily|weekly|monthly")
+    parser.add_argument("--lang", help="for `scout` trending: filter by language (e.g. python)")
     parser.add_argument("--repo", default=".", help="git repo to map (default: cwd; or pass it as a bare path)")
     parser.add_argument("--zone", help="zoning manifest (default: <repo>/.agentopolis.json, else auto-zoned)")
     parser.add_argument("--root", help="map every git repo under this dir as a nation of cities")
@@ -125,6 +128,9 @@ def main() -> None:
             run_crawl(args.target or ".", args.json)
         else:
             run_marathon(args.target or ".", args.port, args.no_open, args.top)
+        return
+    if args.command == "scout":                          # no target → trending; a target is a search query
+        run_scout(args.target, args.since, args.lang, args.top, args.json)
         return
 
     open_path, label, live = "", "City", False          # open_path is appended to the base url; live → auto-hooks
@@ -180,9 +186,32 @@ def run_crawl(root: str, as_json: bool) -> None:
     print(f"  {'-'*24} {'-'*6} {'-'*7} {'-'*5} {'-'*5} {'-'*6}  {'-'*40}")
     for r in rows:
         print(f"  {r['repo'][:24]:24} {r['score']:>6} {r['commits']:>7} {r['buildings']:>5} "
-              f"{r['transitions']:>5} {r['deaths']:>6}  {r['ladder']}")
+              f"{r['transitions']:>5} {r['deaths']:>6}  {_phases(r)}")
     best = rows[0]
     print(f"\n  ▶ best: {best['repo']} — play it with  agentopolis movie {best['path']}\n")
+
+
+def _phases(row: dict) -> str:
+    """Formation ladder with each phase's share of history, e.g. village·42% → spine·33% → grid·25%."""
+    return " → ".join(f"{p['formation']}·{p['pct']}%" for p in row["phases"])
+
+
+def run_scout(query: str | None, since: str, language: str | None, top: int | None, as_json: bool) -> None:
+    """Scout GitHub (trending, or a search query) and rank repos by time-lapse 'movie' potential."""
+    rows = scout.scout(query=query, since=since, language=language, limit=top or 20)
+    if as_json:
+        print(json.dumps(rows, indent=2))
+        return
+    if not rows:
+        print("\n  🎬  scout found no repos with playable history\n")
+        return
+    src = f"search “{query}”" if query else f"github trending ({since}{', ' + language if language else ''})"
+    print(f"\n  🎬  movie potential from {src} — best first:\n")
+    print(f"  {'repo':30} {'score':>6} {'commits':>7} {'trans':>5}  formation ladder (phase share)")
+    print(f"  {'-'*30} {'-'*6} {'-'*7} {'-'*5}  {'-'*44}")
+    for r in rows:
+        print(f"  {r['slug'][:30]:30} {r['score']:>6} {r['commits']:>7} {r['transitions']:>5}  {_phases(r)}")
+    print(f"\n  ▶ best: {rows[0]['slug']} — play it with  agentopolis movie {rows[0]['slug']}\n")
 
 
 def run_marathon(root: str, port: int, no_open: bool, top: int | None) -> None:

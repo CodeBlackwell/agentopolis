@@ -279,6 +279,8 @@ def test_evaluate_scores_a_repo_with_history(history_repo, monkeypatch):
     assert m["commits"] >= 6 and m["buildings"] > 0 and m["score"] > 0
     assert m["ladder"]                                   # the formation ladder it plays
     assert m["deaths"] >= 1                              # the deleted page.js became a ruin
+    assert sum(p["commits"] for p in m["phases"]) == m["commits"]   # phases tile the whole history
+    assert all(p["formation"] and p["pct"] >= 0 for p in m["phases"])
 
 
 def test_crawl_command_ranks_repos_as_a_table(history_repo, capsys, monkeypatch):

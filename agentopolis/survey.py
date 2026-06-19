@@ -252,15 +252,20 @@ def _metrics(zone: dict, head: list, commits: list) -> dict | None:
             epochs.pop(k)
 
     ladder = [f for _, _, f in epochs]
+    phases = [{"formation": f, "commits": e - s + 1, "pct": round((e - s + 1) / n * 100)}
+              for s, e, f in epochs]                     # how long each phase lasted, in commits and %
     transitions = max(0, len(ladder) - 1)
     deaths = len(dead)
     peak = len(birth)
+    balance = 1 - max((p["pct"] for p in phases), default=100) / 100   # 0 if it sits in one shape
     score = (len(set(ladder)) * 12                       # variety of shapes it wears (the main draw)
              + min(transitions, 5) * 8                   # re-formations, capped so noisy flappers don't dominate
              + min(n, 3000) / 40                         # length: more history to watch (capped)
-             + min(deaths, 150) / 5)                     # ruins add drama
+             + min(deaths, 150) / 5                      # ruins add drama
+             + balance * 10)                             # pacing: reward repos that don't dwell in one phase
     return {"commits": n, "buildings": len(head), "peak": peak, "deaths": deaths,
-            "transitions": transitions, "ladder": " → ".join(ladder), "score": round(score, 1)}
+            "transitions": transitions, "ladder": " → ".join(ladder),
+            "phases": phases, "score": round(score, 1)}
 
 
 def find_repos(root: str) -> list[str]:

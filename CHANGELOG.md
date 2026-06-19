@@ -6,6 +6,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- A `scout` command that ranks GitHub repos by time-lapse "movie potential". `agentopolis scout` lists
+  trending (`--since daily|weekly|monthly`, `--lang <language>`), or pass a search query to rank results;
+  each repo is `blob:none` cloned, scored, and listed best-first so you can find the blockbuster before
+  you play it.
+
+### Changed
+- Movie-potential scoring now rewards **pacing**: a repo that moves through several formations scores
+  higher than one that dwells in a single shape, and the crawl/scout tables show each phase's share of
+  history (e.g. `village·42% → spine·33% → grid·25%`) instead of a bare formation ladder.
+
+### Fixed
+- Mobile polish across the demo. The Chief-of-Staff "?" handle no longer overlaps the camera controls —
+  it anchors under their right edge and stays on-screen. The "explore the whole BLACKBOX nation" link is
+  tappable again (it sat inside a `pointer-events:none` header and never re-enabled them). Tapping a
+  building now lights just that building instead of washing its whole district white — the district
+  cross-highlight was a desktop-hover affordance, and phones have no hover. Tooltips flip left/up to stay
+  on-screen near any edge instead of clipping off the right or bottom.
+
 ## [0.25.0] - 2026-06-19
 
 ### Changed
