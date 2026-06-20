@@ -4,7 +4,7 @@ const cityCtx = cityCanvas.getContext('2d');
 const cityCam = { ox: 0, oy: 0, s: 1 };
 window.apxCam = cityCam;                                   // the tour watches this to gate the zoom/pan/reset step
 let cityState = null;
-const FIT = [115, 30, 1.18];                               // City.fit (pad, margin, zoom) for the live view
+const FIT = [115, 30, 0.85];                               // City.fit (pad, margin, zoom) for the live view
 
 // match the backing store to the box × DPR now and on every resize/orientation change, re-fitting
 // the city to the new shape (skipped until the layout has loaded; the fetch below does the first fit)

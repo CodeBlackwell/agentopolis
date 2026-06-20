@@ -464,7 +464,7 @@ def _page(request: Request, forge: str | None, embed: bool = False) -> HTMLRespo
         src = "/city-data.json?repo=" + quote(showcase["city"], safe="")
         timeline_src = "/timeline.json?repo=" + quote(showcase["city"], safe="")
     elif nation["root"]:
-        mode, name, src = "nation", Path(nation["root"]).name, "city-data.json"
+        mode, name, src = "nation", "Agentopolis", "city-data.json"   # the nation is always "Agentopolis", not the workspace dir name
     else:
         mode, name, src = "city", Path(city["repo"]).resolve().name, "city-data.json"
         movie = "timelapse" in qp            # a local city replays its history only on request

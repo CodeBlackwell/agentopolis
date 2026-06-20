@@ -155,7 +155,7 @@
     { sel: '#tl-exit', title: 'Return to the present',
       text: 'Press Exit when the chronicle has flattered you sufficiently — or ⊔ Share your handiwork with the lesser nations.' },
     { center: 1, title: '⭐ NOW GO BUILD, PRESIDENT ⭐',
-      text: `The demonstration is complete, ${pres}. Hold a grand opening of your own — paste any GitHub URL and cut the ribbon — or follow the banner to survey the entire BLACKBOX nation. My portrait beneath the controls recalls me anytime. The people are, as ever, unanimous.` },
+      text: `The demonstration is complete, ${pres}. Hold a grand opening of your own — paste any GitHub URL and cut the ribbon — or follow the banner to survey the entire Agentopolis nation. My portrait beneath the controls recalls me anytime. The people are, as ever, unanimous.` },
   ];
   const LISTS = { nation: NATION, city: CITY, movie: MOVIE, 'demo-land': DEMO_LAND, 'demo-cards': DEMO_CARDS };
 
@@ -524,9 +524,10 @@
     help.onclick = start;
     const place = () => requestAnimationFrame(() => {           // rAF: measure after the mobile scale() transform applies
       const m = document.getElementById('mapctl');
-      if (!m) { help.style.visibility = 'hidden'; return; }    // no camera panel here → no handle to anchor to
+      const r = m ? m.getBoundingClientRect() : null;
+      if (!r || !r.width) { help.style.visibility = 'hidden'; return; }   // no panel, or it's hidden (Skyline) → no anchor
       help.style.visibility = '';
-      const r = m.getBoundingClientRect(), w = help.offsetWidth;
+      const w = help.offsetWidth;
       help.style.top = (r.bottom + 10) + 'px';                 // clear below the controls — never over them
       help.style.left = Math.min(Math.max(8, r.right - w), innerWidth - w - 8) + 'px';   // tuck under the panel's right edge, kept on-screen
     });

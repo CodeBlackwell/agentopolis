@@ -825,20 +825,22 @@ function drawCommitHud() {
 function drawEndCard(t) {
   const W = tlCanvas.width, H = tlCanvas.height, u = H / 18, k = Math.min(1, (t - endCardAt) / END_CARD_FADE);
   const name = document.body.dataset.hallName || 'this city', title = `${name} City — The Movie`;
+  // shrink any line to fit the frame width — on tall narrow mobile canvases u is large and fixed sizes overflow
+  const fit = (text, size) => {
+    while (size > u * 0.4) {
+      tlCtx.font = `${size}px 'Silkscreen', monospace`;
+      if (tlCtx.measureText(text).width <= W * 0.9) break;
+      size -= u * 0.1;
+    }
+  };
   tlCtx.save();
   tlCtx.globalAlpha = k * 0.9; tlCtx.fillStyle = '#241020'; tlCtx.fillRect(0, 0, W, H);
   tlCtx.globalAlpha = k; tlCtx.textAlign = 'center'; tlCtx.textBaseline = 'middle';
-  let titleSize = u * 1.7;                                  // shrink the longer "City — The Movie" title to fit the frame
-  tlCtx.font = `${titleSize}px 'Silkscreen', monospace`;
-  while (tlCtx.measureText(title).width > W * 0.9 && titleSize > u * 0.8) {
-    titleSize -= u * 0.1; tlCtx.font = `${titleSize}px 'Silkscreen', monospace`;
-  }
-  tlCtx.fillStyle = '#f9efe3'; tlCtx.fillText(title, W / 2, H * 0.37);
-  tlCtx.fillStyle = '#c77aaa'; tlCtx.font = `${u * 0.7}px 'Silkscreen', monospace`;
+  tlCtx.fillStyle = '#f9efe3'; fit(title, u * 1.7); tlCtx.fillText(title, W / 2, H * 0.37);
+  tlCtx.fillStyle = '#c77aaa'; fit('An 8-Bit Productions Film', u * 0.7);
   tlCtx.fillText('An 8-Bit Productions Film', W / 2, H * 0.49);
-  tlCtx.fillStyle = '#d4a953'; tlCtx.font = `${u}px 'Silkscreen', monospace`;
-  tlCtx.fillText(canonText(), W / 2, H * 0.61);
-  tlCtx.fillStyle = '#c77aaa'; tlCtx.font = `${u * 0.8}px 'Silkscreen', monospace`;
+  tlCtx.fillStyle = '#d4a953'; fit(canonText(), u); tlCtx.fillText(canonText(), W / 2, H * 0.61);
+  tlCtx.fillStyle = '#c77aaa'; fit('Built with <3 by CodeBlackwell w/ Claude', u * 0.8);
   tlCtx.fillText('Built with <3 by CodeBlackwell w/ Claude', W / 2, H * 0.70);
   tlCtx.restore();
 }
@@ -1001,7 +1003,8 @@ function buildTransport() {
       border-bottom:1px solid rgba(212,169,83,.22)}
     .tl-dd-opt:last-child{border-bottom:0}#transport .tl-dd-opt:hover{background:var(--plum-soft)}
     .tl-dd-opt[aria-selected=true]{background:var(--gold);color:var(--plum)}
-    #tl-label{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}
+    #tl-label{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85;
+      font-size:9px;text-align:center}
     #tl-exit{width:auto;height:26px;padding:0 16px;letter-spacing:.08em;position:relative}
     /* stylized hover tooltip: pixel plaque above the button naming the city it returns to */
     #tl-exit::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);right:0;z-index:5;

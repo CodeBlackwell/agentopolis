@@ -328,20 +328,62 @@
     #forge-slot #forge { position: static; transform: none; display: block; }
     #forge-slot #forge input { width: 100%; max-width: none; font-size: 16px; padding: 12px; }  /* 16px stops iOS focus-zoom from hiding the typed URL */
   }
+
+  /* ---- Skyline: calm first paint = the city, full-bleed + one sentence + one CTA. Expand reveals the floor. ---- */
+  body[data-skyline="1"] { grid-template-columns: 1fr; grid-template-rows: 1fr; grid-template-areas: "map"; gap: 0; padding: 0; }
+  body[data-skyline="1"] #side, body[data-skyline="1"] #dock, body[data-skyline="1"] #mapctl,
+  body[data-skyline="1"] #tiers, body[data-skyline="1"] #version, body[data-skyline="1"] #back,
+  body[data-skyline="1"] #drawer-btn,
+  body[data-skyline="1"] header p:not(.skyline-tagline),
+  body[data-skyline="1"] #forge .install-row, body[data-skyline="1"] #forge .cli-accordion,
+  body[data-skyline="1"] #forge .forge-hint { display: none !important; }
+  body[data-skyline="1"] .mapwrap { border: 0; padding: 0; box-shadow: none; }
+  /* the one sentence + one CTA ride large on the city */
+  body[data-skyline="1"] header { transform: none; top: 26px; left: 30px; max-width: min(560px, 86vw); }
+  body[data-skyline="1"] header h1 { font-size: clamp(20px, 2.4vw, 30px); }
+  .skyline-tagline { display: none; }
+  body[data-skyline="1"] .skyline-tagline { display: block; pointer-events: none;
+    font-family: 'Silkscreen', monospace; font-size: clamp(15px, 1.9vw, 22px); line-height: 1.5;
+    color: var(--cream); margin-top: 10px; letter-spacing: .02em; text-shadow: 0 2px 10px rgba(0,0,0,.85); }
+  body[data-skyline="1"] #forge { display: block; margin-top: 18px; }
+  body[data-skyline="1"] #forge input { width: min(460px, 80vw); }
+
+  /* the one control: Explore (in Skyline) <-> Skyline (in the full operator view) */
+  #skyline-toggle { position: fixed; bottom: 14px; right: 14px; z-index: 9; cursor: pointer;
+    background: var(--plum-soft); color: var(--cream); border: 2px solid var(--gold);
+    box-shadow: 3px 3px 0 var(--plum); font-family: 'Silkscreen', monospace; font-size: 11px;
+    letter-spacing: .1em; text-transform: uppercase; padding: 9px 13px; }
+  #skyline-toggle:hover { background: var(--gold); color: var(--plum); }
+  body[data-embed="1"] #skyline-toggle { display: none; }
+  /* movie mode parks the transport strip at the wrap's bottom; lift the toggle clear of it (desktop) */
+  @media (min-width: 721px) { body:has(.mapwrap.tl-mode) #skyline-toggle { bottom: 76px; } }
+  /* phones: top-center keeps the toggle clear of the title (left), tier/zoom chrome (right), and the bottom buttons */
+  @media (max-width: 720px) { #skyline-toggle { bottom: auto; top: 12px; left: 50%; right: auto; transform: translateX(-50%); } }
 </style>
 </head>
 <body data-mode="{{MODE}}" data-hall-level="{{HALL_LEVEL}}" data-hall-name="{{HALL_NAME}}" data-demo="{{DEMO}}" data-embed="{{EMBED}}">
+  <script>
+    // Skyline: calm first paint everywhere (city + one line + one CTA); remembers if you've expanded.
+    (() => {
+      const q = location.search, b = document.body;
+      if (b.dataset.embed === '1') return;                    // embeds are already chrome-less
+      const pref = localStorage.getItem('agentopolis-view');  // 'full' | 'skyline' | null
+      const full = /[?&]full\b/.test(q) || (pref === 'full' && !/[?&]skyline\b/.test(q));
+      if (!full) b.dataset.skyline = '1';
+    })();
+  </script>
   <div class="mapwrap">
     <canvas id="map" width="1280" height="720"></canvas>
     <header>
       <h1><span class="m-nation">Agentopolis Nation</span><span class="m-city">{{HALL_NAME}} City</span><a
             id="repo-link" class="m-city" href="{{REPO_URL}}" target="_blank" rel="noopener" title="view source on GitHub">&nbsp;&middot;&nbsp;<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a></h1>
+      <p class="skyline-tagline">Watch your codebase build itself<br>as a living isometric city.</p>
       <p class="m-nation">drag to pan<br>scroll to zoom<br>click a city to enter<br>zoom out to leave<br>Q/E rotate</p>
       <button id="back" class="m-nation" title="back to world map">&#8593; WORLD MAP</button>
       <p class="m-city">scroll to zoom in &amp; out<br>drag to pan<br>the city builds itself</p>
       <button id="replay" class="m-city" title="replay this repo's git history as a time-lapse"
               onclick="location.search='?timelapse'">&#9654; replay history</button>
-      <p class="m-city demo-only"><a href="/?nation">&#9656; explore the whole BLACKBOX nation</a></p>
+      <p class="m-city demo-only"><a href="/?nation">&#9656; explore the whole Agentopolis nation</a></p>
       <form id="forge"
             onsubmit="try{navigator.sendBeacon('/e/build_your_own')}catch(e){}location.href='/?forge='+encodeURIComponent(this.url.value.trim());return false">
         <div class="forge-hint demo-only">now build <b>your</b> repo &rarr;</div>
@@ -425,6 +467,7 @@
     <div id="forge-slot"></div>
   </div>
   <div id="scrim"></div>
+  <button id="skyline-toggle" title="toggle the calm Skyline view">Explore &#9656;</button>
   <div id="version">v{{VERSION}}</div>
   <script src="city-render.js"></script>
   <script src="city-scape.js"></script>
@@ -497,6 +540,20 @@
       el.textContent = '✓ copied!'; el.classList.add('copied');
       setTimeout(() => { el.textContent = original; el.classList.remove('copied'); }, 1400);
     }));
+  </script>
+  <script>
+    // Skyline toggle: flip the calm view <-> full operator view, and remember the choice.
+    (() => {
+      const b = document.body, btn = document.getElementById('skyline-toggle');
+      const sync = () => btn.innerHTML = b.dataset.skyline === '1' ? 'Explore &#9656;' : '&#9666; Skyline';
+      btn.addEventListener('click', () => {
+        const on = b.dataset.skyline === '1';
+        if (on) delete b.dataset.skyline; else b.dataset.skyline = '1';
+        localStorage.setItem('agentopolis-view', on ? 'full' : 'skyline');
+        sync();
+      });
+      sync();
+    })();
   </script>
   <script>
     if (location.hostname === 'localhost') {
