@@ -776,7 +776,7 @@ const City = (() => {
     b.foot = FFOOT[b.form]
            ?? (b.floors === 1 && !under ? .96               // minnows join into terraces
               : .55 + .38 * Math.min(1, Math.log10(b.loc + 1) / 4));
-    const j = hash(b.path), m = .4 * (1 - b.foot);          // jitter within the lot's free margin,
+    const j = b.seed = hash(b.path), m = .4 * (1 - b.foot); // jitter within the lot's free margin,
     b.x = lot.x + m * ((j % 5) - 2) / 2;                    // so terraces (foot .96) barely move
     b.y = lot.y + m * (((j >> 2) % 5) - 2) / 2;
     b.hub = b.imports > state.cuts.imports;
@@ -929,7 +929,7 @@ const City = (() => {
   }
 
   function drawWindows(ctx, cam, base, h, b, t) {
-    const seed = hash(b.path), glow = litGlow(b, seed, t), tint = winTint(b);
+    const seed = b.seed, glow = litGlow(b, seed, t), tint = winTint(b);
     faceWindows(ctx, cam, base[3], base[2], h, b.floors, 0, seed, glow, tint);
     faceWindows(ctx, cam, base[2], base[1], h, b.floors, b.floors, seed, glow, tint);
   }
@@ -951,7 +951,7 @@ const City = (() => {
         ctx.stroke();
       }
       if (h > 8 * cam.s) {                                  // lit gauge ports on the tank wall
-        const seed = hash(b.path), glow = litGlow(b, seed, t);
+        const seed = b.seed, glow = litGlow(b, seed, t);
         faceWindows(ctx, cam, base[2], base[1], h, 1, 0, seed, glow, '126,222,255', [.35, .65]);
       }
     },
@@ -968,7 +968,7 @@ const City = (() => {
       }
     },
     frontend(ctx, cam, b, base, top, h, t) {                // rooftop billboard
-      const s = cam.s, seed = hash(b.path);
+      const s = cam.s, seed = b.seed;
       if (!b.billboard) return;                             // active buildings advertise (repo-relative)
       const cx = (top[1].sx + top[3].sx) / 2, cy = (top[0].sy + top[2].sy) / 2;
       ctx.fillStyle = '#1a0a16';
@@ -980,7 +980,7 @@ const City = (() => {
     },
     tests() {},                                             // no band; kept truthy so test files stay penthouse-free
     infra(ctx, cam, b, base, top, h, t) {                   // smokestack + puffs
-      const s = cam.s, seed = hash(b.path);
+      const s = cam.s, seed = b.seed;
       const cx = (top[1].sx + top[3].sx) / 2 + 4 * s, cy = (top[0].sy + top[2].sy) / 2;
       ctx.fillStyle = '#3a3f4a';
       ctx.fillRect(cx - 2 * s, cy - 10 * s, 4 * s, 10 * s);
@@ -1019,7 +1019,7 @@ const City = (() => {
       ctx.fillStyle = '#140c18';
       ctx.fillRect(door.sx - 1.5 * s, door.sy - h * .45, 3 * s, h * .45);
       const win = lerp(base[3], base[2], .5);
-      ctx.fillStyle = b.lit > .1 || hash(b.path) % 2 ? 'rgba(255,214,120,.85)' : 'rgba(20,12,24,.55)';
+      ctx.fillStyle = b.lit > .1 || b.seed % 2 ? 'rgba(255,214,120,.85)' : 'rgba(20,12,24,.55)';
       ctx.fillRect(win.sx - 2 * s, win.sy - h * .55, 4 * s, h * .3);
     },
     shed(ctx, cam, b, base, top, h, t) {                    // corrugated seams + a lit window
@@ -1033,7 +1033,7 @@ const City = (() => {
         }
       ctx.stroke();
       if (h > 6 * cam.s) {
-        const seed = hash(b.path);
+        const seed = b.seed;
         faceWindows(ctx, cam, base[2], base[1], h, 1, 0, seed, litGlow(b, seed, t), '255,214,120', [.3, .7]);
       }
     },
@@ -1048,7 +1048,7 @@ const City = (() => {
       }
       ctx.stroke();
       if (h > 6 * cam.s) {
-        const seed = hash(b.path);
+        const seed = b.seed;
         faceWindows(ctx, cam, base[3], base[2], h, 1, 1, seed, litGlow(b, seed, t), '255,214,120', [.35, .65]);
       }
     },
@@ -1083,7 +1083,7 @@ const City = (() => {
         ctx.lineTo(c.sx + Math.cos(a) * r * .55, cy + Math.sin(a) * r * .48); ctx.stroke();
       }
       if (h > 8 * s) {                                      // dim security slits high on the band
-        const seed = hash(b.path), glow = litGlow(b, seed, t) * .6;   // never as bright as a home
+        const seed = b.seed, glow = litGlow(b, seed, t) * .6;   // never as bright as a home
         faceWindows(ctx, cam, base[3], base[2], h, 1, 2, seed, glow, '255,180,90', [.3, .7]);
       }
     },
@@ -1101,7 +1101,7 @@ const City = (() => {
       tri(ctx, base[3], base[2], apex, shade(b.color, .58));
       tri(ctx, base[2], base[1], apex, shade(b.color, .82));
       if (h > 10 * cam.s) {                                 // lit slits climbing the faces, narrowing to the tip
-        const seed = hash(b.path), glow = litGlow(b, seed, t), rows = Math.max(2, Math.min(4, b.floors));
+        const seed = b.seed, glow = litGlow(b, seed, t), rows = Math.max(2, Math.min(4, b.floors));
         for (const [a, c, off] of [[base[3], base[2], 0], [base[2], base[1], rows]])
           for (let k = 0; k < rows; k++) {
             const fr = (k + .4) / rows, lit = glow > 0 && (seed >> (k + off)) % 3 !== 0;
@@ -1113,7 +1113,7 @@ const City = (() => {
     },
     ziggurat(ctx, cam, b, base, top, h, t) {                // compiled/systems (go/rs/java): stepped tiers
       const c = cen(base), n = Math.max(2, Math.min(4, Math.round(b.floors / 2) + 1));
-      const seed = hash(b.path), glow = litGlow(b, seed, t), tint = winTint(b);
+      const seed = b.seed, glow = litGlow(b, seed, t), tint = winTint(b);
       for (let i = 0; i < n; i++) {
         const k = 1 - .55 * (i / n);
         const lo = base.map(p => lift(toward(p, c, k), h * i / n));
@@ -1136,7 +1136,7 @@ const City = (() => {
       ctx.fillStyle = shade(b.color, .52);
       ctx.fillRect(c.sx - rx, tcy, rx * .55, h);            // shaded flank → roundness
       if (h > 10 * cam.s) {                                 // lit ribbon windows up the glass tower
-        const seed = hash(b.path), glow = litGlow(b, seed, t), rows = Math.max(2, Math.min(5, b.floors));
+        const seed = b.seed, glow = litGlow(b, seed, t), rows = Math.max(2, Math.min(5, b.floors));
         for (let k = 0; k < rows; k++) {
           const yy = tcy + ((k + .6) / rows) * h, lit = glow > 0 && (seed >> k) % 3 !== 0;
           ctx.fillStyle = lit ? `rgba(126,222,255,${Math.min(1, .3 + glow)})` : 'rgba(20,12,24,.4)';
@@ -1151,7 +1151,7 @@ const City = (() => {
       quad(ctx, base[3], base[2], tp[2], tp[3], shade(b.color, .55));
       quad(ctx, base[2], base[1], tp[1], tp[2], shade(b.color, .75));
       if (h > 10 * cam.s) {
-        const seed = hash(b.path), glow = litGlow(b, seed, t), tint = winTint(b), rows = Math.max(2, Math.min(5, b.floors));
+        const seed = b.seed, glow = litGlow(b, seed, t), tint = winTint(b), rows = Math.max(2, Math.min(5, b.floors));
         faceWindows(ctx, cam, base[3], base[2], h, rows, 0, seed, glow, tint);
         faceWindows(ctx, cam, base[2], base[1], h, rows, rows, seed, glow, tint);
       }
@@ -1172,7 +1172,7 @@ const City = (() => {
   }
 
   function drawAntennas(ctx, cam, b, top, t) {              // high import fan-out: comms roof
-    const s = cam.s, seed = hash(b.path);
+    const s = cam.s, seed = b.seed;
     for (const [u, i] of [[.15, 0], [.85, 1]]) {
       const x = top[3].sx + (top[1].sx - top[3].sx) * u;
       const y = top[0].sy + (top[2].sy - top[0].sy) * .5;
@@ -1186,7 +1186,7 @@ const City = (() => {
   }
 
   function drawCrane(ctx, cam, b, top, t) {                 // TODO debt: rooftop crane
-    const s = cam.s, seed = hash(b.path);
+    const s = cam.s, seed = b.seed;
     const x = top[3].sx + (top[1].sx - top[3].sx) * .3;
     const y = top[0].sy + (top[2].sy - top[0].sy) * .5;
     const mh = 16 * s, jib = 14 * s, hx = x + jib * .8 + Math.sin(t / 1600 + seed) * 3 * s;
@@ -1202,7 +1202,7 @@ const City = (() => {
   }
 
   function roofProps(ctx, cam, b, top, t) {
-    const s = cam.s, seed = hash(b.path);
+    const s = cam.s, seed = b.seed;
     const cx = (top[1].sx + top[3].sx) / 2, cy = (top[0].sy + top[2].sy) / 2;
     if (b.floors >= 6 && seed % 2) {
       ctx.strokeStyle = '#1a0a16';
@@ -1347,13 +1347,18 @@ const City = (() => {
 
   const SKY = [[0, '#3a2c4e', '#7a4e5a'], [.34, '#4a5878', '#9a8a8e'],     // dawn → day → dusk → night
                [.67, '#33263f', '#b5654d'], [1, '#0e0a1a', '#241830']];     // [phase, sky-top, horizon]
+  let skyCache = null, skyKeyPhase = -1, skyKeyH = -1;     // gradient is screen-anchored; rebuild only on phase/height change
   function paintSky(ctx, phase) {                          // vertical gradient behind the whole scene
-    let a = SKY[0], b = SKY[SKY.length - 1];
-    for (let i = 1; i < SKY.length; i++) if (phase <= SKY[i][0]) { a = SKY[i - 1]; b = SKY[i]; break; }
-    const k = b[0] === a[0] ? 0 : (phase - a[0]) / (b[0] - a[0]);
-    const g = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
-    g.addColorStop(0, mix(a[1], b[1], k)); g.addColorStop(1, mix(a[2], b[2], k));
-    ctx.fillStyle = g; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    const H = ctx.canvas.height;
+    if (skyKeyPhase !== phase || skyKeyH !== H) {
+      let a = SKY[0], b = SKY[SKY.length - 1];
+      for (let i = 1; i < SKY.length; i++) if (phase <= SKY[i][0]) { a = SKY[i - 1]; b = SKY[i]; break; }
+      const k = b[0] === a[0] ? 0 : (phase - a[0]) / (b[0] - a[0]);
+      skyCache = ctx.createLinearGradient(0, 0, 0, H);
+      skyCache.addColorStop(0, mix(a[1], b[1], k)); skyCache.addColorStop(1, mix(a[2], b[2], k));
+      skyKeyPhase = phase; skyKeyH = H;
+    }
+    ctx.fillStyle = skyCache; ctx.fillRect(0, 0, ctx.canvas.width, H);
   }
 
   function drawBirds(ctx, t) {                              // a slow flock drifting across the sky behind the skyline

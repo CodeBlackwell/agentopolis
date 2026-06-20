@@ -188,7 +188,8 @@ function layoutNation(data) {
       if (h % Math.round(lerp(9, 4, b.vitality)) === 0)      // lush vital provinces, sparse stale ones
         props.push({ x: tx + .5, y: ty + .5, seed: h, kind: b.prop });
     }
-  return { blocks, byBlock, cities: data.cities, props, byRepo, g, pz, W, H, root: data.root };
+  const labelOrder = [...data.cities].sort((a, b) => b.fr - a.fr);   // bigger repos claim label space first; fr is fixed per session
+  return { blocks, byBlock, cities: data.cities, labelOrder, props, byRepo, g, pz, W, H, root: data.root };
 }
 
 function camFor(x0, y0, x1, y1, padX, padY) {              // cam that frames a tile rect, centered
@@ -581,8 +582,8 @@ function drawMap(t) {
   drawMapGround(t);
   for (const c of nation.props) drawProp(c);
   for (const c of nation.cities) drawIcon(c, t);
-  const placed = [];                                            // bigger repos claim label space first; neighbors yield
-  for (const c of [...nation.cities].sort((a, b) => b.fr - a.fr)) cityLabel(c, placed);
+  const placed = [];                                            // neighbors yield to bigger repos (see nation.labelOrder)
+  for (const c of nation.labelOrder) cityLabel(c, placed);
   for (const b of nation.blocks) stateLabel(b);
 }
 
