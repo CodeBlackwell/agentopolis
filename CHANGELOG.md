@@ -7,10 +7,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Skyline — a calm first paint.** Every non-embed surface (city, nation, movie, forge, demo) now
+  opens full-bleed: the city, one tagline, one call-to-action, and nothing else. The operator chrome
+  (camera panel, dock, stats, share) is tucked behind a single **Explore** toggle whose choice is
+  remembered in `localStorage`. On by default; `?full` (or the remembered preference) opens straight
+  into the full operator view, and `?skyline` forces the calm view.
 - A **small version stamp** in the demo's bottom-left corner (`v<x.y.z>`), read from the installed
   package metadata so it matches what `agentopolis --version` reports. Hidden on phones.
 
 ### Changed
+- **The whole island frames on first paint.** The default live-city zoom dialed out (1.18 → 0.85) so a
+  new visitor sees the entire city at once instead of a cropped center.
+- **The movie's streaming commit caption is centered and smaller**, and the end-card lines now shrink
+  to fit the frame width on tall, narrow (mobile) canvases instead of overflowing.
+
 - **The movie's ending breathes now.** When the build completes, the finished city holds for ~3 s so
   the full product reads, then the title card **fades in over ~2 s** (was a 0.3 s snap) and sits for
   ~2.5 s before the recorded clip cuts. Same beat on screen and in the downloaded/shared clip.
@@ -26,6 +36,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   building is placed, not re-hashed at ~15 draw sites per frame), and the nation map's label priority
   order (sorted once per session). Pixel-identical output; just fewer allocations and less arithmetic
   in the hot path.
+
+### Fixed
+- **The public demo no longer leaks the local workspace directory name.** The nation is always named
+  "Agentopolis" (was derived from the serving directory, e.g. a private workspace folder name), and
+  the `BLACKBOX → Agentopolis` rename is carried through the rest of the UI copy.
+- The tour-help sprite no longer collides with the title when the camera panel is hidden (Skyline).
 
 ## [0.28.0] - 2026-06-19
 

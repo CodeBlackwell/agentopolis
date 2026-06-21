@@ -92,6 +92,19 @@ def test_caption_names_the_repo_and_carries_a_stat(page, base_url):
     assert any(ch.isdigit() for ch in text)                # a headline number, not the old static line
 
 
+# ---- Skyline: calm first paint hides operator chrome behind one Explore toggle ----------------
+
+def test_skyline_is_the_calm_default_and_explore_reveals_chrome(page, base_url):
+    page.goto(base_url + "/?skyline")                      # ?skyline forces it past the fixture's view=full
+    page.wait_for_function("window.CITY_STATS && window.CITY_STATS.districts > 0", timeout=15000)
+    assert page.get_attribute("body", "data-skyline") == "1"
+    assert page.is_visible(".skyline-tagline")             # one tagline rides the city
+    assert not page.is_visible("#mapctl")                  # camera panel + Share tucked away
+    page.click("#skyline-toggle")                          # Explore reveals the operator view
+    assert page.get_attribute("body", "data-skyline") is None
+    assert page.is_visible("#mapctl")
+
+
 # ---- Share button opens a destination menu (not auto-record), #8 X-intent + #7 caption -----
 
 def test_share_button_opens_a_destination_menu(page, base_url):
