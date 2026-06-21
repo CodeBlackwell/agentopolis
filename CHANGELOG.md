@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-06-21
+
 ### Added
 - **Skyline — a calm first paint.** Every non-embed surface (city, nation, movie, forge, demo) now
   opens full-bleed: the city, one tagline, one call-to-action, and nothing else. The operator chrome
