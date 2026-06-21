@@ -668,7 +668,7 @@ function loop(t) {
       else advance(target);
     }
     if (ptr >= commits.length - 1) { const justFinished = playing; setPlay(false);
-      if (justFinished) { if (!window.DEMO_MOVIE) finishedAt ||= performance.now(); onMovieComplete(); } }   // mark the finish; the city holds before the card (demo keeps its finished-city beat)
+      if (justFinished) { if (!window.DEMO_MOVIE && !document.body.dataset.skyline) finishedAt ||= performance.now(); onMovieComplete(); } }   // mark the finish; the city holds before the card (demo + Skyline keep the finished-city beat, no outro)
   } else { last = 0; }
   if (finishedAt && !endCardAt && t - finishedAt >= FINISH_HOLD) endCardAt = performance.now();   // the full product has read → bring up the outro
   if (!transition) {

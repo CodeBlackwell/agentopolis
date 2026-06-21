@@ -333,7 +333,7 @@
   body[data-skyline="1"] { grid-template-columns: 1fr; grid-template-rows: 1fr; grid-template-areas: "map"; gap: 0; padding: 0; }
   body[data-skyline="1"] #side, body[data-skyline="1"] #dock, body[data-skyline="1"] #mapctl,
   body[data-skyline="1"] #tiers, body[data-skyline="1"] #version, body[data-skyline="1"] #back,
-  body[data-skyline="1"] #drawer-btn,
+  body[data-skyline="1"] #drawer-btn, body[data-skyline="1"] #transport,
   body[data-skyline="1"] header p:not(.skyline-tagline),
   body[data-skyline="1"] #forge .install-row, body[data-skyline="1"] #forge .cli-accordion,
   body[data-skyline="1"] #forge .forge-hint { display: none !important; }
@@ -356,7 +356,7 @@
   #skyline-toggle:hover { background: var(--gold); color: var(--plum); }
   body[data-embed="1"] #skyline-toggle { display: none; }
   /* movie mode parks the transport strip at the wrap's bottom; lift the toggle clear of it (desktop) */
-  @media (min-width: 721px) { body:has(.mapwrap.tl-mode) #skyline-toggle { bottom: 76px; } }
+  @media (min-width: 721px) { body:has(.mapwrap.tl-mode):not([data-skyline="1"]) #skyline-toggle { bottom: 76px; } }
   /* phones: top-center keeps the toggle clear of the title (left), tier/zoom chrome (right), and the bottom buttons */
   @media (max-width: 720px) { #skyline-toggle { bottom: auto; top: 12px; left: 50%; right: auto; transform: translateX(-50%); } }
 </style>

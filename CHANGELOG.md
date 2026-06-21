@@ -6,6 +6,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **The Skyline landing is calmer still.** While the city builds itself on first paint, the movie
+  transport bar (scrubber + streaming commit line) is now hidden, and when the build finishes the
+  city simply holds — no end-card outro. Both return in the full operator view (**Explore**); shared
+  and recorded clips keep the branded outro.
+
 ## [0.29.0] - 2026-06-21
 
 ### Added
