@@ -66,6 +66,7 @@ def page(browser):
     ctx = browser.new_context(viewport={"width": 1200, "height": 800}, accept_downloads=True)
     pg = ctx.new_page()
     pg.add_init_script("try { localStorage.setItem('agentopolis-tour-done', '1'); } catch (e) {}")  # skip first-visit tour
+    pg.add_init_script("try { localStorage.setItem('agentopolis-view', 'full'); } catch (e) {}")  # operator chrome (Share etc.) visible; Skyline hides it by default
     yield pg
     ctx.close()
 
