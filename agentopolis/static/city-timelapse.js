@@ -355,7 +355,7 @@ function buildEpochLayouts(data, epochs) {
   let hadVillage = false;
   epochs.forEach((ep, ei) => {
     const st = City.layout({ zone: data.zone, buildings: ep.buildingsAlive,
-      deps: data.deps, docker: data.docker, dead: data.dead,
+      deps: data.deps, docker: data.docker, dead: data.dead, deferLife: true,   // cars+peds wait until the build finishes (placeLife on complete)
       _planFn: ep.formation.plan, _formationId: ep.formation.id });   // tag the stage for ambient dressing
     for (const b of st.buildings)
       (b._epochPos ||= {})[ei] = { x: b.x, y: b.y, floors: b.floors, foot: b.foot, color: b.color,
@@ -668,7 +668,9 @@ function loop(t) {
       else advance(target);
     }
     if (ptr >= commits.length - 1) { const justFinished = playing; setPlay(false);
-      if (justFinished) { if (!window.DEMO_MOVIE && !document.body.dataset.skyline) finishedAt ||= performance.now(); onMovieComplete(); } }   // mark the finish; the city holds before the card (demo + Skyline keep the finished-city beat, no outro)
+      if (justFinished) { if (!window.DEMO_MOVIE && !document.body.dataset.skyline) finishedAt ||= performance.now(); onMovieComplete();
+        City.placeLife(state); seek(commits.length - 1); } }   // the build is done → the finished city comes alive with cars+pedestrians, then re-render this frame
+
   } else { last = 0; }
   if (finishedAt && !endCardAt && t - finishedAt >= FINISH_HOLD) endCardAt = performance.now();   // the full product has read → bring up the outro
   if (!transition) {
@@ -813,13 +815,13 @@ function drawCommitHud() {
   const W = tlCanvas.width, H = tlCanvas.height, u = H / 18, pad = u * 0.6;
   tlCtx.save();
   tlCtx.textAlign = 'left'; tlCtx.textBaseline = 'alphabetic';
-  tlCtx.fillStyle = 'rgba(36,16,32,.72)'; tlCtx.fillRect(0, H - u * 2.3, W, u * 2.3);   // legibility scrim
-  tlCtx.fillStyle = '#d4a953'; tlCtx.font = `${u * 0.6}px 'Silkscreen', monospace`;
-  tlCtx.fillText(`${fmtDate(c.ts)}    ${ptr + 1}/${commits.length}`, pad, H - u * 1.35);
-  tlCtx.fillStyle = '#f9efe3'; tlCtx.font = `${u * 0.72}px 'Silkscreen', monospace`;   // truncate the subject to the frame
+  tlCtx.fillStyle = 'rgba(36,16,32,.72)'; tlCtx.fillRect(0, H - u * 1.3, W, u * 1.3);   // legibility scrim
+  tlCtx.fillStyle = '#d4a953'; tlCtx.font = `${u * 0.32}px 'Silkscreen', monospace`;
+  tlCtx.fillText(`${fmtDate(c.ts)}    ${ptr + 1}/${commits.length}`, pad, H - u * 0.74);
+  tlCtx.fillStyle = '#f9efe3'; tlCtx.font = `${u * 0.4}px 'Silkscreen', monospace`;   // truncate the subject to the frame
   let subject = c.subject;
   while (subject.length > 1 && tlCtx.measureText(subject + '…').width > W - pad * 2) subject = subject.slice(0, -1);
-  tlCtx.fillText(subject === c.subject ? subject : subject + '…', pad, H - u * 0.5);
+  tlCtx.fillText(subject === c.subject ? subject : subject + '…', pad, H - u * 0.28);
   tlCtx.restore();
 }
 function drawEndCard(t) {
@@ -865,7 +867,8 @@ window.recordTimelapseClip = (opts = {}) => new Promise(resolve => {
   catch (e) { return resolve(null); }
   const chunks = [];
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-  rec.onstop = () => { if (activeRec === rec) { activeRec = activeAbort = null; }   // leave endCardAt: the title card holds past the cut (seek/replay clears it)
+  rec.onstop = () => { if (activeRec === rec) { activeRec = activeAbort = null; }   // non-demo: leave endCardAt so the title card holds past the cut (seek/replay clears it)
+    if (window.DEMO_MOVIE) { endCardAt = 0; finishedAt = 0; }   // the landing reverts to the finished city once the clip cuts — the card is baked into the clip, not held on screen
     resolve(new Blob(chunks, { type: rec.mimeType || 'video/webm' })); };
   const finish = () => {                                                 // build done → hold the finished city, brand the outro, then cut
     clearTimeout(cap); clearInterval(poll);

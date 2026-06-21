@@ -11,6 +11,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   transport bar (scrubber + streaming commit line) is now hidden, and when the build finishes the
   city simply holds — no end-card outro. Both return in the full operator view (**Explore**); shared
   and recorded clips keep the branded outro.
+- **The demo landing ends on the living city, not the credits.** The branded title card is still baked
+  into the shared/downloaded clip, but once the clip is captured the landing reverts to the finished
+  skyline instead of holding the outro on screen.
+- **The streaming commit caption is about half the size** so it reads as a subtitle, not a banner.
+
+### Performance
+- **Cars and pedestrians now arrive only after the city finishes building.** They were spawned during
+  the build and forced a full painter-order re-sort every frame (the lag). The movie now grows
+  car-free and comes alive once complete; the live city adds them right after its first fit. Spawning
+  is shared by both paths via a single deferrable `placeLife()`.
 
 ## [0.29.0] - 2026-06-21
 

@@ -566,27 +566,36 @@ const City = (() => {
   // (district recency / commit volume, hub dominance, layer count, deletions) — never a constant — and
   // is capped relative to map area so a big repo doesn't clutter. Presence is earned: no fountain unless
   // radial, no boats unless canals exist, no crows unless files died. Pure placement into state.props.
-  function ambientDressing(state, data) {
-    const W = state.W, H = state.H, g = state.ground, code = (x, y) => g[y] && g[y][x];
-    const cap = n => Math.min(n, Math.max(1, Math.round(W * H / 60)));    // clutter ceiling ∝ map area
+  // shared district aggregates for ambient life (cheap; recomputed by the deferred path)
+  function lifeStats(state) {
+    const cap = n => Math.min(n, Math.max(1, Math.round(state.W * state.H / 60)));    // clutter ceiling ∝ map area
     const stats = state.blocks.map(bl => {                               // per-district aggregates
       let commits = 0, lit = 0;
       for (const b of bl.list) { commits += b.commits || 0; lit += b.lit || 0; }
       return { bl, commits, lit, n: bl.list.length };
     });
-    const maxCommits = Math.max(1, ...stats.map(s => s.commits));
-    const commitMed = q(stats.map(s => s.commits), .5);
+    return { cap, stats, maxCommits: Math.max(1, ...stats.map(s => s.commits)), commitMed: q(stats.map(s => s.commits), .5) };
+  }
+
+  // Pedestrians + cars — the moving life. Split out so it can be DEFERRED until the city settles: cars
+  // recompute position every frame and force a full painter re-sort, the one steady per-frame cost.
+  function placeLife(state) {
+    if (state._lifePlaced) return;                                      // idempotent — spawn once per city
+    state._lifePlaced = true;
+    const H = state.H, g = state.ground, code = (x, y) => g[y] && g[y][x];
+    const { cap, stats, maxCommits } = lifeStats(state);
+    const sink = state._props || state.props;                          // movie draws from the _props snapshot; live from props+items
 
     for (const s of stats) {                                            // pedestrians: ∝ district liveliness (mean recency)
       if (!s.n || !s.bl.lots.length) continue;
       for (let i = 0, count = cap(Math.round(s.lit / s.n * Math.sqrt(s.n))); i < count; i++) {
         const lot = s.bl.lots[hash(s.bl.comp.id + 'w' + i) % s.bl.lots.length];
-        state.props.push({ kind: 'walker', x: lot.x, y: lot.y, seed: hash(s.bl.comp.id + 'walk' + i) });
+        sink.push({ kind: 'walker', x: lot.x, y: lot.y, seed: hash(s.bl.comp.id + 'walk' + i) });
       }
     }
 
     const streets = [], sset = new Set();                               // traffic: cars cruise the road grid ∝ commit activity
-    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++)
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < state.W - 1; x++)
       if (code(x, y) <= 1) { streets.push({ x, y }); sset.add(x + ',' + y); }
     if (streets.length) {
       const activity = stats.reduce((a, s) => a + s.commits, 0) / maxCommits;
@@ -605,9 +614,21 @@ const City = (() => {
           cur = { x: cur.x + dir.x, y: cur.y + dir.y };
           path.push({ x: cur.x + .5, y: cur.y + .5 });
         }
-        if (path.length >= 2) state.props.push({ kind: 'traffic', x: path[0].x, y: path[0].y, seed: hash('car' + i), path });
+        if (path.length >= 2) sink.push({ kind: 'traffic', x: path[0].x, y: path[0].y, seed: hash('car' + i), path });
       }
     }
+
+    if (!state._props && state.items.length) {                         // live city, deferred add: rebuild the static draw order to include the new life
+      const k0 = dkey(0);
+      state.items = [...state.buildings, ...state.props].sort((a, b) => k0(a) - k0(b));
+      state.sortedRot = 0;
+    }
+  }
+
+  function ambientDressing(state, data) {
+    const W = state.W, H = state.H, g = state.ground, code = (x, y) => g[y] && g[y][x];
+    const { cap, stats, commitMed } = lifeStats(state);
+    if (!state.deferLife) placeLife(state);                            // pedestrians + cars (deferred during the build for perf)
 
     if (state.formation === 'radial' && state.cityHall) {               // plaza fountain (spray ∝ dominance) + stalls
       state.props.push({ kind: 'fountain', x: state.cityHall.x + .5, y: state.cityHall.y + 2, seed: 11,
@@ -661,6 +682,7 @@ const City = (() => {
     const state = { zone: data.zone, blocks: [], buildings: [], props: [],
                     byPath: new Map(), items: [], clouds: [], cityHall: null };
     state.reserved = data.reserved || null;                 // relic cells the plan must route around
+    state.deferLife = !!data.deferLife;                      // skip cars+pedestrians during the build; placeLife() adds them once settled
     const byComp = {};
     for (const b of data.buildings) (byComp[b.component] ??= []).push(b);
     (data._planFn || PLANS[data.zone.plan] || choosePlan(data))(state, data, byComp);   // _planFn pins a formation per epoch
@@ -1470,7 +1492,7 @@ const City = (() => {
     }
   }
 
-  return { layout, fit, draw, applyEvent, pick, select, roster,
+  return { layout, fit, draw, placeLife, applyEvent, pick, select, roster,
            proj, hash, shade, near, chooseFormation, statsOf, FORM_CUT, clearPocket,
            SHAPE_MODES, applyShapes: assignMasses,
            get shapeMode() { return shapeMode; },

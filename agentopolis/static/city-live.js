@@ -19,6 +19,7 @@ addEventListener('pagehide', () => { try {
 } catch (e) {} });
 
 fetch(window.CITY_SRC || 'city-data.json').then(r => { if (!r.ok) throw r.status; return r.json(); }).then(data => {
+  data.deferLife = true;                                   // build without cars+pedestrians; placeLife() adds them after the first fit (cheaper first paint)
   cityState = City.layout(data);
   const dr = data.sample || {};                            // headline stats for the share caption (#6/#7)
   window.CITY_STATS = { files: data.buildings.reduce((n, b) => n + (b.files || 0), 0) + (dr.files?.dropped || 0),
@@ -54,6 +55,7 @@ fetch(window.CITY_SRC || 'city-data.json').then(r => { if (!r.ok) throw r.status
   };
   citySampleNote(data);
   City.fit(cityCam, cityCanvas, cityState, ...FIT);
+  City.placeLife(cityState);                               // city has loaded + fit → bring on the cars + pedestrians
   try { const c = JSON.parse(sessionStorage.getItem('apx-cam') || 'null');   // keep the frame carried from the movie
     if (c && c.k === camKey) { cityCam.ox = c.ox; cityCam.oy = c.oy; cityCam.s = c.s; cityCam.rot = c.rot; } } catch (e) {}
   pacedLoop(t => {
