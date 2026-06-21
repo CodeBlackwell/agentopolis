@@ -20,6 +20,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   through a shared `pacedLoop` helper off one shared activity clock: ~30 fps while the view is in
   use, ~12 fps once it's gone idle (no pointer/wheel/key activity for 4 s). The ambient twinkle,
   clouds, dispatch beat, and the (delta-time-corrected) avatar walk read the same.
+- **Each painted frame does less repeat work.** Three values that never change within a frame are now
+  computed once instead of every frame: the sky gradient (rebuilt only when the day-phase or canvas
+  height changes, not re-created each frame), each building's layout jitter seed (hashed once when the
+  building is placed, not re-hashed at ~15 draw sites per frame), and the nation map's label priority
+  order (sorted once per session). Pixel-identical output; just fewer allocations and less arithmetic
+  in the hot path.
 
 ## [0.28.0] - 2026-06-19
 
