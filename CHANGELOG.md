@@ -16,8 +16,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The demo's own og:video ends on the city too; a user's forged repo still gets the branded outro.
 - **The streaming commit caption is about half the size** so it reads as a subtitle, not a banner.
 - **Mobile polish.** The Skyline toggle is labelled **See Demo**; on phones it now sits **centered just
-  under the tagline** (was a bottom corner button), the movie **starts ~20% more zoomed in**, and the
-  date/commit stream across the bottom is hidden for a cleaner small screen.
+  under the tagline** (was a bottom corner button), the movie **fills the frame** (a tighter zoom that
+  reads bigger on a narrow screen), and the date/commit stream across the bottom is hidden.
+- **The city title clears the iOS bars on phones.** The full-bleed map runs under Safari's status +
+  address bar, which was burying the title and tagline; the header now drops below that chrome.
 
 ### Performance
 - **Cars and pedestrians now arrive only after the city finishes building.** They were spawned during

@@ -361,6 +361,8 @@
   @media (min-width: 721px) { body:has(.mapwrap.tl-mode):not([data-skyline="1"]) #skyline-toggle { bottom: 76px; } }
   /* phones: the See Demo CTA flows centered just under the tagline; the fixed toggle stays the return button in the full view */
   @media (max-width: 720px) {
+    /* the map is full-bleed 100vh, so the page runs under the iOS status + address bar — drop the title clear of it */
+    body[data-skyline="1"] header { top: 92px; }
     body[data-skyline="1"] #skyline-toggle { display: none; }
     body[data-skyline="1"] #see-demo { display: block; width: fit-content; margin: 16px auto 0; }
     body:not([data-skyline="1"]) #skyline-toggle { top: auto; bottom: 70px; right: 12px; left: auto; transform: none; }

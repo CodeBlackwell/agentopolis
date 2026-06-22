@@ -6,7 +6,7 @@ const tlCanvas = document.getElementById('map');
 const tlCtx = tlCanvas.getContext('2d');
 const cam = { ox: 0, oy: 0, s: 1 };
 window.apxCam = cam;                                       // the tour watches this to gate the zoom/pan/reset step
-const FIT = [150, 30, innerWidth <= 720 ? 1.42 : 1.18];    // City.fit (pad, margin, zoom); phones start ~20% more zoomed in
+const FIT = [150, 30, innerWidth <= 720 ? 1.8 : 1.18];     // City.fit (pad, margin, zoom); phones fill the frame (the city reads bigger on a narrow screen)
 let state = null, commits = [], births = [], mods = [], deaths = [], bornAt = new Map(), props = [];
 // match backing store to box × DPR; on resize re-fit the current epoch's village to the new shape
 autosizeCanvas(tlCanvas, () => { if (state) City.fit(cam, tlCanvas, state, ...FIT); })();
