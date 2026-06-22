@@ -357,8 +357,8 @@
   body[data-embed="1"] #skyline-toggle { display: none; }
   /* movie mode parks the transport strip at the wrap's bottom; lift the toggle clear of it (desktop) */
   @media (min-width: 721px) { body:has(.mapwrap.tl-mode):not([data-skyline="1"]) #skyline-toggle { bottom: 76px; } }
-  /* phones: top-center keeps the toggle clear of the title (left), tier/zoom chrome (right), and the bottom buttons */
-  @media (max-width: 720px) { #skyline-toggle { bottom: auto; top: 12px; left: 50%; right: auto; transform: translateX(-50%); } }
+  /* phones: a pill at the bottom-right, above the build/stats row — clear of the title + tier chrome up top and the date stamp at bottom-left */
+  @media (max-width: 720px) { #skyline-toggle { top: auto; bottom: 70px; right: 12px; left: auto; transform: none; } }
 </style>
 </head>
 <body data-mode="{{MODE}}" data-hall-level="{{HALL_LEVEL}}" data-hall-name="{{HALL_NAME}}" data-demo="{{DEMO}}" data-embed="{{EMBED}}">
@@ -467,7 +467,7 @@
     <div id="forge-slot"></div>
   </div>
   <div id="scrim"></div>
-  <button id="skyline-toggle" title="toggle the calm Skyline view">Explore &#9656;</button>
+  <button id="skyline-toggle" title="toggle the calm Skyline view">See Demo &#9656;</button>
   <div id="version">v{{VERSION}}</div>
   <script src="city-render.js"></script>
   <script src="city-scape.js"></script>
@@ -545,7 +545,7 @@
     // Skyline toggle: flip the calm view <-> full operator view, and remember the choice.
     (() => {
       const b = document.body, btn = document.getElementById('skyline-toggle');
-      const sync = () => btn.innerHTML = b.dataset.skyline === '1' ? 'Explore &#9656;' : '&#9666; Skyline';
+      const sync = () => btn.innerHTML = b.dataset.skyline === '1' ? 'See Demo &#9656;' : '&#9666; Skyline';
       btn.addEventListener('click', () => {
         const on = b.dataset.skyline === '1';
         if (on) delete b.dataset.skyline; else b.dataset.skyline = '1';

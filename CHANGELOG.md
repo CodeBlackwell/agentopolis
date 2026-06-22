@@ -9,12 +9,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 - **The Skyline landing is calmer still.** While the city builds itself on first paint, the movie
   transport bar (scrubber + streaming commit line) is now hidden, and when the build finishes the
-  city simply holds — no end-card outro. Both return in the full operator view (**Explore**); shared
+  city simply holds — no end-card outro. Both return in the full operator view (**See Demo**); shared
   and recorded clips keep the branded outro.
 - **The demo landing ends on the living city, not the credits.** The branded title card is still baked
   into the shared/downloaded clip, but once the clip is captured the landing reverts to the finished
   skyline instead of holding the outro on screen.
 - **The streaming commit caption is about half the size** so it reads as a subtitle, not a banner.
+- **Mobile polish.** The Skyline toggle is now labelled **See Demo** and sits at the bottom-right
+  (clear of the date stamp); on phones the date/commit stream across the bottom is hidden for a
+  cleaner small screen.
 
 ### Performance
 - **Cars and pedestrians now arrive only after the city finishes building.** They were spawned during

@@ -812,6 +812,8 @@ let activeRec = null, activeAbort = null;                  // only one capture r
 // transport label): the date + commit subject of the frame's commit, in lockstep with the build on screen.
 function drawCommitHud() {
   const c = commits[ptr]; if (!c) return;
+  if (innerWidth <= 720) return;                           // mobile: no commit caption across the bottom
+
   const W = tlCanvas.width, H = tlCanvas.height, u = H / 18, pad = u * 0.6;
   tlCtx.save();
   tlCtx.textAlign = 'left'; tlCtx.textBaseline = 'alphabetic';
@@ -1039,9 +1041,8 @@ function buildTransport() {
       #tl-speed .tl-dd-trigger{height:36px;font-size:14px;padding:0 28px 0 13px;
         background-position:right 10px center;background-size:11px 7px}
       #tl-speed .tl-dd-opt{font-size:14px;padding:10px 16px}
-      /* phones: drop the date to the bottom-left so it clears the city title up top; lift it above the
-         transport strip (~52px bar + 8px gap) that owns the bottom of the wrap in movie mode */
-      #tl-date{font-size:10px;top:auto;right:auto;left:14px;bottom:64px;text-align:left}
+      /* phones: no date/commit stream across the bottom — the small screen stays clean */
+      #tl-date{display:none}
       #tl-caption{font-size:11px;bottom:104px}}`;
   document.head.appendChild(document.createElement('style')).textContent = css;
   const bar = document.createElement('div');
