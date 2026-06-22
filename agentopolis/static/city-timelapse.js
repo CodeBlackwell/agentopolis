@@ -6,7 +6,7 @@ const tlCanvas = document.getElementById('map');
 const tlCtx = tlCanvas.getContext('2d');
 const cam = { ox: 0, oy: 0, s: 1 };
 window.apxCam = cam;                                       // the tour watches this to gate the zoom/pan/reset step
-const FIT = [150, 30, 1.18];                               // City.fit (pad, margin, zoom) for the movie view
+const FIT = [150, 30, innerWidth <= 720 ? 1.42 : 1.18];    // City.fit (pad, margin, zoom); phones start ~20% more zoomed in
 let state = null, commits = [], births = [], mods = [], deaths = [], bornAt = new Map(), props = [];
 // match backing store to box × DPR; on resize re-fit the current epoch's village to the new shape
 autosizeCanvas(tlCanvas, () => { if (state) City.fit(cam, tlCanvas, state, ...FIT); })();
@@ -827,6 +827,7 @@ function drawCommitHud() {
   tlCtx.restore();
 }
 function drawEndCard(t) {
+  if (window.DEMO_MOVIE) return;                            // the demo landing ends on the living city, never the credits
   const W = tlCanvas.width, H = tlCanvas.height, u = H / 18, k = Math.min(1, (t - endCardAt) / END_CARD_FADE);
   const name = document.body.dataset.hallName || 'this city', title = `${name} City — The Movie`;
   // shrink any line to fit the frame width — on tall narrow mobile canvases u is large and fixed sizes overflow

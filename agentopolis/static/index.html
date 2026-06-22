@@ -348,17 +348,23 @@
   body[data-skyline="1"] #forge { display: block; margin-top: 18px; }
   body[data-skyline="1"] #forge input { width: min(460px, 80vw); }
 
-  /* the one control: Explore (in Skyline) <-> Skyline (in the full operator view) */
-  #skyline-toggle { position: fixed; bottom: 14px; right: 14px; z-index: 9; cursor: pointer;
+  /* the See Demo CTA + the toggle that returns from the full operator view (shared look) */
+  #skyline-toggle, #see-demo { cursor: pointer; pointer-events: auto;
     background: var(--plum-soft); color: var(--cream); border: 2px solid var(--gold);
     box-shadow: 3px 3px 0 var(--plum); font-family: 'Silkscreen', monospace; font-size: 11px;
     letter-spacing: .1em; text-transform: uppercase; padding: 9px 13px; }
-  #skyline-toggle:hover { background: var(--gold); color: var(--plum); }
-  body[data-embed="1"] #skyline-toggle { display: none; }
+  #skyline-toggle:hover, #see-demo:hover { background: var(--gold); color: var(--plum); }
+  #skyline-toggle { position: fixed; bottom: 14px; right: 14px; z-index: 9; }
+  #see-demo { display: none; }                            /* phones-only, in-header CTA (see the mobile block) */
+  body[data-embed="1"] #skyline-toggle, body[data-embed="1"] #see-demo { display: none; }
   /* movie mode parks the transport strip at the wrap's bottom; lift the toggle clear of it (desktop) */
   @media (min-width: 721px) { body:has(.mapwrap.tl-mode):not([data-skyline="1"]) #skyline-toggle { bottom: 76px; } }
-  /* phones: a pill at the bottom-right, above the build/stats row — clear of the title + tier chrome up top and the date stamp at bottom-left */
-  @media (max-width: 720px) { #skyline-toggle { top: auto; bottom: 70px; right: 12px; left: auto; transform: none; } }
+  /* phones: the See Demo CTA flows centered just under the tagline; the fixed toggle stays the return button in the full view */
+  @media (max-width: 720px) {
+    body[data-skyline="1"] #skyline-toggle { display: none; }
+    body[data-skyline="1"] #see-demo { display: block; width: fit-content; margin: 16px auto 0; }
+    body:not([data-skyline="1"]) #skyline-toggle { top: auto; bottom: 70px; right: 12px; left: auto; transform: none; }
+  }
 </style>
 </head>
 <body data-mode="{{MODE}}" data-hall-level="{{HALL_LEVEL}}" data-hall-name="{{HALL_NAME}}" data-demo="{{DEMO}}" data-embed="{{EMBED}}">
@@ -378,6 +384,7 @@
       <h1><span class="m-nation">Agentopolis Nation</span><span class="m-city">{{HALL_NAME}} City</span><a
             id="repo-link" class="m-city" href="{{REPO_URL}}" target="_blank" rel="noopener" title="view source on GitHub">&nbsp;&middot;&nbsp;<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a></h1>
       <p class="skyline-tagline">Watch your codebase build itself<br>as a living isometric city.</p>
+      <button id="see-demo" title="see the live operator view">See Demo &#9656;</button>
       <p class="m-nation">drag to pan<br>scroll to zoom<br>click a city to enter<br>zoom out to leave<br>Q/E rotate</p>
       <button id="back" class="m-nation" title="back to world map">&#8593; WORLD MAP</button>
       <p class="m-city">scroll to zoom in &amp; out<br>drag to pan<br>the city builds itself</p>
@@ -545,6 +552,7 @@
     // Skyline toggle: flip the calm view <-> full operator view, and remember the choice.
     (() => {
       const b = document.body, btn = document.getElementById('skyline-toggle');
+      document.getElementById('see-demo').addEventListener('click', () => btn.click());   // phones: the in-header CTA drives the same toggle
       const sync = () => btn.innerHTML = b.dataset.skyline === '1' ? 'See Demo &#9656;' : '&#9666; Skyline';
       btn.addEventListener('click', () => {
         const on = b.dataset.skyline === '1';

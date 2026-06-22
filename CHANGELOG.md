@@ -11,13 +11,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   transport bar (scrubber + streaming commit line) is now hidden, and when the build finishes the
   city simply holds — no end-card outro. Both return in the full operator view (**See Demo**); shared
   and recorded clips keep the branded outro.
-- **The demo landing ends on the living city, not the credits.** The branded title card is still baked
-  into the shared/downloaded clip, but once the clip is captured the landing reverts to the finished
-  skyline instead of holding the outro on screen.
+- **The demo landing never shows the credits.** The branded end card is suppressed on the demo, so the
+  build ends on the living, finished city instead of flashing the title card while the share clip warms.
+  The demo's own og:video ends on the city too; a user's forged repo still gets the branded outro.
 - **The streaming commit caption is about half the size** so it reads as a subtitle, not a banner.
-- **Mobile polish.** The Skyline toggle is now labelled **See Demo** and sits at the bottom-right
-  (clear of the date stamp); on phones the date/commit stream across the bottom is hidden for a
-  cleaner small screen.
+- **Mobile polish.** The Skyline toggle is labelled **See Demo**; on phones it now sits **centered just
+  under the tagline** (was a bottom corner button), the movie **starts ~20% more zoomed in**, and the
+  date/commit stream across the bottom is hidden for a cleaner small screen.
 
 ### Performance
 - **Cars and pedestrians now arrive only after the city finishes building.** They were spawned during
