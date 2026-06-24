@@ -7,6 +7,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
+- **The Skyline autoplay fallback fires sooner.** A passive visitor who never taps now sees the city
+  begin building after 3 seconds instead of 5. Reduced-motion users still get no autoplay, and any
+  deliberate tap or keypress still cancels the fallback.
 - **The Skyline view keeps the control panel and Share button.** The map-controls panel (rotate / zoom /
   reset, with Share mounted inside it for city views) was hidden in the calm Skyline; it now stays
   visible in every mode.

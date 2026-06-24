@@ -746,7 +746,7 @@ function armPoster() {
   showCaption();
   addEventListener('pointerdown', clearPoster, { once: true });   // any deliberate touch ends the auto-fallback
   addEventListener('keydown', clearPoster, { once: true });
-  if (!reduce) posterTimer = setTimeout(() => setPlay(true), 5000);
+  if (!reduce) posterTimer = setTimeout(() => setPlay(true), 3000);
 }
 function clearPoster() {
   clearTimeout(posterTimer); posterTimer = 0;
