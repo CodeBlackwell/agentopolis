@@ -870,8 +870,7 @@ window.recordTimelapseClip = (opts = {}) => new Promise(resolve => {
   catch (e) { return resolve(null); }
   const chunks = [];
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-  rec.onstop = () => { if (activeRec === rec) { activeRec = activeAbort = null; }   // non-demo: leave endCardAt so the title card holds past the cut (seek/replay clears it)
-    if (window.DEMO_MOVIE) { endCardAt = 0; finishedAt = 0; }   // the landing reverts to the finished city once the clip cuts — the card is baked into the clip, not held on screen
+  rec.onstop = () => { if (activeRec === rec) { activeRec = activeAbort = null; }   // leave endCardAt so a non-demo title card holds past the cut (seek/replay clears it; the demo never draws it)
     resolve(new Blob(chunks, { type: rec.mimeType || 'video/webm' })); };
   const finish = () => {                                                 // build done → hold the finished city, brand the outro, then cut
     clearTimeout(cap); clearInterval(poll);

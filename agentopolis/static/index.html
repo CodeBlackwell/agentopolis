@@ -331,7 +331,7 @@
 
   /* ---- Skyline: calm first paint = the city, full-bleed + one sentence + one CTA. Expand reveals the floor. ---- */
   body[data-skyline="1"] { grid-template-columns: 1fr; grid-template-rows: 1fr; grid-template-areas: "map"; gap: 0; padding: 0; }
-  body[data-skyline="1"] #side, body[data-skyline="1"] #dock, body[data-skyline="1"] #mapctl,
+  body[data-skyline="1"] #side, body[data-skyline="1"] #dock,
   body[data-skyline="1"] #tiers, body[data-skyline="1"] #version, body[data-skyline="1"] #back,
   body[data-skyline="1"] #drawer-btn, body[data-skyline="1"] #transport,
   body[data-skyline="1"] header p:not(.skyline-tagline),
@@ -365,7 +365,7 @@
     body[data-skyline="1"] header { top: 92px; }
     body[data-skyline="1"] #skyline-toggle { display: none; }
     body[data-skyline="1"] #see-demo { display: block; width: fit-content; margin: 16px auto 0; }
-    body:not([data-skyline="1"]) #skyline-toggle { top: auto; bottom: 70px; right: 12px; left: auto; transform: none; }
+    body:not([data-skyline="1"]) #skyline-toggle { bottom: 70px; right: 12px; }
   }
 </style>
 </head>

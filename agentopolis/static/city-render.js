@@ -1434,13 +1434,6 @@ const City = (() => {
     if (!hallDrawn) drawCityHall(ctx, cam, hall);
     if (!opts.embedded && state.docker.length) CityScape.drawPort(ctx, cam, state, t);   // ships ride the rotating harbor
     if (opts.embedded) return;
-    ctx.fillStyle = 'rgba(243,207,217,.6)';
-    for (const block of state.blocks) {
-      const p = proj(cam, block.lx, block.ly + .55);
-      ctx.font = `${Math.max(7, 8 * cam.s)}px Silkscreen, monospace`;
-      ctx.textAlign = 'center';
-      ctx.fillText(block.comp.name.toUpperCase(), p.sx, p.sy);
-    }
     for (const c of state.clouds) {
       const block = state.blocks.find(bl => bl.comp.id === c.tether);
       if (!block) continue;                                 // tether names an unbuilt district

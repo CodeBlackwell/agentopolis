@@ -7,6 +7,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
+- **The Skyline view keeps the control panel and Share button.** The map-controls panel (rotate / zoom /
+  reset, with Share mounted inside it for city views) was hidden in the calm Skyline; it now stays
+  visible in every mode.
+- **The faded district name placards are gone.** The low-contrast `COMMONS` / `CIVIC PLAZA` labels drawn
+  across the city floor were barely legible, so they no longer render.
 - **The Skyline landing is calmer still.** While the city builds itself on first paint, the movie
   transport bar (scrubber + streaming commit line) is now hidden, and when the build finishes the
   city simply holds — no end-card outro. Both return in the full operator view (**See Demo**); shared
