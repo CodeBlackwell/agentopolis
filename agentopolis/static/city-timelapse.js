@@ -827,6 +827,7 @@ function drawCommitHud() {
   tlCtx.restore();
 }
 function drawEndCard(t) {
+  return;                                                   // TEMP: end card disabled in all modes until it's polished — every finish ends on the living city
   if (window.DEMO_MOVIE) return;                            // the demo landing ends on the living city, never the credits
   const W = tlCanvas.width, H = tlCanvas.height, u = H / 18, k = Math.min(1, (t - endCardAt) / END_CARD_FADE);
   const name = document.body.dataset.hallName || 'this city', title = `${name} City — The Movie`;

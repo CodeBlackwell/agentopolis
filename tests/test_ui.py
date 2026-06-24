@@ -266,16 +266,16 @@ def _open_movie(page, base_url):
     page.wait_for_function("window.__endCard !== undefined", timeout=15000)
 
 
-def test_end_card_paints_over_the_final_frame(page, base_url):
+def test_end_card_is_disabled_in_all_modes(page, base_url):
     _open_movie(page, base_url)
-    # drawing the end-card must mutate the canvas (the branded outro renders)
+    # TEMP: the end card is disabled until it's polished — drawing it must be a no-op (canvas unchanged)
     changed = page.evaluate("""() => {
         const c = document.getElementById('map');
         const before = c.toDataURL();
         window.__endCard.draw(performance.now());
         return before !== c.toDataURL();
     }""")
-    assert changed is True
+    assert changed is False
 
 
 def test_end_card_text_is_the_branded_attribution(page, base_url):

@@ -7,6 +7,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
+- **The branded end card is disabled in every mode for now.** While it gets polished, no finish — on
+  screen, on the demo, in shared clips, or in recordings — draws the credits outro; every build ends on
+  the living, finished city. The recorded clip still holds on the finished city instead of cutting abruptly.
 - **The Skyline autoplay fallback fires sooner.** A passive visitor who never taps now sees the city
   begin building after 3 seconds instead of 5. Reduced-motion users still get no autoplay, and any
   deliberate tap or keypress still cancels the fallback.
