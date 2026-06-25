@@ -364,6 +364,11 @@
     /* the map is full-bleed 100vh, so the page runs under the iOS status + address bar — drop the title clear of it */
     body[data-skyline="1"] header { top: 92px; }
     body[data-skyline="1"] #skyline-toggle { display: none; }
+    /* the calm intro carries no operator chrome — the control box (rotate/reset/share) overlapped the
+       hero title on phones; it returns in the full view behind See Demo */
+    body[data-skyline="1"] #mapctl { display: none; }
+    /* with the return toggle hidden, the build CTA spans the full width instead of leaving its gap */
+    body[data-skyline="1"] #build-btn { right: 12px; }
     body[data-skyline="1"] #see-demo { display: block; width: fit-content; margin: 16px auto 0; }
     body:not([data-skyline="1"]) #skyline-toggle { bottom: 70px; right: 12px; }
   }

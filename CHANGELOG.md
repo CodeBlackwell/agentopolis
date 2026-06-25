@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Mobile Skyline no longer overlaps its own title.** On phones the map-controls panel (rotate / reset /
+  Share) sat pinned top-right over the hero title and tagline. In the calm Skyline view it's now hidden
+  on phones — the controls return in the full operator view behind **See Demo** — and the build CTA
+  spans the full width instead of leaving the gap the hidden toggle reserved. Desktop Skyline still keeps
+  the panel.
+
 ## [0.30.0] — 2026-06-23
 
 ### Changed
